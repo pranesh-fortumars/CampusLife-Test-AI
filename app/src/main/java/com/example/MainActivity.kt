@@ -119,6 +119,12 @@ fun CampusLifeApp(
                         onBack = { viewModel.closeSubScreen() }
                     )
                 }
+                SubScreen.REVISION_PLAN -> {
+                    ExamRevisionPlanScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
                 SubScreen.NONE -> {
                     when (currentTab) {
                         AppDestination.HOME -> {

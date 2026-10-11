@@ -900,7 +900,7 @@ fun ExaminationsView(viewModel: CampusLifeViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Hall: Academic Block B (LH-302)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TextButton(onClick = { viewModel.openSubScreen(SubScreen.FOCUS_TIMER) }) {
+                    TextButton(onClick = { viewModel.openSubScreen(SubScreen.REVISION_PLAN) }) {
                         Text("Open Revision Plan →", style = MaterialTheme.typography.labelSmall)
                     }
                 }

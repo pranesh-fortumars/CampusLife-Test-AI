@@ -23,7 +23,8 @@ enum class SubScreen {
     SUBJECT_DETAIL,
     ID_VERIFICATION,
     CAMPUS_COPILOT,
-    EXECUTIVE_DESK
+    EXECUTIVE_DESK,
+    REVISION_PLAN
 }
 
 class CampusLifeViewModel : ViewModel() {
@@ -82,6 +83,14 @@ class CampusLifeViewModel : ViewModel() {
     val focusSeconds: StateFlow<Int> = _focusSeconds.asStateFlow()
     private val _isFocusRunning = MutableStateFlow(true)
     val isFocusRunning: StateFlow<Boolean> = _isFocusRunning.asStateFlow()
+
+    // Target CGPA simulator
+    private val _simulatedSem6Sgpa = MutableStateFlow(9.20f)
+    val simulatedSem6Sgpa: StateFlow<Float> = _simulatedSem6Sgpa.asStateFlow()
+
+    fun updateSimulatedSem6Sgpa(value: Float) {
+        _simulatedSem6Sgpa.value = value
+    }
 
     fun selectTab(tab: AppDestination) {
         _currentTab.value = tab
