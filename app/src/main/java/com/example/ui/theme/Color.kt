@@ -2,58 +2,72 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Academic Modern Design System Colors
-val Background = Color(0xFFFAF8FF)
-val OnBackground = Color(0xFF131B2E)
+// Modern Academic Design System Colors - Clean, Premium, High Contrast
 
-val Primary = Color(0xFF3525CD)
+// Slate & Neutral Palette
+val Background = Color(0xFFF8FAFC)        // Slate 50 - Crisp modern canvas
+val OnBackground = Color(0xFF0F172A)      // Slate 900 - Deep, rich readable text
+
+// Primary: Royal Cobalt / Indigo
+val Primary = Color(0xFF3B5BDB)           // Refined Indigo
 val OnPrimary = Color(0xFFFFFFFF)
-val PrimaryContainer = Color(0xFF4F46E5)
-val OnPrimaryContainer = Color(0xFFDAD7FF)
+val PrimaryContainer = Color(0xFFEEF2FF)  // Soft indigo tint
+val OnPrimaryContainer = Color(0xFF1E3A8A)
 
-val PrimaryFixed = Color(0xFFE2DFFF)
-val PrimaryFixedDim = Color(0xFFC3C0FF)
-val OnPrimaryFixed = Color(0xFF0F0069)
-val OnPrimaryFixedVariant = Color(0xFF3323CC)
+val PrimaryFixed = Color(0xFFDBEAFE)
+val PrimaryFixedDim = Color(0xFFBFDBFE)
+val OnPrimaryFixed = Color(0xFF1E3A8A)
+val OnPrimaryFixedVariant = Color(0xFF2563EB)
 
-val Secondary = Color(0xFF712AE2)
+// Secondary: Electric Violet / Iris
+val Secondary = Color(0xFF7C3AED)         // Modern Purple / Violet
 val OnSecondary = Color(0xFFFFFFFF)
-val SecondaryContainer = Color(0xFF8A4CFC)
-val OnSecondaryContainer = Color(0xFFFFFBFF)
-val SecondaryFixed = Color(0xFFEADDFF)
-val SecondaryFixedDim = Color(0xFFD2BBFF)
-val OnSecondaryFixed = Color(0xFF25005A)
-val OnSecondaryFixedVariant = Color(0xFF5A00C6)
+val SecondaryContainer = Color(0xFFF5F3FF)
+val OnSecondaryContainer = Color(0xFF4C1D95)
+val SecondaryFixed = Color(0xFFEDE9FE)
+val SecondaryFixedDim = Color(0xFFDDD6FE)
+val OnSecondaryFixed = Color(0xFF4C1D95)
+val OnSecondaryFixedVariant = Color(0xFF6D28D9)
 
-val Tertiary = Color(0xFF00534A)
+// Tertiary: Emerald Green (Attended, Safe Attendance >= 75%, Success)
+val Tertiary = Color(0xFF059669)          // Emerald Green
 val OnTertiary = Color(0xFFFFFFFF)
-val TertiaryContainer = Color(0xFF006D62)
-val OnTertiaryContainer = Color(0xFF69F1DE)
-val TertiaryFixed = Color(0xFF71F8E4)
-val TertiaryFixedDim = Color(0xFF4FDBC8)
-val OnTertiaryFixed = Color(0xFF00201C)
-val OnTertiaryFixedVariant = Color(0xFF005048)
+val TertiaryContainer = Color(0xFFECFDF5)
+val OnTertiaryContainer = Color(0xFF065F46)
+val TertiaryFixed = Color(0xFFD1FAE5)     // Light Mint Green
+val TertiaryFixedDim = Color(0xFFA7F3D0)
+val OnTertiaryFixed = Color(0xFF064E3B)
+val OnTertiaryFixedVariant = Color(0xFF047857)
 
-val Surface = Color(0xFFFAF8FF)
-val OnSurface = Color(0xFF131B2E)
-val SurfaceDim = Color(0xFFD2D9F4)
-val SurfaceBright = Color(0xFFFAF8FF)
+// Surfaces: Clean Whites & Subtle Slate Elevations
+val Surface = Color(0xFFFFFFFF)
+val OnSurface = Color(0xFF0F172A)
+val SurfaceDim = Color(0xFFF1F5F9)
+val SurfaceBright = Color(0xFFFFFFFF)
 val SurfaceContainerLowest = Color(0xFFFFFFFF)
-val SurfaceContainerLow = Color(0xFFF2F3FF)
-val SurfaceContainer = Color(0xFFEAEDFF)
-val SurfaceContainerHigh = Color(0xFFE2E7FF)
-val SurfaceContainerHighest = Color(0xFFDAE2FD)
-val SurfaceVariant = Color(0xFFDAE2FD)
-val OnSurfaceVariant = Color(0xFF464555)
+val SurfaceContainerLow = Color(0xFFF8FAFC)
+val SurfaceContainer = Color(0xFFF1F5F9)
+val SurfaceContainerHigh = Color(0xFFE2E8F0)
+val SurfaceContainerHighest = Color(0xFFCBD5E1)
+val SurfaceVariant = Color(0xFFF1F5F9)
+val OnSurfaceVariant = Color(0xFF475569)   // Slate 600 - Secondary text
 
-val Outline = Color(0xFF777587)
-val OutlineVariant = Color(0xFFC7C4D8)
+// Outlines & Borders
+val Outline = Color(0xFFCBD5E1)          // Slate 300
+val OutlineVariant = Color(0xFFE2E8F0)   // Slate 200
 
-val Error = Color(0xFFBA1A1A)
+// Status: Warning (Borderline Attendance 75-80%)
+val Warning = Color(0xFFD97706)          // Amber 600
+val WarningContainer = Color(0xFFFFFBEB) // Amber 50
+val OnWarningContainer = Color(0xFF92400E)
+
+// Status: Error (Missed, Critical Attendance < 75%, Urgent Deadlines)
+val Error = Color(0xFFDC2626)            // Red 600
 val OnError = Color(0xFFFFFFFF)
-val ErrorContainer = Color(0xFFFFDAD6)
-val OnErrorContainer = Color(0xFF93000A)
+val ErrorContainer = Color(0xFFFEF2F2)   // Red 50
+val OnErrorContainer = Color(0xFF991B1B)
 
-val InverseSurface = Color(0xFF283044)
-val InverseOnSurface = Color(0xFFEEF0FF)
-val InversePrimary = Color(0xFFC3C0FF)
+// Dark / Inverse
+val InverseSurface = Color(0xFF1E293B)   // Slate 800
+val InverseOnSurface = Color(0xFFF8FAFC)
+val InversePrimary = Color(0xFF93C5FD)

@@ -89,14 +89,14 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
                     onClick = { selectedTab = "Chats" },
                     label = { Text("Chats & Huddles") },
                     leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PrimaryContainer, selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White, selectedLeadingIconColor = Color.White)
                 )
                 FilterChip(
                     selected = selectedTab == "Clubs",
                     onClick = { selectedTab = "Clubs" },
                     label = { Text("Clubs Directory (48)") },
                     leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PrimaryContainer, selectedLabelColor = Color.White)
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White, selectedLeadingIconColor = Color.White)
                 )
             }
         }
@@ -119,7 +119,7 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
                     val isSelected = selectedCategory == cat
                     Surface(
                         shape = RoundedCornerShape(100),
-                        color = if (isSelected) PrimaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                        color = if (isSelected) Primary else MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier.clickable { selectedCategory = cat }
                     ) {
                         Text(
@@ -135,7 +135,7 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Active Huddles Reel

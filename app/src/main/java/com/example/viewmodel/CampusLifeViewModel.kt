@@ -46,6 +46,21 @@ class CampusLifeViewModel(
         TaskRepository(AppDatabase.getDatabase(application).taskDao())
     )
 
+    companion object {
+        fun provideFactory(application: Application): androidx.lifecycle.ViewModelProvider.Factory =
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    val db = AppDatabase.getDatabase(application)
+                    return CampusLifeViewModel(
+                        application = application,
+                        repository = AttendanceRepository(db.attendanceDao()),
+                        taskRepository = TaskRepository(db.taskDao())
+                    ) as T
+                }
+            }
+    }
+
     private val _currentTab = MutableStateFlow(AppDestination.HOME)
     val currentTab: StateFlow<AppDestination> = _currentTab.asStateFlow()
 

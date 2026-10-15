@@ -37,7 +37,11 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CampusLifeApp(
-    viewModel: CampusLifeViewModel = viewModel()
+    viewModel: CampusLifeViewModel = run {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val app = context.applicationContext as android.app.Application
+        viewModel(factory = CampusLifeViewModel.provideFactory(app))
+    }
 ) {
     val currentTab by viewModel.currentTab.collectAsState()
     val subScreen by viewModel.subScreen.collectAsState()

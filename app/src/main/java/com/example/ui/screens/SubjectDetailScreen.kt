@@ -81,7 +81,7 @@ fun SubjectDetailScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Hero card

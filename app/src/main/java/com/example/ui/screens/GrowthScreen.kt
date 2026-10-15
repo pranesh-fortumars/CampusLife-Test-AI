@@ -41,14 +41,14 @@ fun GrowthScreen(viewModel: CampusLifeViewModel) {
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .testTag("growth_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Hero Persona Banner
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = PrimaryContainer),
+                colors = CardDefaults.cardColors(containerColor = Primary),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(

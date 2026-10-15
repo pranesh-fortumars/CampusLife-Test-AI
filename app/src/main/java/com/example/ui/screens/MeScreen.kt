@@ -45,7 +45,7 @@ fun MeScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .testTag("me_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Top Profile Hero & Identity Card
