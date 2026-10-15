@@ -120,4 +120,30 @@ class CampusLifeUnitTest {
         assertTrue(MockData.projects.isNotEmpty())
         assertTrue(MockData.societies.isNotEmpty())
     }
+
+    @Test
+    fun testTaskEntityToDomainMapping() {
+        val entity = com.example.data.local.TaskEntity(
+            id = "test-task-1",
+            title = "OS Semaphore Lab",
+            subjectCode = "CS-304",
+            subjectName = "Operating Systems",
+            type = "PROJECT",
+            dueDate = "Oct 29",
+            dueTime = "11:59 PM",
+            priority = "URGENT",
+            weightage = "20% Project",
+            isCompleted = false,
+            progressPercent = 50,
+            faculty = "Prof. Muralidhar",
+            note = "Dining philosophers in C"
+        )
+        val domain = entity.toDomain()
+        assertEquals("test-task-1", domain.id)
+        assertEquals("OS Semaphore Lab", domain.title)
+        assertEquals("CS-304", domain.subjectCode)
+        assertEquals("PROJECT", domain.type)
+        assertEquals("URGENT", domain.priority)
+        assertFalse(domain.isCompleted)
+    }
 }

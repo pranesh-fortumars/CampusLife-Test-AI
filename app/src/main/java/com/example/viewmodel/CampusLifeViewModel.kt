@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.MockData
 import com.example.data.local.AppDatabase
 import com.example.data.repository.AttendanceRepository
+import com.example.data.repository.TaskRepository
 import com.example.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,12 +36,14 @@ enum class SubScreen {
 
 class CampusLifeViewModel(
     application: Application,
-    private val repository: AttendanceRepository
+    private val repository: AttendanceRepository,
+    private val taskRepository: TaskRepository
 ) : AndroidViewModel(application) {
 
     constructor(application: Application) : this(
         application,
-        AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao())
+        AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao()),
+        TaskRepository(AppDatabase.getDatabase(application).taskDao())
     )
 
     private val _currentTab = MutableStateFlow(AppDestination.HOME)
@@ -60,6 +63,9 @@ class CampusLifeViewModel(
 
     private val _selectedSubject = MutableStateFlow<Subject?>(null)
     val selectedSubject: StateFlow<Subject?> = _selectedSubject.asStateFlow()
+
+    private val _academicTasks = MutableStateFlow<List<AcademicTask>>(emptyList())
+    val academicTasks: StateFlow<List<AcademicTask>> = _academicTasks.asStateFlow()
 
     private val _assignments = MutableStateFlow(MockData.assignments)
     val assignments: StateFlow<List<AssignmentItem>> = _assignments.asStateFlow()
@@ -146,6 +152,21 @@ class CampusLifeViewModel(
                 try {
                     repository.allRecords.collect { records ->
                         _attendanceHistory.value = records
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    taskRepository.seedInitialTasksIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    taskRepository.allTasks.collect { tasks ->
+                        _academicTasks.value = tasks
                     }
                 } catch (e: Exception) {
                     // Ignore
@@ -413,6 +434,64 @@ class CampusLifeViewModel(
     fun toggleAssignmentComplete(id: String) {
         _assignments.update { list ->
             list.map { if (it.id == id) it.copy(isCompleted = !it.isCompleted) else it }
+        }
+    }
+
+    fun toggleAcademicTaskComplete(id: String) {
+        val currentTask = _academicTasks.value.find { it.id == id } ?: return
+        val newCompleted = !currentTask.isCompleted
+        viewModelScope.launch {
+            try {
+                taskRepository.setTaskCompleted(id, newCompleted)
+                _userFeedbackMessage.value = if (newCompleted) "Completed: ${currentTask.title}" else "Marked pending: ${currentTask.title}"
+            } catch (e: Exception) {
+                _academicTasks.update { list ->
+                    list.map { if (it.id == id) it.copy(isCompleted = newCompleted) else it }
+                }
+            }
+        }
+    }
+
+    fun addAcademicTask(
+        title: String,
+        subjectCode: String,
+        subjectName: String,
+        type: String,
+        dueDate: String,
+        dueTime: String,
+        priority: String,
+        weightage: String,
+        note: String = ""
+    ) {
+        val newTask = AcademicTask(
+            title = title,
+            subjectCode = subjectCode,
+            subjectName = subjectName,
+            type = type,
+            dueDate = dueDate,
+            dueTime = dueTime,
+            priority = priority,
+            weightage = weightage,
+            note = note
+        )
+        viewModelScope.launch {
+            try {
+                taskRepository.insertTask(newTask)
+                _userFeedbackMessage.value = "Added deadline: $title"
+            } catch (e: Exception) {
+                _academicTasks.update { listOf(newTask) + it }
+            }
+        }
+    }
+
+    fun deleteAcademicTask(id: String) {
+        viewModelScope.launch {
+            try {
+                taskRepository.deleteTask(id)
+                _userFeedbackMessage.value = "Deleted deadline"
+            } catch (e: Exception) {
+                _academicTasks.update { list -> list.filter { it.id != id } }
+            }
         }
     }
 }

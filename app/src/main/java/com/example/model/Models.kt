@@ -84,6 +84,23 @@ data class Subject(
     }
 }
 
+data class AcademicTask(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val subjectCode: String,
+    val subjectName: String,
+    val type: String = "ASSIGNMENT", // "ASSIGNMENT", "PROJECT", "LAB", "EXAM_PREP"
+    val dueDate: String,
+    val dueTime: String = "11:59 PM",
+    val priority: String = "HIGH",   // "URGENT", "HIGH", "MEDIUM", "LOW"
+    val weightage: String = "15% Internal",
+    val isCompleted: Boolean = false,
+    val progressPercent: Int = 0,
+    val faculty: String = "",
+    val note: String = "",
+    val dueTimestamp: Long = System.currentTimeMillis() + 86400000L,
+    val createdAt: Long = System.currentTimeMillis()
+)
 
 data class AssignmentItem(
     val id: String,

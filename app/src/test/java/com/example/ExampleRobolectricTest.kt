@@ -27,4 +27,26 @@ class ExampleRobolectricTest {
     org.junit.Assert.assertNotNull(vm)
     org.junit.Assert.assertNotNull(vm.profile.value)
   }
+
+  @Test
+  fun `test Room TaskDao operations`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = com.example.data.local.AppDatabase.getDatabase(context)
+    val taskDao = db.taskDao()
+
+    val task = com.example.data.local.TaskEntity(
+      id = "robo-task-1",
+      title = "Robolectric CN Project Milestone",
+      subjectCode = "CS-306",
+      subjectName = "Computer Networks",
+      type = "PROJECT",
+      dueDate = "Tomorrow",
+      priority = "HIGH"
+    )
+    taskDao.insertTask(task)
+    val count = taskDao.getTaskCount()
+    org.junit.Assert.assertTrue(count >= 1)
+
+    taskDao.setTaskCompleted("robo-task-1", true)
+  }
 }

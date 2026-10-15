@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.ui.components.MainAcademicDashboard
 import com.example.ui.theme.*
 import com.example.viewmodel.AppDestination
 import com.example.viewmodel.CampusLifeViewModel
@@ -34,6 +35,7 @@ fun HomeScreen(
 ) {
     val profile by viewModel.profile.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
+    val academicTasks by viewModel.academicTasks.collectAsState()
     val homeTasks by viewModel.homeTaskState.collectAsState()
     val todayAttended by viewModel.todayAttendanceLogged.collectAsState()
 
@@ -47,64 +49,19 @@ fun HomeScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 1. Header Greeting & Status Chip
+        // 1. Main Academic Dashboard (Material 3 Greeting & Upcoming Academic Deadline Summary Cards)
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Good morning, ${profile.name.split(" ").first()} \uD83D\uDC4B",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(13.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Thursday, 24 October • Semester 6",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                // Attendance Quick Status Chip
-                Surface(
-                    shape = RoundedCornerShape(100),
-                    color = TertiaryFixed,
-                    shadowElevation = 1.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(Tertiary)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "${profile.overallAttendance}% SAFE",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = OnTertiaryFixed
-                        )
-                    }
-                }
-            }
+            MainAcademicDashboard(
+                profile = profile,
+                subjects = subjects,
+                tasks = academicTasks,
+                onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
+                onAddTask = { title, subjectCode, subjectName, type, dueDate, dueTime, priority, weightage, note ->
+                    viewModel.addAcademicTask(title, subjectCode, subjectName, type, dueDate, dueTime, priority, weightage, note)
+                },
+                onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                onNavigateToTrack = onNavigateToTrack
+            )
         }
 
         // 2. Today's Next Class Card (High Visual Hierarchy)
