@@ -22,6 +22,23 @@ data class StudentProfile(
     val isVerified: Boolean = true
 )
 
+enum class AttendanceType(val label: String) {
+    ATTENDED("Attended"),
+    MISSED("Missed"),
+    CANCELLED("Cancelled")
+}
+
+data class AttendanceRecord(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val subjectCode: String,
+    val subjectName: String,
+    val date: String,
+    val time: String,
+    val type: AttendanceType,
+    val note: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
 data class Subject(
     val code: String,
     val name: String,
@@ -30,33 +47,43 @@ data class Subject(
     val department: String = "Dept. of Computer Science",
     val attendedClasses: Int,
     val totalClasses: Int,
-    val nextClassTime: String,
-    val room: String,
+    val targetPercentage: Double = 75.0,
+    val nextClassTime: String = "Today, 10:30 AM",
+    val room: String = "CS Lab 304, Block B",
     val isLabIncluded: Boolean = true
 ) {
+    val missedClasses: Int
+        get() = (totalClasses - attendedClasses).coerceAtLeast(0)
+
     val attendancePercentage: Double
         get() = if (totalClasses == 0) 100.0 else (attendedClasses.toDouble() / totalClasses) * 100.0
 
     val safeBunksLeft: Int
         get() {
-            // calculate how many bunks while remaining >= 75%
-            // (attendedClasses) / (totalClasses + bunks) >= 0.75
-            // attendedClasses >= 0.75 * totalClasses + 0.75 * bunks
-            // bunks <= (attendedClasses - 0.75 * totalClasses) / 0.75
-            val maxAllowed = ((attendedClasses - 0.75 * totalClasses) / 0.75).toInt()
+            // How many consecutive classes can be missed without dropping below targetPercentage:
+            // attendedClasses / (totalClasses + bunks) >= (targetPercentage / 100.0)
+            val threshold = targetPercentage / 100.0
+            if (threshold <= 0.0) return 99
+            val maxAllowed = ((attendedClasses - threshold * totalClasses) / threshold).toInt()
             return if (maxAllowed < 0) 0 else maxAllowed
         }
 
     val neededToReach75: Int
         get() {
-            // (attendedClasses + X) / (totalClasses + X) >= 0.75
-            // attendedClasses + X >= 0.75 * totalClasses + 0.75 * X
-            // 0.25 * X >= 0.75 * totalClasses - attendedClasses
-            val diff = (0.75 * totalClasses - attendedClasses)
+            val threshold = targetPercentage / 100.0
+            if (attendancePercentage >= targetPercentage) return 0
+            val diff = (threshold * totalClasses - attendedClasses)
             if (diff <= 0) return 0
-            return kotlin.math.ceil(diff / 0.25).toInt()
+            return kotlin.math.ceil(diff / (1.0 - threshold)).toInt()
         }
+
+    fun calculateProjected(addAttended: Int, addMissed: Int): Double {
+        val newAttended = (attendedClasses + addAttended).coerceAtLeast(0)
+        val newTotal = (totalClasses + addAttended + addMissed).coerceAtLeast(0)
+        return if (newTotal == 0) 100.0 else (newAttended.toDouble() / newTotal) * 100.0
+    }
 }
+
 
 data class AssignmentItem(
     val id: String,

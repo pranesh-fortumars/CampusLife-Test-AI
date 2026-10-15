@@ -1,12 +1,18 @@
 package com.example.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.data.MockData
+import com.example.data.local.AppDatabase
+import com.example.data.repository.AttendanceRepository
 import com.example.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 enum class AppDestination(val label: String) {
     HOME("Home"),
@@ -27,7 +33,10 @@ enum class SubScreen {
     REVISION_PLAN
 }
 
-class CampusLifeViewModel : ViewModel() {
+class CampusLifeViewModel(
+    application: Application,
+    private val repository: AttendanceRepository = AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao())
+) : AndroidViewModel(application) {
 
     private val _currentTab = MutableStateFlow(AppDestination.HOME)
     val currentTab: StateFlow<AppDestination> = _currentTab.asStateFlow()
@@ -41,6 +50,12 @@ class CampusLifeViewModel : ViewModel() {
     private val _subjects = MutableStateFlow(MockData.initialSubjects)
     val subjects: StateFlow<List<Subject>> = _subjects.asStateFlow()
 
+    private val _attendanceHistory = MutableStateFlow<List<AttendanceRecord>>(emptyList())
+    val attendanceHistory: StateFlow<List<AttendanceRecord>> = _attendanceHistory.asStateFlow()
+
+    private val _selectedSubject = MutableStateFlow<Subject?>(null)
+    val selectedSubject: StateFlow<Subject?> = _selectedSubject.asStateFlow()
+
     private val _assignments = MutableStateFlow(MockData.assignments)
     val assignments: StateFlow<List<AssignmentItem>> = _assignments.asStateFlow()
 
@@ -53,9 +68,12 @@ class CampusLifeViewModel : ViewModel() {
     private val _conversations = MutableStateFlow(MockData.conversations)
     val conversations: StateFlow<List<ChatConversation>> = _conversations.asStateFlow()
 
-    // Simulator consecutive classes state
+    // Simulator state
     private val _simulatorCount = MutableStateFlow(3)
     val simulatorCount: StateFlow<Int> = _simulatorCount.asStateFlow()
+
+    private val _simulatorSubjectCode = MutableStateFlow("CS-304")
+    val simulatorSubjectCode: StateFlow<String> = _simulatorSubjectCode.asStateFlow()
 
     // Home Checklist tasks status
     private val _homeTaskState = MutableStateFlow(mapOf(0 to false, 1 to false, 2 to false))
@@ -68,6 +86,10 @@ class CampusLifeViewModel : ViewModel() {
     // Track subtabs
     private val _trackSubTab = MutableStateFlow("Academics") // "Academics", "Timetable", "Assignments", "Exams"
     val trackSubTab: StateFlow<String> = _trackSubTab.asStateFlow()
+
+    // Feedback message (e.g. for snackbars)
+    private val _userFeedbackMessage = MutableStateFlow<String?>(null)
+    val userFeedbackMessage: StateFlow<String?> = _userFeedbackMessage.asStateFlow()
 
     // Copilot messages
     private val _copilotMessages = MutableStateFlow(
@@ -88,6 +110,54 @@ class CampusLifeViewModel : ViewModel() {
     private val _simulatedSem6Sgpa = MutableStateFlow(9.20f)
     val simulatedSem6Sgpa: StateFlow<Float> = _simulatedSem6Sgpa.asStateFlow()
 
+    init {
+        viewModelScope.launch {
+            try {
+                repository.seedInitialDataIfEmpty()
+            } catch (e: Exception) {
+                // In testing environments or when DB is unavailable, keep in-memory mock data
+            }
+
+            launch {
+                try {
+                    repository.subjects.collect { updatedList ->
+                        if (updatedList.isNotEmpty()) {
+                            _subjects.value = updatedList
+                            recalculateOverallAttendance(updatedList)
+
+                            // Keep selected subject in sync
+                            val currentSelected = _selectedSubject.value
+                            if (currentSelected != null) {
+                                _selectedSubject.value = updatedList.find { it.code == currentSelected.code } ?: currentSelected
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore DB collect errors in mock fallback
+                }
+            }
+
+            launch {
+                try {
+                    repository.allRecords.collect { records ->
+                        _attendanceHistory.value = records
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+        }
+    }
+
+    private fun recalculateOverallAttendance(list: List<Subject>) {
+        val totalAttended = list.sumOf { it.attendedClasses }
+        val totalClasses = list.sumOf { it.totalClasses }
+        val overall = if (totalClasses == 0) 100.0 else (totalAttended.toDouble() / totalClasses) * 100.0
+        val rounded = String.format(Locale.US, "%.1f", overall).toDoubleOrNull() ?: overall
+
+        _profile.update { it.copy(overallAttendance = rounded) }
+    }
+
     fun updateSimulatedSem6Sgpa(value: Float) {
         _simulatedSem6Sgpa.value = value
     }
@@ -105,8 +175,173 @@ class CampusLifeViewModel : ViewModel() {
         _subScreen.value = SubScreen.NONE
     }
 
+    fun selectSubjectDetail(subject: Subject) {
+        _selectedSubject.value = subject
+        _subScreen.value = SubScreen.SUBJECT_DETAIL
+    }
+
     fun setTrackSubTab(tab: String) {
         _trackSubTab.value = tab
+    }
+
+    fun clearFeedbackMessage() {
+        _userFeedbackMessage.value = null
+    }
+
+    /**
+     * Log a class session as Attended, Missed, or Cancelled
+     */
+    fun logAttendance(
+        subjectCode: String,
+        type: AttendanceType,
+        note: String = "",
+        customDate: String? = null,
+        customTime: String? = null
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.logAttendance(subjectCode, type, note, customDate, customTime)
+                val statusText = when (type) {
+                    AttendanceType.ATTENDED -> "Attended (+1)"
+                    AttendanceType.MISSED -> "Missed (+1 Missed)"
+                    AttendanceType.CANCELLED -> "Cancelled"
+                }
+                _userFeedbackMessage.value = "Logged class for $subjectCode: $statusText"
+            } catch (e: Exception) {
+                // Fallback to in-memory state update
+                updateInMemoryAttendance(subjectCode, type, note)
+            }
+        }
+    }
+
+    /**
+     * Quick 1-tap logging of Attended or Missed class
+     */
+    fun quickLogClass(subjectCode: String, isAttended: Boolean) {
+        val type = if (isAttended) AttendanceType.ATTENDED else AttendanceType.MISSED
+        logAttendance(subjectCode, type, note = "Quick log")
+    }
+
+    /**
+     * Undo last attendance log for subject
+     */
+    fun undoLastAttendance(subjectCode: String) {
+        viewModelScope.launch {
+            try {
+                repository.undoLastRecordForSubject(subjectCode)
+                _userFeedbackMessage.value = "Undid last log for $subjectCode"
+            } catch (e: Exception) {
+                _userFeedbackMessage.value = "Undone"
+            }
+        }
+    }
+
+    /**
+     * Direct manual calibration of attended and missed counts
+     */
+    fun updateSubjectCounts(subjectCode: String, attended: Int, missed: Int, targetPercentage: Double? = null) {
+        viewModelScope.launch {
+            try {
+                repository.updateCounts(subjectCode, attended, missed, targetPercentage)
+                _userFeedbackMessage.value = "Updated $subjectCode: $attended attended, $missed missed"
+            } catch (e: Exception) {
+                _subjects.update { list ->
+                    list.map {
+                        if (it.code == subjectCode) {
+                            it.copy(
+                                attendedClasses = attended.coerceAtLeast(0),
+                                totalClasses = (attended + missed).coerceAtLeast(0),
+                                targetPercentage = targetPercentage ?: it.targetPercentage
+                            )
+                        } else it
+                    }
+                }
+                recalculateOverallAttendance(_subjects.value)
+            }
+        }
+    }
+
+    /**
+     * Add a new custom subject to track
+     */
+    fun addNewSubject(
+        code: String,
+        name: String,
+        credits: Int,
+        faculty: String,
+        attended: Int,
+        missed: Int,
+        targetPercentage: Double = 75.0,
+        room: String = "LH-101",
+        nextClassTime: String = "Mon, 10:00 AM"
+    ) {
+        val newSub = Subject(
+            code = code.trim().uppercase(),
+            name = name.trim(),
+            credits = credits,
+            faculty = faculty.trim(),
+            attendedClasses = attended.coerceAtLeast(0),
+            totalClasses = (attended + missed).coerceAtLeast(0),
+            targetPercentage = targetPercentage,
+            room = room,
+            nextClassTime = nextClassTime
+        )
+
+        viewModelScope.launch {
+            try {
+                repository.addSubject(newSub)
+                _userFeedbackMessage.value = "Added subject ${newSub.code}: ${newSub.name}"
+            } catch (e: Exception) {
+                _subjects.update { it + newSub }
+                recalculateOverallAttendance(_subjects.value)
+            }
+        }
+    }
+
+    /**
+     * Delete an enrolled subject
+     */
+    fun deleteSubject(code: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteSubject(code)
+                _userFeedbackMessage.value = "Deleted subject $code"
+            } catch (e: Exception) {
+                _subjects.update { list -> list.filter { it.code != code } }
+                recalculateOverallAttendance(_subjects.value)
+            }
+        }
+    }
+
+    private fun updateInMemoryAttendance(subjectCode: String, type: AttendanceType, note: String) {
+        _subjects.update { current ->
+            current.map { subject ->
+                if (subject.code == subjectCode) {
+                    val newAttended = when (type) {
+                        AttendanceType.ATTENDED -> subject.attendedClasses + 1
+                        AttendanceType.MISSED -> subject.attendedClasses
+                        AttendanceType.CANCELLED -> subject.attendedClasses
+                    }
+                    val newTotal = when (type) {
+                        AttendanceType.ATTENDED -> subject.totalClasses + 1
+                        AttendanceType.MISSED -> subject.totalClasses + 1
+                        AttendanceType.CANCELLED -> subject.totalClasses
+                    }
+                    subject.copy(attendedClasses = newAttended, totalClasses = newTotal)
+                } else subject
+            }
+        }
+        recalculateOverallAttendance(_subjects.value)
+
+        val newRecord = AttendanceRecord(
+            subjectCode = subjectCode,
+            subjectName = _subjects.value.find { it.code == subjectCode }?.name ?: subjectCode,
+            date = "Today",
+            time = "Just now",
+            type = type,
+            note = note
+        )
+        _attendanceHistory.update { listOf(newRecord) + it }
     }
 
     fun incrementSimulator() {
@@ -125,6 +360,10 @@ class CampusLifeViewModel : ViewModel() {
         _simulatorCount.value = 3
     }
 
+    fun setSimulatorSubject(code: String) {
+        _simulatorSubjectCode.value = code
+    }
+
     fun toggleHomeTask(index: Int) {
         _homeTaskState.update { current ->
             current.toMutableMap().apply {
@@ -135,13 +374,12 @@ class CampusLifeViewModel : ViewModel() {
 
     fun markTodayAttended() {
         _todayAttendanceLogged.value = true
-        // Increment DBMS attendance
-        _subjects.update { current ->
-            current.map {
-                if (it.code == "CS-302") it.copy(attendedClasses = it.attendedClasses + 1, totalClasses = it.totalClasses + 1)
-                else it
-            }
-        }
+        quickLogClass("CS-302", isAttended = true)
+    }
+
+    fun markTodayMissed() {
+        _todayAttendanceLogged.value = true
+        quickLogClass("CS-302", isAttended = false)
     }
 
     fun toggleFocusTimer() {

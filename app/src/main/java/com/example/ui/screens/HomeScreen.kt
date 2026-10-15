@@ -33,8 +33,11 @@ fun HomeScreen(
     onOpenExecutiveDesk: () -> Unit
 ) {
     val profile by viewModel.profile.collectAsState()
+    val subjects by viewModel.subjects.collectAsState()
     val homeTasks by viewModel.homeTaskState.collectAsState()
     val todayAttended by viewModel.todayAttendanceLogged.collectAsState()
+
+    val nextSubject = subjects.find { it.code == "CS-302" } ?: subjects.firstOrNull()
 
     LazyColumn(
         modifier = Modifier
@@ -218,7 +221,34 @@ fun HomeScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    if (nextSubject != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (nextSubject.attendancePercentage >= nextSubject.targetPercentage) TertiaryFixed.copy(alpha = 0.35f) else ErrorContainer.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Attendance: ${String.format(java.util.Locale.US, "%.1f%%", nextSubject.attendancePercentage)} (${nextSubject.attendedClasses}/${nextSubject.totalClasses})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (nextSubject.attendancePercentage >= nextSubject.targetPercentage) Tertiary else Error
+                                )
+                                Text(
+                                    if (nextSubject.attendancePercentage >= nextSubject.targetPercentage) "${nextSubject.safeBunksLeft} safe bunks" else "Needs ${nextSubject.neededToReach75} to 75%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -226,21 +256,40 @@ fun HomeScreen(
                         Button(
                             onClick = { viewModel.markTodayAttended() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (todayAttended) TertiaryContainer else PrimaryContainer,
+                                containerColor = Tertiary,
                                 contentColor = Color.White
                             ),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(1.2f)
                                 .testTag("mark_attended_btn")
                         ) {
                             Icon(
-                                imageVector = if (todayAttended) Icons.Default.CheckCircle else Icons.Default.Done,
+                                imageVector = Icons.Default.Check,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(if (todayAttended) "Logged Present!" else "Mark Attended")
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ Present", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.markTodayMissed() },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Error
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .testTag("mark_missed_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ Missed", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
                         FilledTonalButton(
@@ -248,7 +297,7 @@ fun HomeScreen(
                                 viewModel.setTrackSubTab("Timetable")
                                 onNavigateToTrack()
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainer
                             ),

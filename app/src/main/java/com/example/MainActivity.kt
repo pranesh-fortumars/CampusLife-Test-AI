@@ -43,6 +43,21 @@ fun CampusLifeApp(
     val subScreen by viewModel.subScreen.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
 
+    val selectedSubject by viewModel.selectedSubject.collectAsState()
+    val userFeedbackMessage by viewModel.userFeedbackMessage.collectAsState()
+    val snackbarHostState = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+
+    androidx.compose.runtime.LaunchedEffect(userFeedbackMessage) {
+        val msg = userFeedbackMessage
+        if (msg != null) {
+            snackbarHostState.showSnackbar(
+                message = msg,
+                duration = androidx.compose.material3.SnackbarDuration.Short
+            )
+            viewModel.clearFeedbackMessage()
+        }
+    }
+
     // Handle back button when inside a subscreen
     BackHandler(enabled = subScreen != SubScreen.NONE) {
         viewModel.closeSubScreen()
@@ -50,6 +65,7 @@ fun CampusLifeApp(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             if (subScreen == SubScreen.NONE) {
                 val subtitle = when (currentTab) {
@@ -96,9 +112,9 @@ fun CampusLifeApp(
                     )
                 }
                 SubScreen.SUBJECT_DETAIL -> {
-                    val dbmsSubject = subjects.firstOrNull { it.code == "CS-302" } ?: subjects.first()
+                    val activeSubject = selectedSubject ?: subjects.firstOrNull { it.code == "CS-302" } ?: subjects.first()
                     SubjectDetailScreen(
-                        subject = dbmsSubject,
+                        subject = activeSubject,
                         viewModel = viewModel,
                         onBack = { viewModel.closeSubScreen() }
                     )
@@ -138,8 +154,8 @@ fun CampusLifeApp(
                         AppDestination.TRACK -> {
                             TrackScreen(
                                 viewModel = viewModel,
-                                onOpenSubjectDetail = {
-                                    viewModel.openSubScreen(SubScreen.SUBJECT_DETAIL)
+                                onOpenSubjectDetail = { subject ->
+                                    viewModel.selectSubjectDetail(subject)
                                 }
                             )
                         }

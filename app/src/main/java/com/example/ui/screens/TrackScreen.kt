@@ -23,10 +23,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.MockData
+import com.example.model.AttendanceType
 import com.example.model.Subject
+import com.example.ui.components.AddNewSubjectDialog
+import com.example.ui.components.LogClassSessionDialog
+import com.example.ui.components.QuickAdjustAttendanceDialog
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SubScreen
+import java.util.Locale
 
 @Composable
 fun TrackScreen(
@@ -37,8 +42,23 @@ fun TrackScreen(
     val subjects by viewModel.subjects.collectAsState()
     val assignments by viewModel.assignments.collectAsState()
     val simulatorCount by viewModel.simulatorCount.collectAsState()
+    val simulatorSubjectCode by viewModel.simulatorSubjectCode.collectAsState()
+    val profile by viewModel.profile.collectAsState()
+
+    var loggingSubject by remember { mutableStateOf<Subject?>(null) }
+    var adjustingSubject by remember { mutableStateOf<Subject?>(null) }
+    var showAddSubjectDialog by remember { mutableStateOf(false) }
+    var subjectFilter by remember { mutableStateOf("All") } // "All", "Below 75%", "Safe"
 
     val subTabs = listOf("Academics", "Timetable", "Assignments", "Exams")
+
+    val filteredSubjects = remember(subjects, subjectFilter) {
+        when (subjectFilter) {
+            "Below 75%" -> subjects.filter { it.attendancePercentage < it.targetPercentage }
+            "Safe" -> subjects.filter { it.attendancePercentage >= it.targetPercentage }
+            else -> subjects
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -85,14 +105,17 @@ fun TrackScreen(
         ) {
             when (activeSubTab) {
                 "Academics" -> {
-                    // 1. Student Academic Snapshot
+                    // 1. Student Academic Snapshot with dynamic calculated overall attendance
                     item {
-                        AcademicSnapshotCard()
+                        AcademicSnapshotCard(overallAttendance = profile.overallAttendance)
                     }
 
-                    // 2. Attendance What-If Simulator
+                    // 2. Attendance What-If Simulator with selectable subjects
                     item {
                         AttendanceSimulatorCard(
+                            subjects = subjects,
+                            selectedSubjectCode = simulatorSubjectCode,
+                            onSelectSubject = { viewModel.setSimulatorSubject(it) },
                             consecutiveClasses = simulatorCount,
                             onIncrement = { viewModel.incrementSimulator() },
                             onDecrement = { viewModel.decrementSimulator() },
@@ -100,46 +123,92 @@ fun TrackScreen(
                         )
                     }
 
-                    // 3. Enrolled Subjects Header
+                    // 3. Enrolled Subjects Header with Quick Actions
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    "Enrolled Subjects (${subjects.size})",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    "Semester 6 Theory & Lab tracks",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(100),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("All", style = MaterialTheme.typography.labelSmall)
+                                Column {
+                                    Text(
+                                        "Attendance & Subjects (${subjects.size})",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "Tap + Present or + Missed to log classes directly",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
+
+                                Button(
+                                    onClick = { showAddSubjectDialog = true },
+                                    shape = RoundedCornerShape(100),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.testTag("add_subject_btn")
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Add Subject", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+
+                            // Filter Pills: All, Critical (< 75%), Safe (>= 75%)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val belowCount = subjects.count { it.attendancePercentage < it.targetPercentage }
+                                val safeCount = subjects.count { it.attendancePercentage >= it.targetPercentage }
+
+                                FilterChip(
+                                    selected = subjectFilter == "All",
+                                    onClick = { subjectFilter = "All" },
+                                    label = { Text("All (${subjects.size})") }
+                                )
+                                FilterChip(
+                                    selected = subjectFilter == "Below 75%",
+                                    onClick = { subjectFilter = "Below 75%" },
+                                    label = { Text("Below 75% ($belowCount)") },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = ErrorContainer,
+                                        selectedLabelColor = Error
+                                    )
+                                )
+                                FilterChip(
+                                    selected = subjectFilter == "Safe",
+                                    onClick = { subjectFilter = "Safe" },
+                                    label = { Text("Safe ($safeCount)") },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = TertiaryFixed,
+                                        selectedLabelColor = Tertiary
+                                    )
+                                )
                             }
                         }
                     }
 
                     // Subject Cards List
-                    items(subjects) { subject ->
+                    items(filteredSubjects, key = { it.code }) { subject ->
                         SubjectItemCard(
                             subject = subject,
-                            onClick = { onOpenSubjectDetail(subject) }
+                            onClick = { onOpenSubjectDetail(subject) },
+                            onQuickAttend = {
+                                viewModel.quickLogClass(subject.code, isAttended = true)
+                            },
+                            onQuickMiss = {
+                                viewModel.quickLogClass(subject.code, isAttended = false)
+                            },
+                            onOpenLogDialog = {
+                                loggingSubject = subject
+                            },
+                            onOpenAdjustDialog = {
+                                adjustingSubject = subject
+                            }
                         )
                     }
                 }
@@ -164,10 +233,43 @@ fun TrackScreen(
             }
         }
     }
+
+    // Modal dialogs
+    if (loggingSubject != null) {
+        LogClassSessionDialog(
+            subject = loggingSubject!!,
+            onDismiss = { loggingSubject = null },
+            onConfirm = { type, note ->
+                viewModel.logAttendance(loggingSubject!!.code, type, note)
+                loggingSubject = null
+            }
+        )
+    }
+
+    if (adjustingSubject != null) {
+        QuickAdjustAttendanceDialog(
+            subject = adjustingSubject!!,
+            onDismiss = { adjustingSubject = null },
+            onSave = { attended, missed, targetPct ->
+                viewModel.updateSubjectCounts(adjustingSubject!!.code, attended, missed, targetPct)
+                adjustingSubject = null
+            }
+        )
+    }
+
+    if (showAddSubjectDialog) {
+        AddNewSubjectDialog(
+            onDismiss = { showAddSubjectDialog = false },
+            onConfirm = { code, name, credits, faculty, attended, missed, target ->
+                viewModel.addNewSubject(code, name, credits, faculty, attended, missed, target)
+                showAddSubjectDialog = false
+            }
+        )
+    }
 }
 
 @Composable
-fun AcademicSnapshotCard() {
+fun AcademicSnapshotCard(overallAttendance: Double) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -193,8 +295,7 @@ fun AcademicSnapshotCard() {
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Switch", style = MaterialTheme.typography.labelSmall, color = Primary, fontWeight = FontWeight.SemiBold)
-                        Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
+                        Text("Active", style = MaterialTheme.typography.labelSmall, color = Primary, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -228,15 +329,20 @@ fun AcademicSnapshotCard() {
                         Text("Sem 5 Record", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                     }
                 }
-                // Overall Attendance
+                // Calculated Overall Attendance
                 Card(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
-                        Text("OVERALL ATT.", style = MaterialTheme.typography.labelSmall, color = Tertiary, fontWeight = FontWeight.Bold)
-                        Text("81.4%", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Tertiary)
+                        Text("OVERALL ATT.", style = MaterialTheme.typography.labelSmall, color = if (overallAttendance >= 75.0) Tertiary else Error, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = String.format(Locale.US, "%.1f%%", overallAttendance),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (overallAttendance >= 75.0) Tertiary else Error
+                        )
                         Text("Min 75.0% bar", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                     }
                 }
@@ -251,9 +357,8 @@ fun AcademicSnapshotCard() {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Verified, contentDescription = null, tint = Tertiary, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Self-tracked logs • ERP verified as of Oct 22", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
+                    Text("Attendance recalculated in real time from logged records", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp)
                 }
-                Text("ERP Refresh", style = MaterialTheme.typography.labelSmall, color = Primary, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -261,11 +366,16 @@ fun AcademicSnapshotCard() {
 
 @Composable
 fun AttendanceSimulatorCard(
+    subjects: List<Subject>,
+    selectedSubjectCode: String,
+    onSelectSubject: (String) -> Unit,
     consecutiveClasses: Int,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
     onReset: () -> Unit
 ) {
+    val targetSub = subjects.find { it.code == selectedSubjectCode } ?: subjects.firstOrNull()
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -280,157 +390,183 @@ fun AttendanceSimulatorCard(
             ) {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Tune, contentDescription = null, tint = Secondary, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Calculate, contentDescription = null, tint = Secondary, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Attendance What-If Simulator", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text("Attendance Percentage Simulator", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     }
-                    Text("Predict your margin before bunking or attending", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Simulate future attends or bunks per subject", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Surface(
                     shape = RoundedCornerShape(100),
                     color = SecondaryFixed
                 ) {
-                    Text("Interactive", style = MaterialTheme.typography.labelSmall, color = OnSecondaryFixed, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            // Subject under test banner (OS)
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Subject under test:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Operating Systems (CS-304)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = ErrorContainer
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Warning, contentDescription = null, tint = Error, modifier = Modifier.size(13.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("74.2% Current", style = MaterialTheme.typography.labelSmall, color = Error, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-            // Stepper
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Consecutive classes to attend:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onDecrement, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
-                        }
-                        Text(
-                            text = "$consecutiveClasses",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Primary,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-                        IconButton(onClick = onIncrement, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
-                        }
-                    }
+                    Text("What-If Engine", style = MaterialTheme.typography.labelSmall, color = OnSecondaryFixed, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-            // Projected attended calculation
-            // Base OS: 23 attended / 31 total
-            val projectedAttended = 23 + consecutiveClasses
-            val projectedTotal = 31 + consecutiveClasses
-            val projectedPct = String.format("%.1f", (projectedAttended.toDouble() / projectedTotal) * 100.0)
 
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = TertiaryContainer.copy(alpha = 0.12f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(TertiaryFixed),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Tertiary, modifier = Modifier.size(16.dp))
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            "If you attend next $consecutiveClasses classes:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
+            // Subject selector chips
+            Text("Select Subject to Simulate:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(subjects) { sub ->
+                    val isSelected = sub.code == selectedSubjectCode
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onSelectSubject(sub.code) },
+                        label = { Text(sub.code, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Primary,
+                            selectedLabelColor = Color.White
                         )
-                        Text(
-                            "Attendance rises to $projectedPct% (Crosses safe zone threshold 75%)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            // Projected Bunk
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = ErrorContainer.copy(alpha = 0.25f),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.Top
+            if (targetSub != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                // Subject banner
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(ErrorContainer),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.PriorityHigh, contentDescription = null, tint = Error, modifier = Modifier.size(14.dp))
+                        Column {
+                            Text("${targetSub.name} (${targetSub.code})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text("${targetSub.attendedClasses} attended / ${targetSub.totalClasses} total held", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (targetSub.attendancePercentage >= targetSub.targetPercentage) TertiaryFixed else ErrorContainer
+                        ) {
+                            Text(
+                                text = String.format(Locale.US, "%.1f%% Current", targetSub.attendancePercentage),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (targetSub.attendancePercentage >= targetSub.targetPercentage) Tertiary else Error,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            "If you bunk next class: Drops to 71.9%",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Error
-                        )
-                        Text(
-                            "Requires 2 consecutive attends to recover above minimum debar mark.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                // Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Consecutive classes to attend:", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = onDecrement, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
+                            }
+                            Text(
+                                text = "$consecutiveClasses",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Primary,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                            IconButton(onClick = onIncrement, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                // Projected attended calculation
+                val projectedAttended = targetSub.attendedClasses + consecutiveClasses
+                val projectedTotal = targetSub.totalClasses + consecutiveClasses
+                val projectedPct = (projectedAttended.toDouble() / projectedTotal) * 100.0
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = TertiaryContainer.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(TertiaryFixed),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Tertiary, modifier = Modifier.size(16.dp))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                "If you attend next $consecutiveClasses classes:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Attendance rises to ${String.format(Locale.US, "%.1f%%", projectedPct)} (${projectedAttended}/${projectedTotal})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                // Projected Bunk
+                val bunkTotal = targetSub.totalClasses + 1
+                val bunkPct = (targetSub.attendedClasses.toDouble() / bunkTotal) * 100.0
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ErrorContainer.copy(alpha = 0.25f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(ErrorContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PriorityHigh, contentDescription = null, tint = Error, modifier = Modifier.size(14.dp))
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                "If you miss next class: Drops to ${String.format(Locale.US, "%.1f%%", bunkPct)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Error
+                            )
+                            Text(
+                                text = if (bunkPct >= targetSub.targetPercentage)
+                                    "Safe margin remains above statutory minimum."
+                                else
+                                    "Danger! Drops below 75% threshold and risks semester debarment.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -441,9 +577,9 @@ fun AttendanceSimulatorCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Estimated calculation • Excludes official waivers", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Formula: Attended / Total × 100%", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onReset) {
-                    Text("Reset", style = MaterialTheme.typography.labelSmall)
+                    Text("Reset Simulator", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -453,11 +589,14 @@ fun AttendanceSimulatorCard(
 @Composable
 fun SubjectItemCard(
     subject: Subject,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onQuickAttend: () -> Unit,
+    onQuickMiss: () -> Unit,
+    onOpenLogDialog: () -> Unit,
+    onOpenAdjustDialog: () -> Unit
 ) {
     val pct = subject.attendancePercentage
-    val isSafe = pct >= 80.0
-    val isCritical = pct < 75.0
+    val isCritical = pct < subject.targetPercentage
 
     val statusColor = when {
         pct >= 85.0 -> Tertiary
@@ -483,7 +622,7 @@ fun SubjectItemCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .testTag("subject_card_${subject.code}")
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -538,7 +677,7 @@ fun SubjectItemCard(
             ) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = String.format("%.1f%%", pct),
+                        text = String.format(Locale.US, "%.1f%%", pct),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = statusColor
@@ -577,26 +716,90 @@ fun SubjectItemCard(
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Direct 1-Tap Attendance Logging Buttons & Detail link
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Quick + Attended Button
+                FilledTonalButton(
+                    onClick = onQuickAttend,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = TertiaryFixed,
+                        contentColor = Tertiary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("attend_btn_${subject.code}")
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(subject.nextClassTime, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("+ Present", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Log Record", style = MaterialTheme.typography.labelSmall, color = Primary, fontWeight = FontWeight.Bold)
-                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
+                // Quick + Missed Button
+                FilledTonalButton(
+                    onClick = onQuickMiss,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = ErrorContainer,
+                        contentColor = Error
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("miss_btn_${subject.code}")
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("+ Missed", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Log Session Modal Button
+                IconButton(
+                    onClick = onOpenLogDialog,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .testTag("log_modal_btn_${subject.code}")
+                ) {
+                    Icon(Icons.Default.EditCalendar, contentDescription = "Log with Note", tint = Primary, modifier = Modifier.size(18.dp))
+                }
+
+                // Calibrate / Adjust Counts Button
+                IconButton(
+                    onClick = onOpenAdjustDialog,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .testTag("adjust_btn_${subject.code}")
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = "Adjust counts", tint = Secondary, modifier = Modifier.size(18.dp))
+                }
+
+                // Details Button
+                IconButton(
+                    onClick = onClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .testTag("detail_btn_${subject.code}")
+                ) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Subject Details", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
                 }
             }
         }
     }
 }
+
 
 @Composable
 fun TimetableDayView(viewModel: CampusLifeViewModel) {
