@@ -18,4 +18,13 @@ class ExampleRobolectricTest {
     val appName = context.getString(R.string.app_name)
     assertEquals("CampusLife", appName)
   }
+
+  @Test
+  fun `test CampusLifeViewModel instantiation via AndroidViewModelFactory`() {
+    val application = ApplicationProvider.getApplicationContext<android.app.Application>()
+    val factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+    val vm = factory.create(com.example.viewmodel.CampusLifeViewModel::class.java)
+    org.junit.Assert.assertNotNull(vm)
+    org.junit.Assert.assertNotNull(vm.profile.value)
+  }
 }

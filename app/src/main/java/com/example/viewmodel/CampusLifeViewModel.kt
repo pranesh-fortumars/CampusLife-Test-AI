@@ -35,8 +35,13 @@ enum class SubScreen {
 
 class CampusLifeViewModel(
     application: Application,
-    private val repository: AttendanceRepository = AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao())
+    private val repository: AttendanceRepository
 ) : AndroidViewModel(application) {
+
+    constructor(application: Application) : this(
+        application,
+        AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao())
+    )
 
     private val _currentTab = MutableStateFlow(AppDestination.HOME)
     val currentTab: StateFlow<AppDestination> = _currentTab.asStateFlow()
