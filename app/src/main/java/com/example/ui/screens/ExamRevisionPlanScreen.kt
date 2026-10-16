@@ -144,7 +144,7 @@ fun ExamRevisionPlanScreen(
                 onClick = { selectedTopTab = "CGPA" },
                 label = { Text("CGPA & Marks Simulator") },
                 leadingIcon = { Icon(Icons.Default.Calculate, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PrimaryContainer, selectedLabelColor = Color.White),
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White),
                 modifier = Modifier.weight(1f)
             )
             FilterChip(
@@ -152,14 +152,14 @@ fun ExamRevisionPlanScreen(
                 onClick = { selectedTopTab = "Revision" },
                 label = { Text("Revision Plan") },
                 leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = PrimaryContainer, selectedLabelColor = Color.White),
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White),
                 modifier = Modifier.weight(1f)
             )
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Countdown banner

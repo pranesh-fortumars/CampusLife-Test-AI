@@ -89,7 +89,7 @@ fun TrackScreen(
                         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = PrimaryContainer,
+                        selectedContainerColor = Primary,
                         selectedLabelColor = Color.White,
                         selectedLeadingIconColor = Color.White
                     ),
