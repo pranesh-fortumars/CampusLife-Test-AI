@@ -128,6 +128,7 @@ class CampusLifeUnitTest {
             title = "OS Semaphore Lab",
             subjectCode = "CS-304",
             subjectName = "Operating Systems",
+            category = "Project",
             type = "PROJECT",
             dueDate = "Oct 29",
             dueTime = "11:59 PM",
@@ -142,8 +143,60 @@ class CampusLifeUnitTest {
         assertEquals("test-task-1", domain.id)
         assertEquals("OS Semaphore Lab", domain.title)
         assertEquals("CS-304", domain.subjectCode)
+        assertEquals("Project", domain.category)
         assertEquals("PROJECT", domain.type)
         assertEquals("URGENT", domain.priority)
         assertFalse(domain.isCompleted)
+    }
+
+    @Test
+    fun testAcademicTaskCategoryTagging() {
+        val examTask = com.example.model.AcademicTask(
+            title = "Mid-Term Examination: Operating Systems",
+            subjectCode = "CS-304",
+            subjectName = "Operating Systems",
+            category = "Exam",
+            dueDate = "Oct 30"
+        )
+        assertEquals("Exam", examTask.category)
+
+        val assignmentTask = com.example.model.AcademicTask(
+            title = "DBMS Problem Set 4",
+            subjectCode = "CS-302",
+            subjectName = "DBMS",
+            category = "Assignment",
+            dueDate = "Oct 25"
+        )
+        assertEquals("Assignment", assignmentTask.category)
+
+        val projectTask = com.example.model.AcademicTask(
+            title = "Capstone Milestone 1",
+            subjectCode = "CS-308",
+            subjectName = "Software Engineering",
+            category = "Project",
+            dueDate = "Nov 05"
+        )
+        assertEquals("Project", projectTask.category)
+
+        // Verify default category
+        val defaultTask = com.example.model.AcademicTask(
+            title = "Default Category Task",
+            subjectCode = "CS-310",
+            subjectName = "Web",
+            dueDate = "Nov 12"
+        )
+        assertEquals("Assignment", defaultTask.category)
+
+        // Verify category-based filtering
+        val allTasks = listOf(examTask, assignmentTask, projectTask, defaultTask)
+        val exams = allTasks.filter { it.category.equals("Exam", ignoreCase = true) }
+        val assignments = allTasks.filter { it.category.equals("Assignment", ignoreCase = true) }
+        val projects = allTasks.filter { it.category.equals("Project", ignoreCase = true) }
+
+        assertEquals(1, exams.size)
+        assertEquals(2, assignments.size)
+        assertEquals(1, projects.size)
+        assertEquals("Mid-Term Examination: Operating Systems", exams.first().title)
+        assertEquals("Capstone Milestone 1", projects.first().title)
     }
 }

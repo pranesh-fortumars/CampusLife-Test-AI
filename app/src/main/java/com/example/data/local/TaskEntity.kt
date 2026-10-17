@@ -12,6 +12,7 @@ data class TaskEntity(
     val title: String,
     val subjectCode: String,
     val subjectName: String,
+    val category: String = "Assignment", // "Exam", "Assignment", "Project"
     val type: String = "ASSIGNMENT", // "ASSIGNMENT", "PROJECT", "LAB", "EXAM_PREP"
     val dueDate: String,             // e.g. "Today", "Tomorrow, Oct 25", "Oct 29"
     val dueTime: String = "11:59 PM",
@@ -30,6 +31,7 @@ data class TaskEntity(
             title = title,
             subjectCode = subjectCode,
             subjectName = subjectName,
+            category = category,
             type = type,
             dueDate = dueDate,
             dueTime = dueTime,

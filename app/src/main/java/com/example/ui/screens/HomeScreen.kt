@@ -55,8 +55,8 @@ fun HomeScreen(
                 subjects = subjects,
                 tasks = academicTasks,
                 onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
-                onAddTask = { title, subjectCode, subjectName, type, dueDate, dueTime, priority, weightage, note ->
-                    viewModel.addAcademicTask(title, subjectCode, subjectName, type, dueDate, dueTime, priority, weightage, note)
+                onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
+                    viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
                 },
                 onDeleteTask = { viewModel.deleteAcademicTask(it) },
                 onNavigateToTrack = onNavigateToTrack

@@ -14,6 +14,9 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE subjectCode = :subjectCode ORDER BY dueTimestamp ASC")
     fun getTasksForSubject(subjectCode: String): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE category = :category ORDER BY isCompleted ASC, dueTimestamp ASC")
+    fun getTasksByCategory(category: String): Flow<List<TaskEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTask(task: TaskEntity)
 

@@ -39,6 +39,7 @@ class ExampleRobolectricTest {
       title = "Robolectric CN Project Milestone",
       subjectCode = "CS-306",
       subjectName = "Computer Networks",
+      category = "Project",
       type = "PROJECT",
       dueDate = "Tomorrow",
       priority = "HIGH"
@@ -48,5 +49,6 @@ class ExampleRobolectricTest {
     org.junit.Assert.assertTrue(count >= 1)
 
     taskDao.setTaskCompleted("robo-task-1", true)
+    org.junit.Assert.assertEquals("Project", task.category)
   }
 }

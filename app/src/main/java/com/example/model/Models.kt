@@ -89,6 +89,7 @@ data class AcademicTask(
     val title: String,
     val subjectCode: String,
     val subjectName: String,
+    val category: String = "Assignment", // "Exam", "Assignment", "Project"
     val type: String = "ASSIGNMENT", // "ASSIGNMENT", "PROJECT", "LAB", "EXAM_PREP"
     val dueDate: String,
     val dueTime: String = "11:59 PM",

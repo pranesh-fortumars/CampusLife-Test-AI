@@ -35,7 +35,7 @@ fun MainAcademicDashboard(
     subjects: List<Subject>,
     tasks: List<AcademicTask>,
     onToggleTaskComplete: (String) -> Unit,
-    onAddTask: (title: String, subjectCode: String, subjectName: String, type: String, dueDate: String, dueTime: String, priority: String, weightage: String, note: String) -> Unit,
+    onAddTask: (title: String, subjectCode: String, subjectName: String, category: String, type: String, dueDate: String, dueTime: String, priority: String, weightage: String, note: String) -> Unit,
     onDeleteTask: (String) -> Unit,
     onNavigateToTrack: () -> Unit,
     modifier: Modifier = Modifier
@@ -48,7 +48,9 @@ fun MainAcademicDashboard(
     val dueSoonTasks = remember(tasks) {
         tasks.filter { !it.isCompleted && (it.priority == "URGENT" || it.dueDate.contains("Today", ignoreCase = true) || it.dueDate.contains("Tomorrow", ignoreCase = true)) }
     }
-    val projectTasks = remember(tasks) { tasks.filter { it.type == "PROJECT" } }
+    val examTasks = remember(tasks) { tasks.filter { it.category.equals("Exam", ignoreCase = true) } }
+    val assignmentTasks = remember(tasks) { tasks.filter { it.category.equals("Assignment", ignoreCase = true) } }
+    val projectTasks = remember(tasks) { tasks.filter { it.category.equals("Project", ignoreCase = true) } }
 
     val nextDueTask = remember(pendingTasks) {
         pendingTasks.minByOrNull { it.dueTimestamp }
@@ -57,8 +59,9 @@ fun MainAcademicDashboard(
     val filteredTasks = remember(tasks, selectedFilter) {
         when (selectedFilter) {
             "Pending" -> tasks.filter { !it.isCompleted }
-            "Assignments" -> tasks.filter { it.type == "ASSIGNMENT" || it.type == "LAB" }
-            "Projects" -> tasks.filter { it.type == "PROJECT" }
+            "Exam" -> tasks.filter { it.category.equals("Exam", ignoreCase = true) }
+            "Assignment" -> tasks.filter { it.category.equals("Assignment", ignoreCase = true) }
+            "Project" -> tasks.filter { it.category.equals("Project", ignoreCase = true) }
             "Completed" -> tasks.filter { it.isCompleted }
             else -> tasks
         }
@@ -153,74 +156,82 @@ fun MainAcademicDashboard(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Summary Cards Grid for Upcoming Deadlines
+                // Summary Cards Grid for Academic Categories & Progress
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Pending Deadlines
+                    // Exams
                     Surface(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedFilter = if (selectedFilter == "Exam") "All" else "Exam" },
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.5f))
+                        color = if (selectedFilter == "Exam") Color(0xFFFFE4E6) else MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, if (selectedFilter == "Exam") Color(0xFFBE123C) else OutlineVariant.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.AssignmentLate, contentDescription = null, tint = Primary, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.School, contentDescription = null, tint = Color(0xFFBE123C), modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("PENDING", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                                Text("EXAMS", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = Color(0xFFBE123C), fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("${pendingTasks.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Primary)
-                            Text("Active tasks", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${examTasks.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFFBE123C))
+                            Text("Tests & Viva", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
-                    // Due Soon (< 48 hrs)
+                    // Assignments
                     Surface(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedFilter = if (selectedFilter == "Assignment") "All" else "Assignment" },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (dueSoonTasks.isNotEmpty()) ErrorContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, if (dueSoonTasks.isNotEmpty()) Error.copy(alpha = 0.3f) else OutlineVariant.copy(alpha = 0.5f))
+                        color = if (selectedFilter == "Assignment") PrimaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, if (selectedFilter == "Assignment") Primary else OutlineVariant.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.HourglassTop, contentDescription = null, tint = if (dueSoonTasks.isNotEmpty()) Error else Primary, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Assignment, contentDescription = null, tint = Primary, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("DUE SOON", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = if (dueSoonTasks.isNotEmpty()) Error else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                                Text("ASSIGN.", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = Primary, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("${dueSoonTasks.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = if (dueSoonTasks.isNotEmpty()) Error else MaterialTheme.colorScheme.onSurface)
-                            Text("Next 48 hrs", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${assignmentTasks.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Primary)
+                            Text("Tasks & Labs", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
                     // Major Projects
                     Surface(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedFilter = if (selectedFilter == "Project") "All" else "Project" },
                         shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.5f))
+                        color = if (selectedFilter == "Project") Color(0xFFCCFBF1) else MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, if (selectedFilter == "Project") Color(0xFF0F766E) else OutlineVariant.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Code, contentDescription = null, tint = Secondary, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Code, contentDescription = null, tint = Color(0xFF0F766E), modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("PROJECTS", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                                Text("PROJECTS", style = MaterialTheme.typography.labelSmall, fontSize = 10.sp, color = Color(0xFF0F766E), fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("${projectTasks.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Secondary)
+                            Text("${projectTasks.size}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFF0F766E))
                             Text("Milestones", style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 
                     // Completed
                     Surface(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { selectedFilter = if (selectedFilter == "Completed") "All" else "Completed" },
                         shape = RoundedCornerShape(12.dp),
-                        color = TertiaryContainer.copy(alpha = 0.6f),
-                        border = BorderStroke(1.dp, Tertiary.copy(alpha = 0.25f))
+                        color = if (selectedFilter == "Completed") TertiaryContainer else TertiaryContainer.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, if (selectedFilter == "Completed") Tertiary else Tertiary.copy(alpha = 0.25f))
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -394,10 +405,11 @@ fun MainAcademicDashboard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val filters = listOf(
-                    "Pending" to pendingTasks.size,
                     "All" to tasks.size,
-                    "Assignments" to tasks.count { it.type == "ASSIGNMENT" || it.type == "LAB" },
-                    "Projects" to projectTasks.size,
+                    "Pending" to pendingTasks.size,
+                    "Exam" to examTasks.size,
+                    "Assignment" to assignmentTasks.size,
+                    "Project" to projectTasks.size,
                     "Completed" to completedTasks.size
                 )
                 items(filters) { (filterName, count) ->
@@ -410,7 +422,8 @@ fun MainAcademicDashboard(
                             selectedContainerColor = Primary,
                             selectedLabelColor = Color.White
                         ),
-                        shape = RoundedCornerShape(100)
+                        shape = RoundedCornerShape(100),
+                        modifier = Modifier.testTag("filter_chip_$filterName")
                     )
                 }
             }
@@ -453,8 +466,8 @@ fun MainAcademicDashboard(
         AddAcademicDeadlineDialog(
             subjects = subjects,
             onDismiss = { showAddDialog = false },
-            onConfirm = { title, subjectCode, subjectName, type, dueDate, dueTime, priority, weightage, note ->
-                onAddTask(title, subjectCode, subjectName, type, dueDate, dueTime, priority, weightage, note)
+            onConfirm = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
+                onAddTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
                 showAddDialog = false
             }
         )
@@ -473,6 +486,12 @@ fun AcademicDeadlineItemCard(
         "HIGH" -> Warning
         "MEDIUM" -> Secondary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val (categoryColor, categoryContainerColor, categoryIcon) = when (task.category.lowercase()) {
+        "exam" -> Triple(Color(0xFFBE123C), Color(0xFFFFE4E6), Icons.Default.School)
+        "project" -> Triple(Color(0xFF0F766E), Color(0xFFCCFBF1), Icons.Default.Code)
+        else -> Triple(Color(0xFF4338CA), Color(0xFFEEF2FF), Icons.Default.Assignment)
     }
 
     Card(
@@ -514,6 +533,7 @@ fun AcademicDeadlineItemCard(
                             color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                             textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -524,6 +544,36 @@ fun AcademicDeadlineItemCard(
                                 fontWeight = FontWeight.Bold,
                                 color = Primary
                             )
+                            Text("•", color = MaterialTheme.colorScheme.outlineVariant)
+                            
+                            // Category Tag Badge
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = categoryContainerColor,
+                                border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.3f)),
+                                modifier = Modifier.testTag("task_category_${task.id}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = categoryIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(11.dp),
+                                        tint = categoryColor
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = task.category.replaceFirstChar { it.uppercase() },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = categoryColor
+                                    )
+                                }
+                            }
+
                             Text("•", color = MaterialTheme.colorScheme.outlineVariant)
                             Text(
                                 text = task.weightage,
@@ -619,11 +669,12 @@ fun AcademicDeadlineItemCard(
 fun AddAcademicDeadlineDialog(
     subjects: List<Subject>,
     onDismiss: () -> Unit,
-    onConfirm: (title: String, subjectCode: String, subjectName: String, type: String, dueDate: String, dueTime: String, priority: String, weightage: String, note: String) -> Unit
+    onConfirm: (title: String, subjectCode: String, subjectName: String, category: String, type: String, dueDate: String, dueTime: String, priority: String, weightage: String, note: String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var selectedSubject by remember { mutableStateOf(subjects.firstOrNull() ?: Subject(code = "CS-302", name = "DBMS", credits = 4, faculty = "Dr. Roy", attendedClasses = 26, totalClasses = 30)) }
-    var type by remember { mutableStateOf("ASSIGNMENT") } // ASSIGNMENT, PROJECT, LAB, QUIZ
+    var category by remember { mutableStateOf("Assignment") } // "Exam", "Assignment", "Project"
+    var type by remember { mutableStateOf("ASSIGNMENT") } // ASSIGNMENT, PROJECT, LAB, QUIZ, EXAM_PREP
     var dueDate by remember { mutableStateOf("Tomorrow") }
     var dueTime by remember { mutableStateOf("11:59 PM") }
     var priority by remember { mutableStateOf("HIGH") }
@@ -634,7 +685,7 @@ fun AddAcademicDeadlineDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                "Add Academic Deadline",
+                "Add Academic Task & Deadline",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -649,11 +700,82 @@ fun AddAcademicDeadlineDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Deadline / Task Title") },
-                    placeholder = { Text("e.g., Mini Project Submission") },
+                    label = { Text("Task / Deadline Title") },
+                    placeholder = { Text("e.g., Mid-Term Prep or Mini Project") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("task_title_input")
                 )
+
+                // Category Tagging Selector ('Exam', 'Assignment', 'Project')
+                Column {
+                    Text(
+                        text = "Tag Category",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val categoryOptions = listOf(
+                            Triple("Exam", Icons.Default.School, Color(0xFFBE123C)),
+                            Triple("Assignment", Icons.Default.Assignment, Primary),
+                            Triple("Project", Icons.Default.Code, Color(0xFF0F766E))
+                        )
+                        categoryOptions.forEach { (catName, catIcon, catAccent) ->
+                            val isSelected = category.equals(catName, ignoreCase = true)
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) catAccent else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                border = BorderStroke(1.dp, if (isSelected) catAccent else OutlineVariant.copy(alpha = 0.6f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        category = catName
+                                        when (catName) {
+                                            "Exam" -> {
+                                                type = "EXAM_PREP"
+                                                weightage = "30% Exam"
+                                            }
+                                            "Assignment" -> {
+                                                type = "ASSIGNMENT"
+                                                weightage = "15% Weightage"
+                                            }
+                                            "Project" -> {
+                                                type = "PROJECT"
+                                                weightage = "25% Project"
+                                            }
+                                        }
+                                    }
+                                    .testTag("category_tag_$catName")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = catIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp),
+                                        tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = catName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Subject picker
                 Column {
@@ -680,12 +802,12 @@ fun AddAcademicDeadlineDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    listOf("ASSIGNMENT", "PROJECT", "LAB").forEach { t ->
+                    listOf("ASSIGNMENT", "PROJECT", "LAB", "EXAM_PREP").forEach { t ->
                         val isSelected = type == t
                         FilterChip(
                             selected = isSelected,
                             onClick = { type = t },
-                            label = { Text(t, fontSize = 11.sp) },
+                            label = { Text(if (t == "EXAM_PREP") "EXAM" else t, fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -737,6 +859,7 @@ fun AddAcademicDeadlineDialog(
                             title.trim(),
                             selectedSubject.code,
                             selectedSubject.name,
+                            category,
                             type,
                             dueDate.trim(),
                             dueTime.trim(),
@@ -746,9 +869,10 @@ fun AddAcademicDeadlineDialog(
                         )
                     }
                 },
-                enabled = title.isNotBlank()
+                enabled = title.isNotBlank(),
+                modifier = Modifier.testTag("save_task_btn")
             ) {
-                Text("Save Deadline")
+                Text("Save Task")
             }
         },
         dismissButton = {

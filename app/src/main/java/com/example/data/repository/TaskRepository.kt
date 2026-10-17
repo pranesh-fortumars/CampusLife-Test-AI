@@ -22,6 +22,12 @@ class TaskRepository(private val dao: TaskDao) {
         }
     }
 
+    fun getTasksByCategory(category: String): Flow<List<AcademicTask>> {
+        return dao.getTasksByCategory(category).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
     suspend fun seedInitialTasksIfEmpty() {
         val count = dao.getTaskCount()
         if (count == 0) {
@@ -35,6 +41,7 @@ class TaskRepository(private val dao: TaskDao) {
                     title = "Computer Networks Lab Assignment 4",
                     subjectCode = "CS-306",
                     subjectName = "Computer Networks",
+                    category = "Assignment",
                     type = "ASSIGNMENT",
                     dueDate = "Today",
                     dueTime = "5:00 PM",
@@ -52,6 +59,7 @@ class TaskRepository(private val dao: TaskDao) {
                     title = "DBMS Relational Calculus & B+ Trees Problem Set",
                     subjectCode = "CS-302",
                     subjectName = "Database Management Systems",
+                    category = "Assignment",
                     type = "ASSIGNMENT",
                     dueDate = "Tomorrow, Oct 25",
                     dueTime = "11:59 PM",
@@ -66,11 +74,30 @@ class TaskRepository(private val dao: TaskDao) {
                 ),
                 TaskEntity(
                     id = "task-3",
+                    title = "Mid-Term Examination: Operating Systems Core",
+                    subjectCode = "CS-304",
+                    subjectName = "Operating Systems",
+                    category = "Exam",
+                    type = "EXAM_PREP",
+                    dueDate = "Oct 30",
+                    dueTime = "09:30 AM",
+                    priority = "URGENT",
+                    weightage = "30% Mid-Sem",
+                    isCompleted = false,
+                    progressPercent = 50,
+                    faculty = "Prof. K. Muralidhar",
+                    note = "Chapters 3-7: Processes, Threads, CPU Scheduling & Deadlock Prevention",
+                    dueTimestamp = now + (5 * day),
+                    createdAt = now - (4 * day)
+                ),
+                TaskEntity(
+                    id = "task-4",
                     title = "Operating Systems Semaphore Synchronization Project",
                     subjectCode = "CS-304",
                     subjectName = "Operating Systems",
+                    category = "Project",
                     type = "PROJECT",
-                    dueDate = "Oct 29",
+                    dueDate = "Nov 02",
                     dueTime = "11:59 PM",
                     priority = "MEDIUM",
                     weightage = "20% Project",
@@ -78,42 +105,44 @@ class TaskRepository(private val dao: TaskDao) {
                     progressPercent = 55,
                     faculty = "Prof. K. Muralidhar",
                     note = "Dining Philosophers & Producer-Consumer problem in C with POSIX pthreads",
-                    dueTimestamp = now + (4 * day),
+                    dueTimestamp = now + (8 * day),
                     createdAt = now - (5 * day)
                 ),
                 TaskEntity(
-                    id = "task-4",
-                    title = "Agile Sprint Retrospective & Jira Release Report",
+                    id = "task-5",
+                    title = "Full-Stack Microservices Architecture Milestone 1",
                     subjectCode = "CS-308",
                     subjectName = "Software Engineering & Agile",
+                    category = "Project",
                     type = "PROJECT",
-                    dueDate = "Nov 2",
+                    dueDate = "Nov 06",
                     dueTime = "5:00 PM",
                     priority = "MEDIUM",
-                    weightage = "15% Capstone",
+                    weightage = "25% Capstone",
                     isCompleted = false,
-                    progressPercent = 20,
+                    progressPercent = 30,
                     faculty = "Prof. Neha Gupta",
-                    note = "Sprint burndown metrics and velocity chart submission",
-                    dueTimestamp = now + (8 * day),
+                    note = "Sprint burndown metrics and Dockerized service deployment",
+                    dueTimestamp = now + (12 * day),
                     createdAt = now - (1 * day)
                 ),
                 TaskEntity(
-                    id = "task-5",
-                    title = "Web Engineering RESTful API Microservices Lab",
+                    id = "task-6",
+                    title = "Web Engineering Lab Practical & Viva Exam",
                     subjectCode = "CS-310",
                     subjectName = "Web Engineering",
-                    type = "LAB",
-                    dueDate = "Nov 5",
-                    dueTime = "11:59 PM",
-                    priority = "LOW",
-                    weightage = "10% Lab",
-                    isCompleted = true,
-                    progressPercent = 100,
+                    category = "Exam",
+                    type = "EXAM_PREP",
+                    dueDate = "Nov 10",
+                    dueTime = "02:00 PM",
+                    priority = "HIGH",
+                    weightage = "20% Exam",
+                    isCompleted = false,
+                    progressPercent = 20,
                     faculty = "Prof. S. Sengupta",
-                    note = "JWT authentication & Swagger OpenAPI spec verification",
-                    dueTimestamp = now + (11 * day),
-                    createdAt = now - (7 * day)
+                    note = "Hands-on REST API implementation and security viva",
+                    dueTimestamp = now + (16 * day),
+                    createdAt = now - (2 * day)
                 )
             )
             dao.insertTasks(initialTasks)
@@ -127,6 +156,7 @@ class TaskRepository(private val dao: TaskDao) {
                 title = task.title.trim(),
                 subjectCode = task.subjectCode.trim().uppercase(),
                 subjectName = task.subjectName.trim(),
+                category = task.category,
                 type = task.type,
                 dueDate = task.dueDate.trim(),
                 dueTime = task.dueTime.trim(),
