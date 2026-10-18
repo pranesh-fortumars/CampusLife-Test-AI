@@ -283,4 +283,47 @@ class CampusLifeUnitTest {
         assertEquals(78.57, courseAttendance.attendancePercentage, 0.1)
         assertTrue(courseAttendance.isSafe)
     }
+
+    @Test
+    fun testTaskEntityFromDomainAndUpcomingDueSorting() {
+        val now = System.currentTimeMillis()
+        val examDomain = com.example.model.AcademicTask(
+            id = "exam-1",
+            title = "Operating Systems Mid-Term",
+            subjectCode = "CS-304",
+            subjectName = "Operating Systems",
+            category = "Exam",
+            type = "EXAM_PREP",
+            dueDate = "Oct 30",
+            dueTimestamp = now + 86400000L * 5
+        )
+        val entityFromDomain = com.example.data.local.TaskEntity.fromDomain(examDomain)
+        assertEquals("exam-1", entityFromDomain.id)
+        assertEquals("Operating Systems Mid-Term", entityFromDomain.title)
+        assertEquals("CS-304", entityFromDomain.subjectCode)
+        assertEquals("Exam", entityFromDomain.category)
+        assertEquals("EXAM_PREP", entityFromDomain.type)
+        assertEquals(examDomain.dueTimestamp, entityFromDomain.dueTimestamp)
+
+        // Mapping back to domain
+        val mappedDomain = entityFromDomain.toDomain()
+        assertEquals(examDomain.id, mappedDomain.id)
+        assertEquals(examDomain.title, mappedDomain.title)
+        assertEquals(examDomain.category, mappedDomain.category)
+
+        // Test sorting by upcoming due dates
+        val assignmentDomain = com.example.model.AcademicTask(
+            id = "asgn-1",
+            title = "Networks Lab Assignment",
+            subjectCode = "CS-306",
+            subjectName = "Networks",
+            category = "Assignment",
+            dueDate = "Today",
+            dueTimestamp = now + 3600000L * 3 // Due sooner
+        )
+        val tasks = listOf(examDomain, assignmentDomain)
+        val sortedUpcoming = tasks.sortedBy { it.dueTimestamp }
+        assertEquals("asgn-1", sortedUpcoming.first().id)
+        assertEquals("exam-1", sortedUpcoming.last().id)
+    }
 }

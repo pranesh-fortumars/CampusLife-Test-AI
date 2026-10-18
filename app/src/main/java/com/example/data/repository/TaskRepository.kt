@@ -16,6 +16,14 @@ class TaskRepository(private val dao: TaskDao) {
         entities.map { it.toDomain() }
     }
 
+    val upcomingDueTasks: Flow<List<AcademicTask>> = dao.getUpcomingDueTasks().map { entities ->
+        entities.map { it.toDomain() }
+    }
+
+    val assignmentsAndExams: Flow<List<AcademicTask>> = dao.getAssignmentsAndExams().map { entities ->
+        entities.map { it.toDomain() }
+    }
+
     fun getTasksForSubject(subjectCode: String): Flow<List<AcademicTask>> {
         return dao.getTasksForSubject(subjectCode).map { entities ->
             entities.map { it.toDomain() }

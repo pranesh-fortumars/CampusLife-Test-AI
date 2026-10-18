@@ -45,4 +45,27 @@ data class TaskEntity(
             createdAt = createdAt
         )
     }
+
+    companion object {
+        fun fromDomain(task: AcademicTask): TaskEntity {
+            return TaskEntity(
+                id = task.id,
+                title = task.title,
+                subjectCode = task.subjectCode,
+                subjectName = task.subjectName,
+                category = task.category,
+                type = task.type,
+                dueDate = task.dueDate,
+                dueTime = task.dueTime,
+                priority = task.priority,
+                weightage = task.weightage,
+                isCompleted = task.isCompleted,
+                progressPercent = task.progressPercent,
+                faculty = task.faculty,
+                note = task.note,
+                dueTimestamp = task.dueTimestamp,
+                createdAt = task.createdAt
+            )
+        }
+    }
 }

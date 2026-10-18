@@ -11,6 +11,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE isCompleted = 0 ORDER BY dueTimestamp ASC")
     fun getPendingTasks(): Flow<List<TaskEntity>>
 
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 ORDER BY dueTimestamp ASC")
+    fun getUpcomingDueTasks(): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE category IN ('Assignment', 'Exam') ORDER BY isCompleted ASC, dueTimestamp ASC")
+    fun getAssignmentsAndExams(): Flow<List<TaskEntity>>
+
     @Query("SELECT * FROM tasks WHERE subjectCode = :subjectCode ORDER BY dueTimestamp ASC")
     fun getTasksForSubject(subjectCode: String): Flow<List<TaskEntity>>
 

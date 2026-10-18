@@ -25,6 +25,7 @@ import coil.compose.AsyncImage
 import com.example.data.MockData
 import com.example.model.AttendanceType
 import com.example.model.Subject
+import com.example.ui.components.AcademicTasksUpcomingDueListComponent
 import com.example.ui.components.AddNewSubjectDialog
 import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
@@ -40,6 +41,7 @@ fun TrackScreen(
 ) {
     val activeSubTab by viewModel.trackSubTab.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
+    val academicTasks by viewModel.academicTasks.collectAsState()
     val assignments by viewModel.assignments.collectAsState()
     val simulatorCount by viewModel.simulatorCount.collectAsState()
     val simulatorSubjectCode by viewModel.simulatorSubjectCode.collectAsState()
@@ -221,11 +223,37 @@ fun TrackScreen(
 
                 "Assignments" -> {
                     item {
+                        AcademicTasksUpcomingDueListComponent(
+                            tasks = academicTasks,
+                            subjects = subjects,
+                            onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
+                            onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                            onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
+                                viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
+                            },
+                            title = "Assignments & Course Submissions",
+                            subtitle = "Room DB academic tasks sorted by due date"
+                        )
+                    }
+                    item {
                         AssignmentsView(viewModel = viewModel)
                     }
                 }
 
                 "Exams" -> {
+                    item {
+                        AcademicTasksUpcomingDueListComponent(
+                            tasks = academicTasks.filter { it.category.equals("Exam", ignoreCase = true) || it.type == "EXAM_PREP" },
+                            subjects = subjects,
+                            onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
+                            onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                            onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
+                                viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
+                            },
+                            title = "Exams & Tests Schedule",
+                            subtitle = "Upcoming examinations and practical tests"
+                        )
+                    }
                     item {
                         ExaminationsView(viewModel = viewModel)
                     }
