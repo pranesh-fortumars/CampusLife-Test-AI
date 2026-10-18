@@ -403,4 +403,86 @@ object MockData {
             avatarUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuDcFBtrZiRomGEO1eqS9GtUlG1U8-00eJx8jVVaETIRdNtWglTHCoeMFAUQqeQjbsXVKAkYIzW8RPUvQw9WcJjsXFdvw3NGGWtEJQ7PA1U_PuwMgkTb_X53RI6znT-0SsgxxXgrrYBBjbuVrsKWBsBCTkRPjlF_o2S0SaTg0ZcMdJnONie8YoSWWld9LE7pU_0GPgEjSwP2V-3HEx_ZMz8FtVr0cTRm6wu3PfJBJfBFmavVD3A69k6ulw"
         )
     )
+
+    val initialSemesterGrades = listOf(
+        SemesterGrades(
+            semesterNumber = 1,
+            semesterName = "Semester 1",
+            academicYear = "2021-2022",
+            courses = listOf(
+                CourseGrade(courseCode = "CS-101", courseName = "Programming Fundamentals", credits = 4, grade = "O", gradePoint = 10.0),
+                CourseGrade(courseCode = "MA-101", courseName = "Engineering Mathematics I", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "PH-101", courseName = "Applied Physics", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "EE-101", courseName = "Basic Electrical Engineering", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "ME-101", courseName = "Engineering Graphics", credits = 3, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "HU-101", courseName = "Communication Skills", credits = 3, grade = "O", gradePoint = 10.0)
+            )
+        ),
+        SemesterGrades(
+            semesterNumber = 2,
+            semesterName = "Semester 2",
+            academicYear = "2021-2022",
+            courses = listOf(
+                CourseGrade(courseCode = "CS-102", courseName = "Data Structures", credits = 4, grade = "O", gradePoint = 10.0),
+                CourseGrade(courseCode = "MA-102", courseName = "Engineering Mathematics II", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "EC-102", courseName = "Digital Electronics", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-104", courseName = "Discrete Mathematics", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "EN-102", courseName = "Environmental Science", credits = 3, grade = "B+", gradePoint = 7.0),
+                CourseGrade(courseCode = "CS-106", courseName = "Workshop & Python Lab", credits = 3, grade = "O", gradePoint = 10.0)
+            )
+        ),
+        SemesterGrades(
+            semesterNumber = 3,
+            semesterName = "Semester 3",
+            academicYear = "2022-2023",
+            courses = listOf(
+                CourseGrade(courseCode = "CS-201", courseName = "Object Oriented Programming", credits = 4, grade = "O", gradePoint = 10.0),
+                CourseGrade(courseCode = "CS-203", courseName = "Computer Architecture", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-205", courseName = "Design & Analysis of Algorithms", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "MA-201", courseName = "Linear Algebra & Probability", credits = 4, grade = "B+", gradePoint = 7.0),
+                CourseGrade(courseCode = "CS-207", courseName = "Web Development Lab", credits = 4, grade = "O", gradePoint = 10.0),
+                CourseGrade(courseCode = "HU-201", courseName = "Engineering Economics", credits = 4, grade = "A", gradePoint = 8.0)
+            )
+        ),
+        SemesterGrades(
+            semesterNumber = 4,
+            semesterName = "Semester 4",
+            academicYear = "2022-2023",
+            courses = listOf(
+                CourseGrade(courseCode = "CS-202", courseName = "Theory of Computation", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-204", courseName = "Microprocessors & Interfacing", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "CS-206", courseName = "Principles of Programming Languages", credits = 4, grade = "B+", gradePoint = 7.0),
+                CourseGrade(courseCode = "CS-208", courseName = "Advanced Data Structures", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-210", courseName = "Database Management Lab", credits = 3, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "MG-202", courseName = "Organizational Behavior", credits = 3, grade = "A", gradePoint = 8.0)
+            )
+        ),
+        SemesterGrades(
+            semesterNumber = 5,
+            semesterName = "Semester 5",
+            academicYear = "2023-2024",
+            courses = listOf(
+                CourseGrade(courseCode = "CS-301", courseName = "Compiler Design", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-303", courseName = "Artificial Intelligence", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "CS-305", courseName = "Computer Graphics", credits = 4, grade = "A", gradePoint = 8.0),
+                CourseGrade(courseCode = "CS-307", courseName = "Information Security", credits = 4, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-309", courseName = "Cloud Computing & DevOps", credits = 3, grade = "A+", gradePoint = 9.0),
+                CourseGrade(courseCode = "CS-311", courseName = "Industrial Training Viva", credits = 3, grade = "A", gradePoint = 8.0)
+            )
+        ),
+        SemesterGrades(
+            semesterNumber = 6,
+            semesterName = "Semester 6 (Active)",
+            academicYear = "2023-2024",
+            isCurrentSemester = true,
+            courses = listOf(
+                CourseGrade(courseCode = "CS-302", courseName = "Database Management Systems", credits = 4, grade = "O", gradePoint = 10.0, isCompleted = false),
+                CourseGrade(courseCode = "CS-304", courseName = "Operating Systems", credits = 4, grade = "A+", gradePoint = 9.0, isCompleted = false),
+                CourseGrade(courseCode = "CS-306", courseName = "Computer Networks", credits = 3, grade = "A+", gradePoint = 9.0, isCompleted = false),
+                CourseGrade(courseCode = "CS-308", courseName = "Software Engineering & Agile", credits = 3, grade = "A", gradePoint = 8.0, isCompleted = false),
+                CourseGrade(courseCode = "CS-310", courseName = "Web Technologies Lab", credits = 4, grade = "O", gradePoint = 10.0, isCompleted = false),
+                CourseGrade(courseCode = "CS-312", courseName = "Machine Learning Elective", credits = 4, grade = "O", gradePoint = 10.0, isCompleted = false)
+            )
+        )
+    )
 }

@@ -199,8 +199,46 @@ class CampusLifeViewModel(
         _profile.update { it.copy(overallAttendance = rounded) }
     }
 
+    // Semester Grades & CGPA state
+    private val _semesterGrades = MutableStateFlow(MockData.initialSemesterGrades)
+    val semesterGrades: StateFlow<List<SemesterGrades>> = _semesterGrades.asStateFlow()
+
     fun updateSimulatedSem6Sgpa(value: Float) {
         _simulatedSem6Sgpa.value = value
+    }
+
+    fun updateCourseGrade(semesterNumber: Int, courseCode: String, newGrade: String) {
+        val newPoint = GradeScale.getPoint(newGrade)
+        _semesterGrades.update { list ->
+            list.map { sem ->
+                if (sem.semesterNumber == semesterNumber) {
+                    val updatedCourses = sem.courses.map { c ->
+                        if (c.courseCode == courseCode) {
+                            c.copy(grade = newGrade.uppercase(), gradePoint = newPoint)
+                        } else c
+                    }
+                    sem.copy(courses = updatedCourses)
+                } else sem
+            }
+        }
+        recalculateCgpa()
+    }
+
+    fun addCourseGrade(semesterNumber: Int, courseGrade: CourseGrade) {
+        _semesterGrades.update { list ->
+            list.map { sem ->
+                if (sem.semesterNumber == semesterNumber) {
+                    sem.copy(courses = sem.courses + courseGrade)
+                } else sem
+            }
+        }
+        recalculateCgpa()
+    }
+
+    fun recalculateCgpa() {
+        val summary = AcademicGpaSummary(_semesterGrades.value)
+        val rounded = String.format(Locale.US, "%.2f", summary.cumulativeGpa).toDoubleOrNull() ?: summary.cumulativeGpa
+        _profile.update { it.copy(cgpa = rounded) }
     }
 
     fun selectTab(tab: AppDestination) {

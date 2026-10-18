@@ -24,6 +24,7 @@ import coil.compose.AsyncImage
 import com.example.model.RevisionSprint
 import com.example.model.RevisionTopic
 import com.example.model.SubjectTargetMarks
+import com.example.ui.components.CumulativeGpaTrackerComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SubScreen
@@ -35,6 +36,7 @@ fun ExamRevisionPlanScreen(
 ) {
     var selectedTopTab by remember { mutableStateOf("CGPA") } // "CGPA", "Revision"
     val simulatedSgpa by viewModel.simulatedSem6Sgpa.collectAsState()
+    val semesterGrades by viewModel.semesterGrades.collectAsState()
 
     // Calculated Overall CGPA from:
     // 112 credits at 8.64 CGPA + 22 active credits at simulatedSgpa
@@ -162,45 +164,27 @@ fun ExamRevisionPlanScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Countdown banner
-            item {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    shadowElevation = 1.dp,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Schedule, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text("Mid-Semester Exam Window", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                Text("Nov 4 – Nov 12 • 11 Days countdown", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        Surface(shape = RoundedCornerShape(100), color = TertiaryFixed) {
-                            Text("ON SCHEDULE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Tertiary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                        }
-                    }
+            if (selectedTopTab == "CGPA") {
+                // 1. Interactive Cumulative GPA & Semester Grade Breakdown Component
+                item {
+                    CumulativeGpaTrackerComponent(
+                        semesters = semesterGrades,
+                        onUpdateGrade = { sem, code, grade -> viewModel.updateCourseGrade(sem, code, grade) },
+                        onAddCourse = { sem, course -> viewModel.addCourseGrade(sem, course) }
+                    )
                 }
-            }
 
-            // Target CGPA Simulator Card
-            item {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
+                // 2. Target CGPA Simulator Card
+                item {
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -411,9 +395,37 @@ fun ExamRevisionPlanScreen(
                     }
                 }
             }
-
-            // Revision Roadmap Section
+        } else {
+            // Countdown banner
             item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        shadowElevation = 1.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Schedule, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Mid-Semester Exam Window", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                    Text("Nov 4 – Nov 12 • 11 Days countdown", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Surface(shape = RoundedCornerShape(100), color = TertiaryFixed) {
+                                Text("ON SCHEDULE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Tertiary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                            }
+                        }
+                    }
+                }
+
+                // Revision Roadmap Section
+                item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Revision Roadmap", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text("Mid-Sem Exam Roadmap • Starts Nov 4 (11 Days Left)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -628,6 +640,7 @@ fun ExamRevisionPlanScreen(
                     }
                 }
             }
+        }
         }
     }
 }

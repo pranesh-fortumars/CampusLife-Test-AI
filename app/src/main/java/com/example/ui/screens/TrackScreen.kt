@@ -27,6 +27,7 @@ import com.example.model.AttendanceType
 import com.example.model.Subject
 import com.example.ui.components.AcademicTasksUpcomingDueListComponent
 import com.example.ui.components.AddNewSubjectDialog
+import com.example.ui.components.CumulativeGpaTrackerComponent
 import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
 import com.example.ui.theme.*
@@ -52,7 +53,7 @@ fun TrackScreen(
     var showAddSubjectDialog by remember { mutableStateOf(false) }
     var subjectFilter by remember { mutableStateOf("All") } // "All", "Below 75%", "Safe"
 
-    val subTabs = listOf("Academics", "Timetable", "Assignments", "Exams")
+    val subTabs = listOf("Academics", "Timetable", "Assignments", "Exams", "CGPA")
 
     val filteredSubjects = remember(subjects, subjectFilter) {
         when (subjectFilter) {
@@ -86,6 +87,7 @@ fun TrackScreen(
                             "Academics" -> Icons.Default.School
                             "Timetable" -> Icons.Default.CalendarToday
                             "Assignments" -> Icons.Default.Assignment
+                            "CGPA" -> Icons.Default.Grade
                             else -> Icons.Default.EventNote
                         }
                         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -256,6 +258,19 @@ fun TrackScreen(
                     }
                     item {
                         ExaminationsView(viewModel = viewModel)
+                    }
+                }
+
+                "CGPA" -> {
+                    item {
+                        val semesterGrades by viewModel.semesterGrades.collectAsState()
+                        CumulativeGpaTrackerComponent(
+                            semesters = semesterGrades,
+                            onUpdateGrade = { sem, code, grade -> viewModel.updateCourseGrade(sem, code, grade) },
+                            onAddCourse = { sem, course -> viewModel.addCourseGrade(sem, course) },
+                            title = "Cumulative GPA (CGPA) Tracker",
+                            subtitle = "Interactive grade adjustments, semester credit breakdown & CGPA forecasting"
+                        )
                     }
                 }
             }

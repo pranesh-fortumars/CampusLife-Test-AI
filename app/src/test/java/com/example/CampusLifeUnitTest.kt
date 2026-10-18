@@ -326,4 +326,98 @@ class CampusLifeUnitTest {
         assertEquals("asgn-1", sortedUpcoming.first().id)
         assertEquals("exam-1", sortedUpcoming.last().id)
     }
+
+    @Test
+    fun testSemesterGradesAndCumulativeGpaCalculations() {
+        // Course grades with credits & letter grades
+        val c1 = com.example.model.CourseGrade(
+            courseCode = "CS-101",
+            courseName = "Introduction to Programming",
+            credits = 4,
+            grade = "O" // 10.0 grade points -> 40.0 credit points
+        )
+        val c2 = com.example.model.CourseGrade(
+            courseCode = "MA-101",
+            courseName = "Calculus & Linear Algebra",
+            credits = 4,
+            grade = "A+" // 9.0 grade points -> 36.0 credit points
+        )
+        val c3 = com.example.model.CourseGrade(
+            courseCode = "PH-101",
+            courseName = "Physics for Computing",
+            credits = 4,
+            grade = "A" // 8.0 grade points -> 32.0 credit points
+        )
+
+        assertEquals(40.0, c1.creditPoints, 0.001)
+        assertEquals(36.0, c2.creditPoints, 0.001)
+        assertEquals(32.0, c3.creditPoints, 0.001)
+
+        val sem1 = com.example.model.SemesterGrades(
+            semesterNumber = 1,
+            semesterName = "Semester 1",
+            academicYear = "2023-24",
+            courses = listOf(c1, c2, c3),
+            isCurrentSemester = false
+        )
+
+        // 12 credits, 108 earned points -> SGPA = 9.0
+        assertEquals(12, sem1.totalCredits)
+        assertEquals(108.0, sem1.totalEarnedPoints, 0.001)
+        assertEquals(9.0, sem1.sgpa, 0.001)
+        assertEquals("9.00", sem1.formattedSgpa)
+
+        // Semester 2: 12 credits, SGPA 8.0
+        val c4 = com.example.model.CourseGrade(
+            courseCode = "CS-102",
+            courseName = "Data Structures",
+            credits = 4,
+            grade = "A" // 8.0
+        )
+        val c5 = com.example.model.CourseGrade(
+            courseCode = "CS-104",
+            courseName = "Digital Logic",
+            credits = 4,
+            grade = "B+" // 7.0
+        )
+        val c6 = com.example.model.CourseGrade(
+            courseCode = "MA-102",
+            courseName = "Discrete Mathematics",
+            credits = 4,
+            grade = "A+" // 9.0
+        )
+        val sem2 = com.example.model.SemesterGrades(
+            semesterNumber = 2,
+            semesterName = "Semester 2",
+            academicYear = "2023-24",
+            courses = listOf(c4, c5, c6),
+            isCurrentSemester = false
+        )
+        // 12 credits, (32 + 28 + 36) = 96 points -> SGPA = 8.0
+        assertEquals(12, sem2.totalCredits)
+        assertEquals(96.0, sem2.totalEarnedPoints, 0.001)
+        assertEquals(8.0, sem2.sgpa, 0.001)
+
+        // CGPA calculation across Sem 1 and Sem 2:
+        // Total credits = 24, total points = 108 + 96 = 204
+        // CGPA = 204 / 24 = 8.50
+        val gpaSummary = com.example.model.AcademicGpaSummary(listOf(sem1, sem2))
+        assertEquals(24, gpaSummary.totalCreditsEarned)
+        assertEquals(204.0, gpaSummary.totalEarnedPoints, 0.001)
+        assertEquals(8.50, gpaSummary.cumulativeGpa, 0.001)
+        assertEquals("8.50", gpaSummary.formattedCgpa)
+
+        // AICTE Percentage: 8.5 * 9.5 = 80.75%
+        assertEquals(80.75, gpaSummary.percentageEquivalent, 0.01)
+        assertEquals("80.8%", gpaSummary.formattedPercentage)
+
+        // US 4.0 scale: (8.5 / 10.0) * 4.0 = 3.40
+        assertEquals(3.40, gpaSummary.equivalentUsGpa, 0.01)
+        assertEquals("3.40", gpaSummary.formattedUsGpa)
+
+        // Forecasting: Projected CGPA if Sem 3 has 20 credits and student scores 9.0 SGPA
+        // Total credits = 44, total points = 204 + 180 = 384 -> CGPA = 384 / 44 = 8.727
+        val projected = gpaSummary.calculateProjectedCgpa(activeSemesterCredits = 20, projectedSgpa = 9.0)
+        assertEquals(8.727, projected, 0.01)
+    }
 }
