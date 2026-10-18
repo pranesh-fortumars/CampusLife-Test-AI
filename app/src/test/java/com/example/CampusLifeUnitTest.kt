@@ -199,4 +199,88 @@ class CampusLifeUnitTest {
         assertEquals("Mid-Term Examination: Operating Systems", exams.first().title)
         assertEquals("Capstone Milestone 1", projects.first().title)
     }
+
+    @Test
+    fun testCourseAttendanceDataModelCalculations() {
+        // Course 1: Safe (> 75%)
+        val safeCourse = com.example.model.CourseAttendance(
+            courseCode = "CS-302",
+            courseName = "Database Management Systems",
+            attendedClasses = 26,
+            totalClasses = 30,
+            targetPercentage = 75.0,
+            credits = 4,
+            faculty = "Dr. Ananya Roy"
+        )
+        assertEquals(86.67, safeCourse.attendancePercentage, 0.1)
+        assertEquals(0.8667f, safeCourse.progressFraction, 0.01f)
+        assertTrue(safeCourse.isSafe)
+        assertEquals(com.example.model.AttendanceStatus.SAFE, safeCourse.status)
+        assertEquals(4, safeCourse.missedClasses)
+        assertEquals(4, safeCourse.safeBunksLeft)
+        assertEquals(0, safeCourse.neededToReachTarget)
+        assertEquals("86.7%", safeCourse.formattedPercentage)
+
+        // Course 2: Warning / Critical (< 75%)
+        val lowCourse = com.example.model.CourseAttendance(
+            courseCode = "CS-304",
+            courseName = "Operating Systems",
+            attendedClasses = 19,
+            totalClasses = 28,
+            targetPercentage = 75.0,
+            credits = 4,
+            faculty = "Prof. K. Muralidhar"
+        )
+        assertEquals(67.86, lowCourse.attendancePercentage, 0.1)
+        assertEquals(0.6786f, lowCourse.progressFraction, 0.01f)
+        assertFalse(lowCourse.isSafe)
+        assertEquals(com.example.model.AttendanceStatus.CRITICAL, lowCourse.status)
+        assertEquals(9, lowCourse.missedClasses)
+        assertEquals(0, lowCourse.safeBunksLeft)
+        assertTrue(lowCourse.neededToReachTarget > 0)
+
+        // Course 3: Edge case 0 total classes
+        val newCourse = com.example.model.CourseAttendance(
+            courseCode = "CS-312",
+            courseName = "Cloud Computing",
+            attendedClasses = 0,
+            totalClasses = 0
+        )
+        assertEquals(100.0, newCourse.attendancePercentage, 0.01)
+        assertEquals(1.0f, newCourse.progressFraction, 0.01f)
+        assertTrue(newCourse.isSafe)
+
+        // Test projection calculation
+        val projectedAttending = lowCourse.calculateProjected(addAttended = 4, addMissed = 0)
+        // (19 + 4) / (28 + 4) = 23 / 32 = 71.875%
+        assertEquals(71.88, projectedAttending, 0.1)
+
+        // Test Summary calculation
+        val summary = com.example.model.CourseAttendanceSummary(listOf(safeCourse, lowCourse))
+        assertEquals(45, summary.totalAttended)
+        assertEquals(58, summary.totalClasses)
+        assertEquals(77.59, summary.overallPercentage, 0.1)
+        assertEquals(1, summary.safeCount)
+        assertEquals(1, summary.criticalCount)
+    }
+
+    @Test
+    fun testSubjectToCourseAttendanceMapping() {
+        val subject = Subject(
+            code = "CS-306",
+            name = "Computer Networks",
+            credits = 4,
+            faculty = "Dr. R. Venkat",
+            attendedClasses = 22,
+            totalClasses = 28,
+            room = "Lab 2"
+        )
+        val courseAttendance = com.example.model.CourseAttendance.fromSubject(subject)
+        assertEquals("CS-306", courseAttendance.courseCode)
+        assertEquals("Computer Networks", courseAttendance.courseName)
+        assertEquals(22, courseAttendance.attendedClasses)
+        assertEquals(28, courseAttendance.totalClasses)
+        assertEquals(78.57, courseAttendance.attendancePercentage, 0.1)
+        assertTrue(courseAttendance.isSafe)
+    }
 }

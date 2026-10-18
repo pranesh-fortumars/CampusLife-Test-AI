@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.CourseAttendanceTrackerComponent
 import com.example.ui.components.MainAcademicDashboard
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
@@ -275,7 +276,29 @@ fun HomeScreen(
             }
         }
 
-        // 3. Smart Student Tools (2x2 Grid)
+        // 3. Course Attendance Tracker (Percentages & Progress Bars for each course)
+        item {
+            CourseAttendanceTrackerComponent(
+                subjects = subjects,
+                onQuickAttend = { courseCode ->
+                    viewModel.quickLogClass(courseCode, isAttended = true)
+                },
+                onQuickMiss = { courseCode ->
+                    viewModel.quickLogClass(courseCode, isAttended = false)
+                },
+                onCourseClick = { courseCode ->
+                    val sub = subjects.find { it.code == courseCode }
+                    if (sub != null) {
+                        viewModel.selectSubjectDetail(sub)
+                    } else {
+                        viewModel.setTrackSubTab("Academics")
+                        onNavigateToTrack()
+                    }
+                }
+            )
+        }
+
+        // 4. Smart Student Tools (2x2 Grid)
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
