@@ -2,5 +2,7 @@
   "name": "CampusLife",
   "description": "College Student Super App - Track, organize, and excel in academics, attendance, projects, community, and career.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
