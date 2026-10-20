@@ -145,6 +145,12 @@ fun CampusLifeApp(
                         onBack = { viewModel.closeSubScreen() }
                     )
                 }
+                SubScreen.DAILY_ATTENDANCE_LOGGER -> {
+                    DailyAttendanceScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
                 SubScreen.NONE -> {
                     when (currentTab) {
                         AppDestination.HOME -> {

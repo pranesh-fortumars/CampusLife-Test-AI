@@ -256,6 +256,26 @@ fun HomeScreen(
 
                         FilledTonalButton(
                             onClick = {
+                                viewModel.openSubScreen(SubScreen.DAILY_ATTENDANCE_LOGGER)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ),
+                            modifier = Modifier.testTag("open_daily_attendance_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FactCheck,
+                                contentDescription = "Daily Attendance Logger",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Log Daily", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
                                 viewModel.setTrackSubTab("Timetable")
                                 onNavigateToTrack()
                             },

@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.MockData
 import com.example.data.local.AppDatabase
+import com.example.data.local.CourseGradeEntity
 import com.example.data.repository.AttendanceRepository
+import com.example.data.repository.GradeRepository
 import com.example.data.repository.TaskRepository
 import com.example.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,19 +33,33 @@ enum class SubScreen {
     ID_VERIFICATION,
     CAMPUS_COPILOT,
     EXECUTIVE_DESK,
-    REVISION_PLAN
+    REVISION_PLAN,
+    DAILY_ATTENDANCE_LOGGER
 }
 
 class CampusLifeViewModel(
     application: Application,
     private val repository: AttendanceRepository,
-    private val taskRepository: TaskRepository
+    private val taskRepository: TaskRepository,
+    private val gradeRepository: GradeRepository
 ) : AndroidViewModel(application) {
+
+    constructor(
+        application: Application,
+        repository: AttendanceRepository,
+        taskRepository: TaskRepository
+    ) : this(
+        application,
+        repository,
+        taskRepository,
+        GradeRepository(AppDatabase.getDatabase(application).gradeDao())
+    )
 
     constructor(application: Application) : this(
         application,
         AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao()),
-        TaskRepository(AppDatabase.getDatabase(application).taskDao())
+        TaskRepository(AppDatabase.getDatabase(application).taskDao()),
+        GradeRepository(AppDatabase.getDatabase(application).gradeDao())
     )
 
     companion object {
@@ -55,7 +71,8 @@ class CampusLifeViewModel(
                     return CampusLifeViewModel(
                         application = application,
                         repository = AttendanceRepository(db.attendanceDao()),
-                        taskRepository = TaskRepository(db.taskDao())
+                        taskRepository = TaskRepository(db.taskDao()),
+                        gradeRepository = GradeRepository(db.gradeDao())
                     ) as T
                 }
             }
@@ -187,6 +204,31 @@ class CampusLifeViewModel(
                     // Ignore
                 }
             }
+
+            launch {
+                try {
+                    gradeRepository.seedInitialGradesIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    gradeRepository.allGradeEntities.collect { entities ->
+                        if (entities.isNotEmpty()) {
+                            val grouped = entities.groupBy { it.semesterNumber }
+                            val updatedSemesters = _semesterGrades.value.map { sem ->
+                                val coursesInSem = grouped[sem.semesterNumber]?.map { it.toDomain() }
+                                if (coursesInSem != null && coursesInSem.isNotEmpty()) {
+                                    sem.copy(courses = coursesInSem)
+                                } else sem
+                            }
+                            _semesterGrades.value = updatedSemesters
+                            recalculateCgpa()
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
         }
     }
 
@@ -222,6 +264,13 @@ class CampusLifeViewModel(
             }
         }
         recalculateCgpa()
+        viewModelScope.launch {
+            try {
+                gradeRepository.updateCourseGrade(semesterNumber, courseCode, newGrade)
+            } catch (e: Exception) {
+                // In-memory already updated
+            }
+        }
     }
 
     fun addCourseGrade(semesterNumber: Int, courseGrade: CourseGrade) {
@@ -233,6 +282,13 @@ class CampusLifeViewModel(
             }
         }
         recalculateCgpa()
+        viewModelScope.launch {
+            try {
+                gradeRepository.insertGrade(courseGrade, semesterNumber)
+            } catch (e: Exception) {
+                // In-memory already updated
+            }
+        }
     }
 
     fun recalculateCgpa() {

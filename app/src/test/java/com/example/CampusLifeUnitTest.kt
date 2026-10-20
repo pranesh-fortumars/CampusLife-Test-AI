@@ -420,4 +420,83 @@ class CampusLifeUnitTest {
         val projected = gpaSummary.calculateProjectedCgpa(activeSemesterCredits = 20, projectedSgpa = 9.0)
         assertEquals(8.727, projected, 0.01)
     }
+
+    @Test
+    fun testCourseGradeEntityRoomMapping() {
+        val domainGrade = com.example.model.CourseGrade(
+            id = "grade-test-1",
+            courseCode = "CS-401",
+            courseName = "Compiler Design",
+            credits = 4,
+            grade = "A+",
+            gradePoint = 9.0,
+            isCompleted = true
+        )
+        val entity = com.example.data.local.CourseGradeEntity.fromDomain(
+            domain = domainGrade,
+            semesterNumber = 6,
+            semesterName = "Semester 6",
+            academicYear = "2026-27"
+        )
+        assertEquals("grade-test-1", entity.id)
+        assertEquals("CS-401", entity.courseCode)
+        assertEquals("Compiler Design", entity.courseName)
+        assertEquals(4, entity.credits)
+        assertEquals("A+", entity.grade)
+        assertEquals(9.0, entity.gradePoint, 0.001)
+        assertEquals(6, entity.semesterNumber)
+
+        val restored = entity.toDomain()
+        assertEquals(domainGrade.id, restored.id)
+        assertEquals(domainGrade.courseCode, restored.courseCode)
+        assertEquals(domainGrade.grade, restored.grade)
+        assertEquals(domainGrade.gradePoint, restored.gradePoint, 0.001)
+        assertEquals(36.0, restored.creditPoints, 0.001)
+    }
+
+    @Test
+    fun testDailyAttendanceAndOverallCoursePercentage() {
+        val course1 = Subject(
+            code = "CS-302",
+            name = "DBMS",
+            credits = 4,
+            faculty = "Dr. Roy",
+            attendedClasses = 26,
+            totalClasses = 30
+        )
+        val course2 = Subject(
+            code = "CS-304",
+            name = "Operating Systems",
+            credits = 4,
+            faculty = "Prof. Muralidhar",
+            attendedClasses = 20,
+            totalClasses = 25
+        )
+
+        // Course 1: 26/30 = 86.67%
+        // Course 2: 20/25 = 80.0%
+        // Total: 46 / 55 = 83.64%
+        val totalAttended = listOf(course1, course2).sumOf { it.attendedClasses }
+        val totalClasses = listOf(course1, course2).sumOf { it.totalClasses }
+        val overallPct = (totalAttended.toDouble() / totalClasses) * 100.0
+
+        assertEquals(46, totalAttended)
+        assertEquals(55, totalClasses)
+        assertEquals(83.636, overallPct, 0.01)
+
+        // Log 1 daily attendance attended for course 2
+        val updatedCourse2 = course2.copy(
+            attendedClasses = course2.attendedClasses + 1,
+            totalClasses = course2.totalClasses + 1
+        )
+        // New Course 2: 21 / 26 = 80.77%
+        assertEquals(80.769, updatedCourse2.attendancePercentage, 0.01)
+
+        // New total: 47 / 56 = 83.93%
+        val newTotalAttended = course1.attendedClasses + updatedCourse2.attendedClasses
+        val newTotalClasses = course1.totalClasses + updatedCourse2.totalClasses
+        val newOverallPct = (newTotalAttended.toDouble() / newTotalClasses) * 100.0
+        assertEquals(83.928, newOverallPct, 0.01)
+    }
 }
+
