@@ -20,6 +20,13 @@ class ExampleRobolectricTest {
   }
 
   @Test
+  fun `test MainActivity instantiation`() {
+    val controller = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup()
+    val activity = controller.get()
+    org.junit.Assert.assertNotNull(activity)
+  }
+
+  @Test
   fun `test CampusLifeViewModel instantiation via AndroidViewModelFactory`() {
     val application = ApplicationProvider.getApplicationContext<android.app.Application>()
     val factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(application)

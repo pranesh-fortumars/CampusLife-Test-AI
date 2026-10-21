@@ -1,0 +1,5 @@
+-keep class com.example.** { *; }
+-keep class com.example.MainActivity { *; }
+-keep class androidx.activity.** { *; }
+-keep class androidx.core.** { *; }
+-keep class androidx.lifecycle.** { *; }
