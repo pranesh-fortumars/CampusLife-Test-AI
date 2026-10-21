@@ -498,5 +498,69 @@ class CampusLifeUnitTest {
         val newOverallPct = (newTotalAttended.toDouble() / newTotalClasses) * 100.0
         assertEquals(83.928, newOverallPct, 0.01)
     }
+
+    @Test
+    fun testTaskListFilteringAndSorting() {
+        val task1 = com.example.model.AcademicTask(
+            id = "t-1",
+            title = "OS Lab Assignment",
+            subjectCode = "CS-304",
+            subjectName = "Operating Systems",
+            category = "Assignment",
+            priority = "URGENT",
+            dueTimestamp = 1000L,
+            dueDate = "Today",
+            isCompleted = false
+        )
+        val task2 = com.example.model.AcademicTask(
+            id = "t-2",
+            title = "DBMS Midterm Exam",
+            subjectCode = "CS-302",
+            subjectName = "DBMS",
+            category = "Exam",
+            priority = "HIGH",
+            dueTimestamp = 2000L,
+            dueDate = "Next Week",
+            isCompleted = false
+        )
+        val task3 = com.example.model.AcademicTask(
+            id = "t-3",
+            title = "CN Socket Programming",
+            subjectCode = "CS-306",
+            subjectName = "Computer Networks",
+            category = "Project",
+            priority = "MEDIUM",
+            dueTimestamp = 3000L,
+            dueDate = "Oct 28",
+            isCompleted = true
+        )
+
+        val allTasks = listOf(task1, task2, task3)
+
+        // Filter: Pending (All Due)
+        val pending = allTasks.filter { !it.isCompleted }
+        assertEquals(2, pending.size)
+
+        // Filter: Completed
+        val completed = allTasks.filter { it.isCompleted }
+        assertEquals(1, completed.size)
+        assertEquals("CN Socket Programming", completed.first().title)
+
+        // Filter: Exams
+        val exams = allTasks.filter { it.category.equals("Exam", ignoreCase = true) }
+        assertEquals(1, exams.size)
+        assertEquals("CS-302", exams.first().subjectCode)
+
+        // Sort by Due Date
+        val sortedByDate = allTasks.sortedBy { it.dueTimestamp }
+        assertEquals("t-1", sortedByDate[0].id)
+        assertEquals("t-2", sortedByDate[1].id)
+        assertEquals("t-3", sortedByDate[2].id)
+
+        // Toggle task completion
+        val toggledTask1 = task1.copy(isCompleted = !task1.isCompleted)
+        assertTrue(toggledTask1.isCompleted)
+    }
 }
+
 

@@ -34,7 +34,8 @@ enum class SubScreen {
     CAMPUS_COPILOT,
     EXECUTIVE_DESK,
     REVISION_PLAN,
-    DAILY_ATTENDANCE_LOGGER
+    DAILY_ATTENDANCE_LOGGER,
+    TASKS_LIST
 }
 
 class CampusLifeViewModel(
