@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AcademicTask
 import com.example.model.Subject
 import com.example.viewmodel.CampusLifeViewModel
+import com.example.viewmodel.TaskViewModel
 
 enum class TaskSortOption(val label: String) {
     DUE_DATE("Earliest Due Date"),
@@ -45,7 +46,43 @@ enum class TaskSortOption(val label: String) {
 
 /**
  * Screen layout for viewing and managing tasks from the Room database in a list,
- * designed with Material 3 cards, rich urgency indicators, filters, and interactive actions.
+ * using [TaskViewModel] for state management and CRUD operations.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TasksListScreen(
+    taskViewModel: TaskViewModel,
+    subjects: List<Subject> = emptyList(),
+    onBack: () -> Unit
+) {
+    val tasks by taskViewModel.academicTasks.collectAsState()
+
+    TasksListScreenContent(
+        tasks = tasks,
+        subjects = subjects,
+        onToggleComplete = { id -> taskViewModel.toggleTaskCompleted(id) },
+        onAddTask = { title, code, name, category, type, date, time, priority, weight, note ->
+            taskViewModel.addTask(
+                title = title,
+                subjectCode = code,
+                subjectName = name,
+                category = category,
+                type = type,
+                dueDate = date,
+                dueTime = time,
+                priority = priority,
+                weightage = weight,
+                note = note
+            )
+        },
+        onDeleteTask = { id -> taskViewModel.deleteTask(id) },
+        onBack = onBack
+    )
+}
+
+/**
+ * Screen layout for viewing and managing tasks from the Room database in a list,
+ * using [CampusLifeViewModel] for state management and CRUD operations.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,10 +90,43 @@ fun TasksListScreen(
     viewModel: CampusLifeViewModel,
     onBack: () -> Unit
 ) {
-    BackHandler { onBack() }
-
     val tasks by viewModel.academicTasks.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
+
+    TasksListScreenContent(
+        tasks = tasks,
+        subjects = subjects,
+        onToggleComplete = { id -> viewModel.toggleAcademicTaskComplete(id) },
+        onAddTask = { title, code, name, category, type, date, time, priority, weight, note ->
+            viewModel.addAcademicTask(
+                title = title,
+                subjectCode = code,
+                subjectName = name,
+                category = category,
+                type = type,
+                dueDate = date,
+                dueTime = time,
+                priority = priority,
+                weightage = weight,
+                note = note
+            )
+        },
+        onDeleteTask = { id -> viewModel.deleteAcademicTask(id) },
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TasksListScreenContent(
+    tasks: List<AcademicTask>,
+    subjects: List<Subject>,
+    onToggleComplete: (String) -> Unit,
+    onAddTask: (String, String, String, String, String, String, String, String, String, String) -> Unit,
+    onDeleteTask: (String) -> Unit,
+    onBack: () -> Unit
+) {
+    BackHandler { onBack() }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All Due") }
@@ -321,7 +391,7 @@ fun TasksListScreen(
                 items(filteredTasks, key = { it.id }) { task ->
                     Material3TaskCard(
                         task = task,
-                        onToggleComplete = { viewModel.toggleAcademicTaskComplete(task.id) },
+                        onToggleComplete = { onToggleComplete(task.id) },
                         onDelete = { taskToDelete = task }
                     )
                 }
@@ -335,17 +405,17 @@ fun TasksListScreen(
             subjects = subjects,
             onDismiss = { showAddDialog = false },
             onConfirm = { title, code, name, category, type, date, time, priority, weight, note ->
-                viewModel.addAcademicTask(
-                    title = title,
-                    subjectCode = code,
-                    subjectName = name,
-                    category = category,
-                    type = type,
-                    dueDate = date,
-                    dueTime = time,
-                    priority = priority,
-                    weightage = weight,
-                    note = note
+                onAddTask(
+                    title,
+                    code,
+                    name,
+                    category,
+                    type,
+                    date,
+                    time,
+                    priority,
+                    weight,
+                    note
                 )
                 showAddDialog = false
             }
@@ -362,7 +432,7 @@ fun TasksListScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.deleteAcademicTask(task.id)
+                        onDeleteTask(task.id)
                         taskToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),

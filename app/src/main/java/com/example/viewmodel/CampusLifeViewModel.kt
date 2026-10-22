@@ -56,11 +56,21 @@ class CampusLifeViewModel(
         GradeRepository(AppDatabase.getDatabase(application).gradeDao())
     )
 
+    constructor(
+        application: Application,
+        taskDao: com.example.data.local.TaskDao
+    ) : this(
+        application,
+        AttendanceRepository(AppDatabase.provideAttendanceDao(application)),
+        TaskRepository(taskDao),
+        GradeRepository(AppDatabase.provideGradeDao(application))
+    )
+
     constructor(application: Application) : this(
         application,
-        AttendanceRepository(AppDatabase.getDatabase(application).attendanceDao()),
-        TaskRepository(AppDatabase.getDatabase(application).taskDao()),
-        GradeRepository(AppDatabase.getDatabase(application).gradeDao())
+        AttendanceRepository(AppDatabase.provideAttendanceDao(application)),
+        TaskRepository(AppDatabase.provideTaskDao(application)),
+        GradeRepository(AppDatabase.provideGradeDao(application))
     )
 
     companion object {

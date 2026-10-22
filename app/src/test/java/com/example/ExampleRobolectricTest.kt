@@ -58,4 +58,54 @@ class ExampleRobolectricTest {
     taskDao.setTaskCompleted("robo-task-1", true)
     org.junit.Assert.assertEquals("Project", task.category)
   }
+
+  @Test
+  fun `test AppDatabase singleton builder and provider`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db1 = com.example.data.local.AppDatabase.getDatabase(context)
+    val db2 = com.example.data.local.AppDatabase.getInstance(context)
+    org.junit.Assert.assertSame(db1, db2)
+    org.junit.Assert.assertEquals("campuslife_db", com.example.data.local.AppDatabase.DATABASE_NAME)
+
+    val taskDao1 = com.example.data.local.AppDatabase.provideTaskDao(context)
+    val taskDao2 = com.example.data.local.DatabaseProvider.provideTaskDao(context)
+    org.junit.Assert.assertNotNull(taskDao1)
+    org.junit.Assert.assertNotNull(taskDao2)
+  }
+
+  @Test
+  fun `test TaskViewModel injection via TaskDao and Factory`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val taskDao = com.example.data.local.AppDatabase.provideTaskDao(context)
+    org.junit.Assert.assertNotNull(taskDao)
+
+    // Direct constructor injection of TaskDao
+    val viewModel = com.example.viewmodel.TaskViewModel(taskDao)
+    org.junit.Assert.assertNotNull(viewModel)
+
+    // Factory provider injection
+    val factory = com.example.viewmodel.TaskViewModel.provideFactory(taskDao)
+    val vmFromFactory = factory.create(com.example.viewmodel.TaskViewModel::class.java)
+    org.junit.Assert.assertNotNull(vmFromFactory)
+
+    // Context-based factory provider using singleton database
+    val contextFactory = com.example.viewmodel.TaskViewModel.provideFactory(context)
+    val vmFromContextFactory = contextFactory.create(com.example.viewmodel.TaskViewModel::class.java)
+    org.junit.Assert.assertNotNull(vmFromContextFactory)
+
+    // Task CRUD operations through injected TaskViewModel
+    val testTask = com.example.model.AcademicTask(
+      id = "tvm-test-1",
+      title = "Injected TaskViewModel Test Task",
+      subjectCode = "CS-302",
+      subjectName = "DBMS",
+      category = "Assignment",
+      dueDate = "Today",
+      isCompleted = false
+    )
+    viewModel.insertTask(testTask)
+    viewModel.toggleTaskCompletion(testTask)
+    viewModel.deleteTask("tvm-test-1")
+    viewModel.clearUserMessage()
+  }
 }
