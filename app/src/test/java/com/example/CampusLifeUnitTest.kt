@@ -561,6 +561,37 @@ class CampusLifeUnitTest {
         val toggledTask1 = task1.copy(isCompleted = !task1.isCompleted)
         assertTrue(toggledTask1.isCompleted)
     }
+
+    @Test
+    fun testTaskEntityIsCompletedFieldAndToggle() {
+        val entity = com.example.data.local.TaskEntity(
+            id = "unit-test-task",
+            title = "Test Entity Completion Status",
+            subjectCode = "CS-302",
+            subjectName = "DBMS",
+            dueDate = "Tomorrow",
+            isCompleted = false,
+            progressPercent = 0
+        )
+        assertFalse(entity.isCompleted)
+        assertEquals(0, entity.progressPercent)
+
+        // Toggle to true
+        val completedEntity = entity.toggleCompleted()
+        assertTrue(completedEntity.isCompleted)
+        assertEquals(100, completedEntity.progressPercent)
+
+        // Toggle back to false
+        val revertedEntity = completedEntity.toggleCompleted()
+        assertFalse(revertedEntity.isCompleted)
+        assertEquals(0, revertedEntity.progressPercent)
+
+        // Domain conversion test
+        val domain = completedEntity.toDomain()
+        assertTrue(domain.isCompleted)
+        val fromDomain = com.example.data.local.TaskEntity.fromDomain(domain)
+        assertTrue(fromDomain.isCompleted)
+    }
 }
 
 

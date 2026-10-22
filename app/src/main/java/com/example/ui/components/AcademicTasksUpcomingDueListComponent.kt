@@ -356,22 +356,30 @@ fun UpcomingAcademicTaskItemCard(
                 verticalAlignment = Alignment.Top
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onToggleComplete() },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = task.isCompleted,
-                        onCheckedChange = { onToggleComplete() },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = Tertiary,
-                            uncheckedColor = MaterialTheme.colorScheme.outline
-                        ),
+                    Box(
                         modifier = Modifier
-                            .size(24.dp)
-                            .testTag("task_checkbox_${task.id}")
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                            .size(48.dp)
+                            .testTag("task_checkbox_box_${task.id}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Checkbox(
+                            checked = task.isCompleted,
+                            onCheckedChange = { onToggleComplete() },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = Tertiary,
+                                uncheckedColor = MaterialTheme.colorScheme.outline
+                            ),
+                            modifier = Modifier.testTag("task_checkbox_${task.id}")
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = task.title,
                             style = MaterialTheme.typography.bodyLarge,

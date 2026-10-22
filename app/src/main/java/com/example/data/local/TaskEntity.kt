@@ -1,10 +1,16 @@
 package com.example.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.model.AcademicTask
 import java.util.UUID
 
+/**
+ * Room database entity for Academic Tasks.
+ * Includes explicit tracking for the boolean 'isCompleted' completion status,
+ * priority, due dates, course associations, and timestamps.
+ */
 @Entity(tableName = "tasks")
 data class TaskEntity(
     @PrimaryKey
@@ -18,6 +24,7 @@ data class TaskEntity(
     val dueTime: String = "11:59 PM",
     val priority: String = "HIGH",   // "URGENT", "HIGH", "MEDIUM", "LOW"
     val weightage: String = "15% Internal",
+    @ColumnInfo(name = "isCompleted", defaultValue = "0")
     val isCompleted: Boolean = false,
     val progressPercent: Int = 0,    // 0 to 100
     val faculty: String = "",
@@ -25,6 +32,18 @@ data class TaskEntity(
     val dueTimestamp: Long = System.currentTimeMillis() + 86400000L,
     val createdAt: Long = System.currentTimeMillis()
 ) {
+    /**
+     * Returns a copy of the task with toggled completion status.
+     * When completed, progress is updated to 100%; when unmarked, restored to 0%.
+     */
+    fun toggleCompleted(): TaskEntity {
+        val nextCompleted = !isCompleted
+        return copy(
+            isCompleted = nextCompleted,
+            progressPercent = if (nextCompleted) 100 else 0
+        )
+    }
+
     fun toDomain(): AcademicTask {
         return AcademicTask(
             id = id,

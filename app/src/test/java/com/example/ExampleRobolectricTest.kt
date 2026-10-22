@@ -104,7 +104,18 @@ class ExampleRobolectricTest {
       isCompleted = false
     )
     viewModel.insertTask(testTask)
-    viewModel.toggleTaskCompletion(testTask)
+    val inserted = taskDao.getTaskById("tvm-test-1")
+    org.junit.Assert.assertNotNull(inserted)
+    org.junit.Assert.assertFalse(inserted!!.isCompleted)
+
+    // Toggle completion atomically
+    val newStatus = taskDao.toggleTaskCompletion("tvm-test-1")
+    org.junit.Assert.assertTrue(newStatus)
+    val toggled = taskDao.getTaskById("tvm-test-1")
+    org.junit.Assert.assertTrue(toggled!!.isCompleted)
+
+    // Toggle back via ViewModel method
+    viewModel.toggleTaskCompletion("tvm-test-1")
     viewModel.deleteTask("tvm-test-1")
     viewModel.clearUserMessage()
   }

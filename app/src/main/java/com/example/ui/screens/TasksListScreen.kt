@@ -665,6 +665,34 @@ fun Material3TaskCard(
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                         )
                     }
+
+                    // Completion Status Badge with quick-toggle tap
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (task.isCompleted) Color(0xFFDCFCE7) else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier
+                            .clickable { onToggleComplete() }
+                            .testTag("task_status_pill_${task.id}")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                contentDescription = null,
+                                tint = if (task.isCompleted) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = if (task.isCompleted) "Completed" else "Pending",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (task.isCompleted) Color(0xFF15803D) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
 
                 // Delete Icon
@@ -685,16 +713,18 @@ fun Material3TaskCard(
 
             // Main Content Row: Checkbox and Task Title
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onToggleComplete() }
+                    .testTag("task_row_toggle_${task.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Interactive Checkbox with 48dp minimum touch target
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .clickable { onToggleComplete() }
+                        .size(48.dp)
                         .testTag("toggle_task_checkbox_${task.id}"),
                     contentAlignment = Alignment.Center
                 ) {

@@ -36,6 +36,9 @@ class TaskViewModel(
             initialValue = emptyList()
         )
 
+    val tasks: StateFlow<List<AcademicTask>> = allTasks
+    val academicTasks: StateFlow<List<AcademicTask>> = allTasks
+
     val pendingTasks: StateFlow<List<AcademicTask>> = repository.pendingTasks
         .stateIn(
             scope = viewModelScope,
@@ -51,6 +54,13 @@ class TaskViewModel(
         )
 
     val assignmentsAndExams: StateFlow<List<AcademicTask>> = repository.assignmentsAndExams
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val completedTasks: StateFlow<List<AcademicTask>> = repository.completedTasks
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -87,17 +97,34 @@ class TaskViewModel(
         _selectedSort.value = sortOption
     }
 
-    fun toggleTaskCompletion(task: AcademicTask) {
+    /**
+     * Toggles task completion by ID atomically via the repository.
+     */
+    fun toggleTaskCompletion(taskId: String) {
         viewModelScope.launch {
-            val newStatus = !task.isCompleted
-            repository.setTaskCompleted(task.id, newStatus)
+            val newStatus = repository.toggleTaskCompletion(taskId)
             _userMessage.value = if (newStatus) "Marked task as completed" else "Marked task as pending"
         }
+    }
+
+    /**
+     * Toggles task completion for domain AcademicTask.
+     */
+    fun toggleTaskCompletion(task: AcademicTask) {
+        toggleTaskCompletion(task.id)
+    }
+
+    /**
+     * Toggles task completion for Room TaskEntity.
+     */
+    fun toggleTaskCompletion(taskEntity: TaskEntity) {
+        toggleTaskCompletion(taskEntity.id)
     }
 
     fun setTaskCompleted(id: String, isCompleted: Boolean) {
         viewModelScope.launch {
             repository.setTaskCompleted(id, isCompleted)
+            _userMessage.value = if (isCompleted) "Marked task as completed" else "Marked task as pending"
         }
     }
 
@@ -127,6 +154,55 @@ class TaskViewModel(
             repository.deleteTask(id)
             _userMessage.value = "Task deleted"
         }
+    }
+
+    fun toggleTaskCompleted(id: String) {
+        toggleTaskCompletion(id)
+    }
+
+    fun addTask(task: TaskEntity) {
+        insertTask(task)
+    }
+
+    fun addTask(task: AcademicTask) {
+        insertTask(task)
+    }
+
+    fun addTask(
+        title: String,
+        subjectCode: String,
+        subjectName: String,
+        category: String = "Assignment",
+        type: String = "ASSIGNMENT",
+        dueDate: String = "Upcoming",
+        dueTime: String = "11:59 PM",
+        priority: String = "HIGH",
+        weightage: String = "",
+        note: String = ""
+    ) {
+        val newTask = AcademicTask(
+            id = java.util.UUID.randomUUID().toString(),
+            title = title.trim(),
+            subjectCode = subjectCode.trim().uppercase(),
+            subjectName = subjectName.trim(),
+            category = category,
+            type = type,
+            dueDate = dueDate.trim(),
+            dueTime = dueTime.trim(),
+            priority = priority,
+            weightage = weightage.trim(),
+            isCompleted = false,
+            note = note.trim()
+        )
+        insertTask(newTask)
+    }
+
+    fun getTasksForSubject(subjectCode: String): kotlinx.coroutines.flow.Flow<List<AcademicTask>> {
+        return repository.getTasksForSubject(subjectCode)
+    }
+
+    fun getTasksByCategory(category: String): kotlinx.coroutines.flow.Flow<List<AcademicTask>> {
+        return repository.getTasksByCategory(category)
     }
 
     fun clearUserMessage() {

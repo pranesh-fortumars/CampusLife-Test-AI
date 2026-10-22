@@ -24,6 +24,10 @@ class TaskRepository(private val dao: TaskDao) {
         entities.map { it.toDomain() }
     }
 
+    val completedTasks: Flow<List<AcademicTask>> = dao.getCompletedTasks().map { entities ->
+        entities.map { it.toDomain() }
+    }
+
     fun getTasksForSubject(subjectCode: String): Flow<List<AcademicTask>> {
         return dao.getTasksForSubject(subjectCode).map { entities ->
             entities.map { it.toDomain() }
@@ -182,6 +186,10 @@ class TaskRepository(private val dao: TaskDao) {
 
     suspend fun setTaskCompleted(id: String, isCompleted: Boolean) {
         dao.setTaskCompleted(id, isCompleted)
+    }
+
+    suspend fun toggleTaskCompletion(id: String): Boolean {
+        return dao.toggleTaskCompletion(id)
     }
 
     suspend fun deleteTask(id: String) {
