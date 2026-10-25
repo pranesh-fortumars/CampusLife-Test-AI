@@ -64,12 +64,13 @@ fun TrackScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .testTag("track_screen")
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .testTag("track_screen")
+        ) {
         // Sub-tab Navigation Pill Carousel
         LazyRow(
             modifier = Modifier
@@ -338,6 +339,16 @@ fun TrackScreen(
             }
         }
     }
+
+    if (activeSubTab == "Assignments" || activeSubTab == "Exams") {
+        com.example.ui.components.AddTaskFabAndDialog(
+            viewModel = viewModel,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 16.dp, end = 16.dp)
+        )
+    }
+}
 
     // Modal dialogs
     if (loggingSubject != null) {

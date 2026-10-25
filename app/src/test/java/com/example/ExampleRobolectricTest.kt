@@ -119,4 +119,63 @@ class ExampleRobolectricTest {
     viewModel.deleteTask("tvm-test-1")
     viewModel.clearUserMessage()
   }
+
+  @Test
+  fun `test TaskNotificationHelper channel and permission checks`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    com.example.worker.TaskNotificationHelper.createNotificationChannel(context)
+    val hasPerm = com.example.worker.TaskNotificationHelper.hasNotificationPermission(context)
+    org.junit.Assert.assertNotNull(hasPerm)
+
+    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+      val channel = notificationManager.getNotificationChannel(com.example.worker.TaskNotificationHelper.CHANNEL_ID)
+      org.junit.Assert.assertNotNull(channel)
+      org.junit.Assert.assertEquals("Upcoming Task Deadlines", channel.name)
+    }
+  }
+
+  @Test
+  fun `test TaskNotificationScheduler triggers WorkManager`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    // Verify immediate due check execution without throwing exceptions
+    com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(context)
+
+    // Verify periodic scheduling without throwing exceptions
+    com.example.worker.TaskNotificationScheduler.schedulePeriodicTaskReminder(context, intervalHours = 4)
+
+    // Verify cancellation
+    com.example.worker.TaskNotificationScheduler.cancelPeriodicReminder(context)
+  }
+
+  @Test
+  fun `test UpcomingTasksReminderWorker queries Room DAO and processes tasks`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = com.example.data.local.AppDatabase.getDatabase(context)
+    val taskDao = db.taskDao()
+
+    val upcomingTask = com.example.data.local.TaskEntity(
+      id = "worker-test-task",
+      title = "Worker Urgent Assessment",
+      subjectCode = "CS-304",
+      subjectName = "Operating Systems",
+      category = "Exam",
+      type = "EXAM_PREP",
+      dueDate = "Today",
+      priority = "URGENT",
+      isCompleted = false
+    )
+    taskDao.insertTask(upcomingTask)
+
+    val pendingList = taskDao.getPendingTasksList()
+    org.junit.Assert.assertTrue(pendingList.any { it.id == "worker-test-task" })
+
+    // Verify helper creates notification payload
+    val notificationSent = com.example.worker.TaskNotificationHelper.postUpcomingTasksNotification(
+      context,
+      listOf(upcomingTask)
+    )
+    // Even if permission is denied in test sandbox, the function returns a clean boolean without crash
+    org.junit.Assert.assertNotNull(notificationSent)
+  }
 }

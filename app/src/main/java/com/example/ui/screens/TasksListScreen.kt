@@ -217,6 +217,21 @@ fun TasksListScreenContent(
                     }
                 },
                 actions = {
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    IconButton(
+                        onClick = {
+                            com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(context)
+                            android.widget.Toast.makeText(context, "WorkManager: Checking upcoming deadlines...", android.widget.Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.testTag("workmanager_reminder_action_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = "Trigger WorkManager task reminder",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     Box {
                         IconButton(
                             onClick = { showSortMenu = true },
@@ -259,13 +274,8 @@ fun TasksListScreenContent(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showAddDialog = true },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("New Task", fontWeight = FontWeight.Bold) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("fab_add_task")
+            com.example.ui.components.AddTaskFloatingActionButton(
+                onClick = { showAddDialog = true }
             )
         }
     ) { innerPadding ->
@@ -401,10 +411,11 @@ fun TasksListScreenContent(
 
     // Add New Task Dialog
     if (showAddDialog) {
-        AddNewTaskDialog(
+        val context = androidx.compose.ui.platform.LocalContext.current
+        com.example.ui.components.AddTaskDialog(
             subjects = subjects,
             onDismiss = { showAddDialog = false },
-            onConfirm = { title, code, name, category, type, date, time, priority, weight, note ->
+            onConfirm = { title, code, name, category, type, date, time, priority, weight, note, scheduleReminder ->
                 onAddTask(
                     title,
                     code,
@@ -417,6 +428,9 @@ fun TasksListScreenContent(
                     weight,
                     note
                 )
+                if (scheduleReminder) {
+                    com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(context)
+                }
                 showAddDialog = false
             }
         )

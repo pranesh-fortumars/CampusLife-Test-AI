@@ -27,9 +27,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        com.example.worker.TaskNotificationHelper.createNotificationChannel(this)
+        val navigateToTasks = intent.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
+
         setContent {
             CampusLifeTheme {
-                CampusLifeApp()
+                CampusLifeApp(initialOpenTasks = navigateToTasks)
             }
         }
     }
@@ -37,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun CampusLifeApp(
+    initialOpenTasks: Boolean = false,
     viewModel: CampusLifeViewModel = run {
         val context = androidx.compose.ui.platform.LocalContext.current
         val app = context.applicationContext as android.app.Application
@@ -50,6 +54,28 @@ fun CampusLifeApp(
     val selectedSubject by viewModel.selectedSubject.collectAsState()
     val userFeedbackMessage by viewModel.userFeedbackMessage.collectAsState()
     val snackbarHostState = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+
+    // Request notification permission on Android 13+ (API 33+)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                com.example.worker.TaskNotificationScheduler.schedulePeriodicTaskReminder(context)
+            }
+        }
+    )
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (!com.example.worker.TaskNotificationHelper.hasNotificationPermission(context)) {
+                permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (initialOpenTasks) {
+            viewModel.openSubScreen(SubScreen.TASKS_LIST)
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(userFeedbackMessage) {
         val msg = userFeedbackMessage
@@ -82,7 +108,9 @@ fun CampusLifeApp(
                 CampusLifeTopBar(
                     subtitle = subtitle,
                     onSearchClick = {},
-                    onNotificationsClick = {},
+                    onNotificationsClick = {
+                        viewModel.triggerUpcomingTasksReminder()
+                    },
                     onProfileClick = { viewModel.selectTab(AppDestination.ME) },
                     onExecutiveDeskClick = { viewModel.openSubScreen(SubScreen.EXECUTIVE_DESK) }
                 )

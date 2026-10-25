@@ -204,6 +204,7 @@ class CampusLifeViewModel(
             launch {
                 try {
                     taskRepository.seedInitialTasksIfEmpty()
+                    com.example.worker.TaskNotificationScheduler.schedulePeriodicTaskReminder(application)
                 } catch (e: Exception) {
                     // Ignore
                 }
@@ -600,10 +601,18 @@ class CampusLifeViewModel(
             try {
                 taskRepository.insertTask(newTask)
                 _userFeedbackMessage.value = "Added deadline: $title"
+                if (priority == "URGENT" || dueDate.contains("Today", ignoreCase = true) || dueDate.contains("Tomorrow", ignoreCase = true)) {
+                    com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(getApplication())
+                }
             } catch (e: Exception) {
                 _academicTasks.update { listOf(newTask) + it }
             }
         }
+    }
+
+    fun triggerUpcomingTasksReminder() {
+        com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(getApplication())
+        _userFeedbackMessage.value = "WorkManager checking upcoming deadlines..."
     }
 
     fun deleteAcademicTask(id: String) {

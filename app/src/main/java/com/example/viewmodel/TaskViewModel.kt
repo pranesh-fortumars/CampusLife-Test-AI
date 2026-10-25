@@ -209,6 +209,15 @@ class TaskViewModel(
         _userMessage.value = null
     }
 
+    fun triggerUpcomingTasksReminder(context: Context) {
+        com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(context)
+        _userMessage.value = "WorkManager checking upcoming deadlines..."
+    }
+
+    fun schedulePeriodicReminders(context: Context, intervalHours: Long = 4) {
+        com.example.worker.TaskNotificationScheduler.schedulePeriodicTaskReminder(context, intervalHours)
+    }
+
     companion object {
         /**
          * Factory provider to inject TaskDao into TaskViewModel.
