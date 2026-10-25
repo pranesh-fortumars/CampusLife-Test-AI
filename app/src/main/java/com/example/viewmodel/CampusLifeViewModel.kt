@@ -42,7 +42,9 @@ class CampusLifeViewModel(
     application: Application,
     private val repository: AttendanceRepository,
     private val taskRepository: TaskRepository,
-    private val gradeRepository: GradeRepository
+    private val gradeRepository: GradeRepository,
+    private val projectRepository: com.example.data.repository.AcademicProjectRepository =
+        com.example.data.repository.AcademicProjectRepository(AppDatabase.provideProjectDao(application))
 ) : AndroidViewModel(application) {
 
     constructor(
@@ -109,6 +111,9 @@ class CampusLifeViewModel(
 
     private val _academicTasks = MutableStateFlow<List<AcademicTask>>(emptyList())
     val academicTasks: StateFlow<List<AcademicTask>> = _academicTasks.asStateFlow()
+
+    private val _academicProjects = MutableStateFlow<List<com.example.data.local.AcademicProjectEntity>>(emptyList())
+    val academicProjects: StateFlow<List<com.example.data.local.AcademicProjectEntity>> = _academicProjects.asStateFlow()
 
     private val _assignments = MutableStateFlow(MockData.assignments)
     val assignments: StateFlow<List<AssignmentItem>> = _assignments.asStateFlow()
@@ -236,6 +241,21 @@ class CampusLifeViewModel(
                             _semesterGrades.value = updatedSemesters
                             recalculateCgpa()
                         }
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    projectRepository.seedInitialProjectsIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    projectRepository.allProjects.collect { projects ->
+                        _academicProjects.value = projects
                     }
                 } catch (e: Exception) {
                     // Ignore
@@ -622,6 +642,63 @@ class CampusLifeViewModel(
                 _userFeedbackMessage.value = "Deleted deadline"
             } catch (e: Exception) {
                 _academicTasks.update { list -> list.filter { it.id != id } }
+            }
+        }
+    }
+
+    fun toggleAcademicProjectComplete(id: String) {
+        viewModelScope.launch {
+            try {
+                projectRepository.toggleProjectCompletion(id)
+            } catch (e: Exception) {
+                _academicProjects.update { list ->
+                    list.map { if (it.id == id) it.toggleCompleted() else it }
+                }
+            }
+        }
+    }
+
+    fun deleteAcademicProject(id: String) {
+        viewModelScope.launch {
+            try {
+                projectRepository.deleteProjectById(id)
+                _userFeedbackMessage.value = "Deleted project"
+            } catch (e: Exception) {
+                _academicProjects.update { list -> list.filter { it.id != id } }
+            }
+        }
+    }
+
+    fun addAcademicProject(
+        title: String,
+        subjectCode: String,
+        subjectName: String,
+        description: String,
+        techStack: String,
+        deadlineDate: String,
+        totalMilestones: Int,
+        weightage: String,
+        githubUrl: String,
+        teamMembers: String
+    ) {
+        val newProj = com.example.data.local.AcademicProjectEntity(
+            title = title,
+            subjectCode = subjectCode,
+            subjectName = subjectName,
+            description = description,
+            techStack = techStack,
+            deadlineDate = deadlineDate,
+            totalMilestones = totalMilestones,
+            weightage = weightage,
+            githubUrl = githubUrl,
+            teamMembers = teamMembers
+        )
+        viewModelScope.launch {
+            try {
+                projectRepository.insertProject(newProj)
+                _userFeedbackMessage.value = "Added capstone project: $title"
+            } catch (e: Exception) {
+                _academicProjects.update { it + newProj }
             }
         }
     }

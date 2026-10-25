@@ -14,9 +14,10 @@ import androidx.room.RoomDatabase
         SubjectEntity::class,
         AttendanceRecordEntity::class,
         TaskEntity::class,
-        CourseGradeEntity::class
+        CourseGradeEntity::class,
+        AcademicProjectEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun attendanceDao(): AttendanceDao
     abstract fun taskDao(): TaskDao
     abstract fun gradeDao(): GradeDao
+    abstract fun projectDao(): AcademicProjectDao
 
     companion object {
         const val DATABASE_NAME = "campuslife_db"
@@ -76,6 +78,13 @@ abstract class AppDatabase : RoomDatabase() {
         fun provideGradeDao(context: Context): GradeDao {
             return getDatabase(context).gradeDao()
         }
+
+        /**
+         * Singleton provider function that supplies the AcademicProjectDao directly.
+         */
+        fun provideProjectDao(context: Context): AcademicProjectDao {
+            return getDatabase(context).projectDao()
+        }
     }
 }
 
@@ -92,4 +101,5 @@ object DatabaseProvider {
     fun provideTaskDao(context: Context): TaskDao = AppDatabase.provideTaskDao(context)
     fun provideAttendanceDao(context: Context): AttendanceDao = AppDatabase.provideAttendanceDao(context)
     fun provideGradeDao(context: Context): GradeDao = AppDatabase.provideGradeDao(context)
+    fun provideProjectDao(context: Context): AcademicProjectDao = AppDatabase.provideProjectDao(context)
 }

@@ -680,7 +680,43 @@ class CampusLifeUnitTest {
         assertEquals(com.example.model.LectureAttendanceStatus.PRESENT, log.status)
         assertEquals("Normalization and BCNF", log.topic)
     }
+
+    @Test
+    fun testAcademicProjectEntityRoomModelAndMilestones() {
+        val project = com.example.data.local.AcademicProjectEntity(
+            id = "proj-test-1",
+            title = "Distributed In-Memory Cache with Raft Consensus",
+            subjectCode = "CS-302",
+            subjectName = "DBMS",
+            description = "High performance partitioned key-value store with leader election",
+            techStack = "Kotlin, Netty, Raft Consensus, Docker",
+            deadlineDate = "Nov 12, 2026",
+            milestonesCompleted = 3,
+            totalMilestones = 5,
+            status = "IN_PROGRESS",
+            weightage = "25% Major Capstone",
+            isCompleted = false
+        )
+
+        assertEquals("proj-test-1", project.id)
+        assertEquals(60, project.progressPercentage)
+        assertEquals(0.6f, project.progressFraction, 0.01f)
+        assertFalse(project.isCompleted)
+
+        // Toggle completion status
+        val completedProj = project.toggleCompleted()
+        assertTrue(completedProj.isCompleted)
+        assertEquals("COMPLETED", completedProj.status)
+        assertEquals(5, completedProj.milestonesCompleted)
+        assertEquals(100, completedProj.progressPercentage)
+
+        // Revert toggle
+        val revertedProj = completedProj.toggleCompleted()
+        assertFalse(revertedProj.isCompleted)
+        assertEquals("IN_PROGRESS", revertedProj.status)
+    }
 }
+
 
 
 

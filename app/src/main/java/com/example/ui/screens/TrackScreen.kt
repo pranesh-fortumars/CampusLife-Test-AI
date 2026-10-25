@@ -32,6 +32,7 @@ import com.example.ui.components.CumulativeGpaTrackerComponent
 import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
 import com.example.ui.components.CourseLectureAttendanceCard
+import com.example.ui.components.AcademicProjectsAndDeadlinesComponent
 import com.example.model.toCourseAttendance
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
@@ -46,6 +47,7 @@ fun TrackScreen(
     val activeSubTab by viewModel.trackSubTab.collectAsState()
     val subjects by viewModel.subjects.collectAsState()
     val academicTasks by viewModel.academicTasks.collectAsState()
+    val academicProjects by viewModel.academicProjects.collectAsState()
     val assignments by viewModel.assignments.collectAsState()
     val simulatorCount by viewModel.simulatorCount.collectAsState()
     val simulatorSubjectCode by viewModel.simulatorSubjectCode.collectAsState()
@@ -327,16 +329,22 @@ fun TrackScreen(
                     }
 
                     item {
-                        AcademicTasksUpcomingDueListComponent(
+                        AcademicProjectsAndDeadlinesComponent(
                             tasks = academicTasks,
+                            projects = academicProjects,
                             subjects = subjects,
                             onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
                             onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                            onToggleProjectComplete = { viewModel.toggleAcademicProjectComplete(it) },
+                            onDeleteProject = { viewModel.deleteAcademicProject(it) },
                             onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
                                 viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
                             },
-                            title = "Assignments & Course Submissions",
-                            subtitle = "Room DB academic tasks sorted by due date"
+                            onAddProject = { title, subjectCode, subjectName, description, techStack, deadlineDate, totalMilestones, weightage, githubUrl, teamMembers ->
+                                viewModel.addAcademicProject(title, subjectCode, subjectName, description, techStack, deadlineDate, totalMilestones, weightage, githubUrl, teamMembers)
+                            },
+                            title = "Academic Projects & Deadlines",
+                            subtitle = "Room SQLite persistent capstone projects & task deadlines"
                         )
                     }
                     item {
