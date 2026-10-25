@@ -592,6 +592,95 @@ class CampusLifeUnitTest {
         val fromDomain = com.example.data.local.TaskEntity.fromDomain(domain)
         assertTrue(fromDomain.isCompleted)
     }
+
+    @Test
+    fun testCourseLectureAttendanceModelAndForecasting() {
+        val course = com.example.model.CourseAttendance(
+            courseCode = "CS-302",
+            courseName = "Database Management Systems",
+            attendedClasses = 26,
+            totalClasses = 30,
+            targetPercentage = 75.0,
+            credits = 4,
+            faculty = "Dr. Ananya Roy",
+            theoryAttended = 18,
+            theoryTotal = 21,
+            labAttended = 8,
+            labTotal = 9
+        )
+
+        // Attendance Percentage: 26 / 30 = 86.67%
+        assertEquals(86.666, course.attendancePercentage, 0.01)
+        assertEquals("86.7%", course.formattedPercentage)
+        assertEquals(4, course.missedClasses)
+        assertTrue(course.isSafe)
+        assertFalse(course.isBorderline)
+        assertEquals(com.example.model.AttendanceStatus.SAFE, course.status)
+
+        // Safe bunks margin: attended / (total + B) >= 0.75
+        // 26 / (30 + B) >= 0.75 => 26 >= 22.5 + 0.75B => 3.5 >= 0.75B => B <= 4.66 => 4 safe bunks
+        assertTrue(course.safeBunksLeft >= 4)
+        assertEquals(0, course.neededToReachTarget)
+
+        // Forecast: If student misses 2 upcoming lectures: 26 / 32 = 81.25%
+        val forecastMiss2 = course.getForecast(futureAttends = 0, futureMisses = 2)
+        assertEquals(26, forecastMiss2.projectedAttended)
+        assertEquals(32, forecastMiss2.projectedTotal)
+        assertEquals(81.25, forecastMiss2.projectedPercentage, 0.01)
+        assertTrue(forecastMiss2.isProjectedSafe)
+        assertTrue(forecastMiss2.percentageDelta < 0.0)
+
+        // Forecast: If student attends 4 upcoming lectures: 30 / 34 = 88.24%
+        val forecastAttend4 = course.getForecast(futureAttends = 4, futureMisses = 0)
+        assertEquals(30, forecastAttend4.projectedAttended)
+        assertEquals(34, forecastAttend4.projectedTotal)
+        assertEquals(88.235, forecastAttend4.projectedPercentage, 0.01)
+        assertTrue(forecastAttend4.isProjectedSafe)
+        assertTrue(forecastAttend4.percentageDelta > 0.0)
+    }
+
+    @Test
+    fun testCourseLectureAttendanceShortageAndRecoveryCalculation() {
+        val criticalCourse = com.example.model.CourseAttendance(
+            courseCode = "CS-304",
+            courseName = "Operating Systems",
+            attendedClasses = 20,
+            totalClasses = 30, // 20/30 = 66.67% (Below 75%)
+            targetPercentage = 75.0
+        )
+
+        assertFalse(criticalCourse.isSafe)
+        assertEquals(com.example.model.AttendanceStatus.CRITICAL, criticalCourse.status)
+        assertEquals(0, criticalCourse.safeBunksLeft)
+        // Recovery calculation: (20 + X) / (30 + X) >= 0.75 => 20 + X >= 22.5 + 0.75X => 0.25X >= 2.5 => X >= 10
+        assertEquals(10, criticalCourse.neededToReachTarget)
+
+        // Check forecast after 10 consecutive attends: 30 / 40 = 75.0%
+        val recoveryForecast = criticalCourse.getForecast(futureAttends = 10, futureMisses = 0)
+        assertEquals(30, recoveryForecast.projectedAttended)
+        assertEquals(40, recoveryForecast.projectedTotal)
+        assertEquals(75.0, recoveryForecast.projectedPercentage, 0.01)
+        assertTrue(recoveryForecast.isProjectedSafe)
+    }
+
+    @Test
+    fun testLectureSessionLogModelAndTypes() {
+        val log = com.example.model.LectureSessionLog(
+            courseCode = "CS-302",
+            courseName = "DBMS",
+            date = "Oct 25, 2026",
+            timeSlot = "10:30 AM",
+            lectureType = com.example.model.LectureType.THEORY,
+            status = com.example.model.LectureAttendanceStatus.PRESENT,
+            topic = "Normalization and BCNF"
+        )
+
+        assertEquals("CS-302", log.courseCode)
+        assertEquals(com.example.model.LectureType.THEORY, log.lectureType)
+        assertEquals(com.example.model.LectureAttendanceStatus.PRESENT, log.status)
+        assertEquals("Normalization and BCNF", log.topic)
+    }
 }
+
 
 

@@ -73,6 +73,8 @@ fun CourseAttendanceTracker(
     subtitle: String = "Live percentage tracking & progress towards 75% requirement",
     showSummaryHeader: Boolean = true
 ) {
+    var isDetailedLectureView by remember { mutableStateOf(true) }
+    var loggingCourse by remember { mutableStateOf<CourseAttendance?>(null) }
     var selectedFilter by remember { mutableStateOf("All") } // "All", "Attention", "Safe"
     var sortBy by remember { mutableStateOf("Default") } // "Default", "Lowest", "Highest"
 
@@ -144,29 +146,46 @@ fun CourseAttendanceTracker(
                     )
                 }
 
-                // Sort toggle button
-                IconButton(
-                    onClick = {
-                        sortBy = when (sortBy) {
-                            "Default" -> "Lowest"
-                            "Lowest" -> "Highest"
-                            else -> "Default"
-                        }
-                    },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("sort_attendance_btn")
-                ) {
-                    Icon(
-                        imageVector = when (sortBy) {
-                            "Lowest" -> Icons.Default.ArrowUpward
-                            "Highest" -> Icons.Default.ArrowDownward
-                            else -> Icons.Default.Sort
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // View format toggle
+                    IconButton(
+                        onClick = { isDetailedLectureView = !isDetailedLectureView },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("toggle_view_format_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (isDetailedLectureView) Icons.Default.ViewAgenda else Icons.Default.ViewStream,
+                            contentDescription = "Toggle View Format",
+                            tint = Primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Sort toggle button
+                    IconButton(
+                        onClick = {
+                            sortBy = when (sortBy) {
+                                "Default" -> "Lowest"
+                                "Lowest" -> "Highest"
+                                else -> "Default"
+                            }
                         },
-                        contentDescription = "Sort order: $sortBy",
-                        tint = if (sortBy != "Default") Primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("sort_attendance_btn")
+                    ) {
+                        Icon(
+                            imageVector = when (sortBy) {
+                                "Lowest" -> Icons.Default.ArrowUpward
+                                "Highest" -> Icons.Default.ArrowDownward
+                                else -> Icons.Default.Sort
+                            },
+                            contentDescription = "Sort order: $sortBy",
+                            tint = if (sortBy != "Default") Primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
@@ -227,18 +246,45 @@ fun CourseAttendanceTracker(
                     }
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     filteredCourses.forEach { course ->
-                        CourseAttendanceProgressBarItem(
-                            course = course,
-                            onQuickAttend = { onQuickAttend(course.courseCode) },
-                            onQuickMiss = { onQuickMiss(course.courseCode) },
-                            onClick = { onCourseClick(course.courseCode) }
-                        )
+                        if (isDetailedLectureView) {
+                            CourseLectureAttendanceCard(
+                                course = course,
+                                onQuickAttend = { onQuickAttend(course.courseCode) },
+                                onQuickMiss = { onQuickMiss(course.courseCode) },
+                                onLogSession = { loggingCourse = course },
+                                onCardClick = { onCourseClick(course.courseCode) }
+                            )
+                        } else {
+                            CourseAttendanceProgressBarItem(
+                                course = course,
+                                onQuickAttend = { onQuickAttend(course.courseCode) },
+                                onQuickMiss = { onQuickMiss(course.courseCode) },
+                                onClick = { onCourseClick(course.courseCode) }
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    loggingCourse?.let { targetCourse ->
+        MarkLectureSessionDialog(
+            course = targetCourse,
+            onDismiss = { loggingCourse = null },
+            onConfirm = { status, _, _ ->
+                if (status == com.example.model.LectureAttendanceStatus.PRESENT ||
+                    status == com.example.model.LectureAttendanceStatus.DUTY_LEAVE ||
+                    status == com.example.model.LectureAttendanceStatus.MEDICAL_LEAVE) {
+                    onQuickAttend(targetCourse.courseCode)
+                } else if (status == com.example.model.LectureAttendanceStatus.ABSENT) {
+                    onQuickMiss(targetCourse.courseCode)
+                }
+                loggingCourse = null
+            }
+        )
     }
 }
 

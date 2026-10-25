@@ -31,6 +31,8 @@ import com.example.ui.components.AddNewSubjectDialog
 import com.example.ui.components.CumulativeGpaTrackerComponent
 import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
+import com.example.ui.components.CourseLectureAttendanceCard
+import com.example.model.toCourseAttendance
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SubScreen
@@ -53,6 +55,7 @@ fun TrackScreen(
     var adjustingSubject by remember { mutableStateOf<Subject?>(null) }
     var showAddSubjectDialog by remember { mutableStateOf(false) }
     var subjectFilter by remember { mutableStateOf("All") } // "All", "Below 75%", "Safe"
+    var isLectureCardView by remember { mutableStateOf(true) }
 
     val subTabs = listOf("Academics", "Timetable", "Assignments", "Exams", "CGPA")
 
@@ -176,59 +179,95 @@ fun TrackScreen(
                                 }
                             }
 
-                            // Filter Pills: All, Critical (< 75%), Safe (>= 75%)
+                            // Filter Pills: All, Critical (< 75%), Safe (>= 75%) & View Format Toggle
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val belowCount = subjects.count { it.attendancePercentage < it.targetPercentage }
-                                val safeCount = subjects.count { it.attendancePercentage >= it.targetPercentage }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val belowCount = subjects.count { it.attendancePercentage < it.targetPercentage }
+                                    val safeCount = subjects.count { it.attendancePercentage >= it.targetPercentage }
 
-                                FilterChip(
-                                    selected = subjectFilter == "All",
-                                    onClick = { subjectFilter = "All" },
-                                    label = { Text("All (${subjects.size})") }
-                                )
-                                FilterChip(
-                                    selected = subjectFilter == "Below 75%",
-                                    onClick = { subjectFilter = "Below 75%" },
-                                    label = { Text("Below 75% ($belowCount)") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = ErrorContainer,
-                                        selectedLabelColor = Error
+                                    FilterChip(
+                                        selected = subjectFilter == "All",
+                                        onClick = { subjectFilter = "All" },
+                                        label = { Text("All (${subjects.size})") }
                                     )
-                                )
-                                FilterChip(
-                                    selected = subjectFilter == "Safe",
-                                    onClick = { subjectFilter = "Safe" },
-                                    label = { Text("Safe ($safeCount)") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = TertiaryFixed,
-                                        selectedLabelColor = Tertiary
+                                    FilterChip(
+                                        selected = subjectFilter == "Below 75%",
+                                        onClick = { subjectFilter = "Below 75%" },
+                                        label = { Text("Below 75% ($belowCount)") },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = ErrorContainer,
+                                            selectedLabelColor = Error
+                                        )
                                     )
-                                )
+                                    FilterChip(
+                                        selected = subjectFilter == "Safe",
+                                        onClick = { subjectFilter = "Safe" },
+                                        label = { Text("Safe ($safeCount)") },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = TertiaryFixed,
+                                            selectedLabelColor = Tertiary
+                                        )
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { isLectureCardView = !isLectureCardView },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .testTag("track_toggle_lecture_view_btn")
+                                ) {
+                                    Icon(
+                                        imageVector = if (isLectureCardView) Icons.Default.ViewAgenda else Icons.Default.ViewStream,
+                                        contentDescription = "Toggle View",
+                                        tint = Primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
 
                     // Subject Cards List
                     items(filteredSubjects, key = { it.code }) { subject ->
-                        SubjectItemCard(
-                            subject = subject,
-                            onClick = { onOpenSubjectDetail(subject) },
-                            onQuickAttend = {
-                                viewModel.quickLogClass(subject.code, isAttended = true)
-                            },
-                            onQuickMiss = {
-                                viewModel.quickLogClass(subject.code, isAttended = false)
-                            },
-                            onOpenLogDialog = {
-                                loggingSubject = subject
-                            },
-                            onOpenAdjustDialog = {
-                                adjustingSubject = subject
-                            }
-                        )
+                        if (isLectureCardView) {
+                            CourseLectureAttendanceCard(
+                                course = subject.toCourseAttendance(),
+                                onQuickAttend = {
+                                    viewModel.quickLogClass(subject.code, isAttended = true)
+                                },
+                                onQuickMiss = {
+                                    viewModel.quickLogClass(subject.code, isAttended = false)
+                                },
+                                onLogSession = {
+                                    loggingSubject = subject
+                                },
+                                onCardClick = { onOpenSubjectDetail(subject) }
+                            )
+                        } else {
+                            SubjectItemCard(
+                                subject = subject,
+                                onClick = { onOpenSubjectDetail(subject) },
+                                onQuickAttend = {
+                                    viewModel.quickLogClass(subject.code, isAttended = true)
+                                },
+                                onQuickMiss = {
+                                    viewModel.quickLogClass(subject.code, isAttended = false)
+                                },
+                                onOpenLogDialog = {
+                                    loggingSubject = subject
+                                },
+                                onOpenAdjustDialog = {
+                                    adjustingSubject = subject
+                                }
+                            )
+                        }
                     }
                 }
 
