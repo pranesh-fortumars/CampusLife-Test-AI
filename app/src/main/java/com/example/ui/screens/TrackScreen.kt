@@ -34,6 +34,7 @@ import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
 import com.example.ui.components.CourseLectureAttendanceCard
 import com.example.ui.components.AcademicProjectsAndDeadlinesComponent
+import com.example.ui.components.WeeklyClassScheduleComponent
 import com.example.model.toCourseAttendance
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
@@ -276,7 +277,11 @@ fun TrackScreen(
 
                 "Timetable" -> {
                     item {
-                        TimetableDayView(viewModel = viewModel)
+                        WeeklyClassScheduleComponent(
+                            onLogAttendance = { courseCode, isAttended ->
+                                viewModel.quickLogClass(courseCode, isAttended)
+                            }
+                        )
                     }
                 }
 
