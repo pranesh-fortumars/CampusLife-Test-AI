@@ -29,6 +29,7 @@ import com.example.model.Subject
 import com.example.ui.components.AcademicTasksUpcomingDueListComponent
 import com.example.ui.components.AddNewSubjectDialog
 import com.example.ui.components.CumulativeGpaTrackerComponent
+import com.example.ui.components.SemesterGpaCalculatorComponent
 import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
 import com.example.ui.components.CourseLectureAttendanceCard
@@ -373,14 +374,99 @@ fun TrackScreen(
 
                 "CGPA" -> {
                     item {
+                        var gpaViewMode by remember { mutableStateOf("calculator") }
                         val semesterGrades by viewModel.semesterGrades.collectAsState()
-                        CumulativeGpaTrackerComponent(
-                            semesters = semesterGrades,
-                            onUpdateGrade = { sem, code, grade -> viewModel.updateCourseGrade(sem, code, grade) },
-                            onAddCourse = { sem, course -> viewModel.addCourseGrade(sem, course) },
-                            title = "Cumulative GPA (CGPA) Tracker",
-                            subtitle = "Interactive grade adjustments, semester credit breakdown & CGPA forecasting"
-                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Sub-navigation selector for CGPA / Semester Calculator
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (gpaViewMode == "calculator") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { gpaViewMode = "calculator" }
+                                            .testTag("tab_gpa_calculator")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Calculate,
+                                                contentDescription = null,
+                                                tint = if (gpaViewMode == "calculator") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Term GPA Calculator",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (gpaViewMode == "calculator") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (gpaViewMode == "records") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { gpaViewMode = "records" }
+                                            .testTag("tab_gpa_records")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.School,
+                                                contentDescription = null,
+                                                tint = if (gpaViewMode == "records") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Transcript Breakdown",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (gpaViewMode == "records") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (gpaViewMode == "calculator") {
+                                SemesterGpaCalculatorComponent(
+                                    existingSemesters = semesterGrades,
+                                    onSaveToRecords = { sem, courses ->
+                                        viewModel.saveSemesterCourseGrades(sem, courses)
+                                    }
+                                )
+                            } else {
+                                CumulativeGpaTrackerComponent(
+                                    semesters = semesterGrades,
+                                    onUpdateGrade = { sem, code, grade -> viewModel.updateCourseGrade(sem, code, grade) },
+                                    onAddCourse = { sem, course -> viewModel.addCourseGrade(sem, course) },
+                                    title = "Cumulative GPA (CGPA) Tracker",
+                                    subtitle = "Interactive grade adjustments, semester credit breakdown & CGPA forecasting"
+                                )
+                            }
+                        }
                     }
                 }
             }

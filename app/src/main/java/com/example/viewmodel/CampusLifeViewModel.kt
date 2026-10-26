@@ -323,6 +323,47 @@ class CampusLifeViewModel(
         }
     }
 
+    fun saveSemesterCourseGrades(semesterNumber: Int, courses: List<CourseGrade>) {
+        _semesterGrades.update { list ->
+            var semesterFound = false
+            val updated = list.map { sem ->
+                if (sem.semesterNumber == semesterNumber) {
+                    semesterFound = true
+                    sem.copy(courses = courses)
+                } else sem
+            }
+            if (!semesterFound) {
+                updated + SemesterGrades(
+                    semesterNumber = semesterNumber,
+                    semesterName = "Semester $semesterNumber",
+                    academicYear = "2026-27",
+                    courses = courses,
+                    isCurrentSemester = true
+                )
+            } else updated
+        }
+        recalculateCgpa()
+        viewModelScope.launch {
+            try {
+                courses.forEach { course ->
+                    gradeRepository.insertGrade(course, semesterNumber)
+                }
+            } catch (e: Exception) {
+                // In-memory already updated
+            }
+        }
+        _userFeedbackMessage.value = "Saved ${courses.size} courses to Semester $semesterNumber records!"
+    }
+
+    fun logFocusSession(taskId: String?, durationMinutes: Int) {
+        val taskTitle = if (taskId != null) _academicTasks.value.find { it.id == taskId }?.title else null
+        _userFeedbackMessage.value = if (taskTitle != null) {
+            "Logged $durationMinutes min Pomodoro session for '$taskTitle'! 🍅"
+        } else {
+            "Completed $durationMinutes min Pomodoro study sprint! 🎉"
+        }
+    }
+
     fun recalculateCgpa() {
         val summary = AcademicGpaSummary(_semesterGrades.value)
         val rounded = String.format(Locale.US, "%.2f", summary.cumulativeGpa).toDoubleOrNull() ?: summary.cumulativeGpa

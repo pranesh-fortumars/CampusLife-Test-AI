@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.PomodoroTaskTimerComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 
@@ -27,13 +28,7 @@ fun FocusTimerScreen(
     viewModel: CampusLifeViewModel,
     onBack: () -> Unit
 ) {
-    val focusSeconds by viewModel.focusSeconds.collectAsState()
-    val isRunning by viewModel.isFocusRunning.collectAsState()
-
-    val minutes = focusSeconds / 60
-    val seconds = focusSeconds % 60
-    val timeFormatted = String.format("%02d:%02d", minutes, seconds)
-
+    val academicTasks by viewModel.academicTasks.collectAsState()
     var currentSound by remember { mutableStateOf("Library Silence") }
 
     Column(
@@ -55,7 +50,7 @@ fun FocusTimerScreen(
             Spacer(modifier = Modifier.width(6.dp))
             Column {
                 Text("Track > Deep Work & Study Room", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Focus Timer & Social Room", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text("Pomodoro Focus Timer & Study Room", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -64,104 +59,17 @@ fun FocusTimerScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Target Subject Card
+            // Pomodoro Study Timer Component linked to Academic Tasks
             item {
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Tertiary))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("ACTIVE TARGET", style = MaterialTheme.typography.labelSmall, color = Tertiary, fontWeight = FontWeight.Bold)
-                            }
-                            Text("Change Subject ▾", style = MaterialTheme.typography.labelSmall, color = Primary, fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("CS-302: Database Management Systems", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text("Goal: Complete B+ Tree Indexing & 3NF Normalization exercises", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PomodoroTaskTimerComponent(
+                    tasks = academicTasks,
+                    onSessionCompleted = { taskId, durationMinutes ->
+                        viewModel.logFocusSession(taskId, durationMinutes)
+                    },
+                    onToggleTaskComplete = { taskId ->
+                        viewModel.toggleAcademicTaskComplete(taskId)
                     }
-                }
-            }
-
-            // Big Timer Visual Hero
-            item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Circular gauge simulation
-                        Box(
-                            modifier = Modifier
-                                .size(200.dp)
-                                .clip(CircleShape)
-                                .background(Primary.copy(alpha = 0.08f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = timeFormatted,
-                                    style = MaterialTheme.typography.displayMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Surface(shape = RoundedCornerShape(100), color = TertiaryFixed) {
-                                    Text(
-                                        "• IN THE FLOW",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Tertiary,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text("Session 2 of 4", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text("Deep Focus Mode • 11m 15s elapsed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                        Spacer(modifier = Modifier.height(18.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FilledTonalIconButton(onClick = { viewModel.resetFocusTimer() }) {
-                                Icon(Icons.Default.RestartAlt, contentDescription = "Reset")
-                            }
-
-                            Button(
-                                onClick = { viewModel.toggleFocusTimer() },
-                                shape = RoundedCornerShape(100),
-                                colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                                modifier = Modifier.height(52.dp).padding(horizontal = 12.dp)
-                            ) {
-                                Icon(if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (isRunning) "Pause" else "Resume", style = MaterialTheme.typography.titleSmall)
-                            }
-
-                            FilledTonalIconButton(onClick = {}) {
-                                Icon(Icons.Default.FastForward, contentDescription = "Skip")
-                            }
-                        }
-                    }
-                }
+                )
             }
 
             // Atmospheric Sound Deck
