@@ -34,6 +34,8 @@ import com.example.ui.components.LogClassSessionDialog
 import com.example.ui.components.QuickAdjustAttendanceDialog
 import com.example.ui.components.CourseLectureAttendanceCard
 import com.example.ui.components.AcademicProjectsAndDeadlinesComponent
+import com.example.ui.components.AcademicProjectManagementModule
+import com.example.ui.components.CourseGradeTrackerComponent
 import com.example.ui.components.WeeklyClassScheduleComponent
 import com.example.model.toCourseAttendance
 import com.example.ui.theme.*
@@ -287,93 +289,253 @@ fun TrackScreen(
 
                 "Assignments" -> {
                     item {
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { viewModel.openSubScreen(SubScreen.TASKS_LIST) }
-                                .testTag("track_open_full_tasks_screen_btn"),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
-                        ) {
-                            Row(
+                        var assignmentViewMode by remember { mutableStateOf("projects") }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Sub-navigation selector for Group Projects vs Deadlines
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 4.dp)
                             ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    modifier = Modifier.padding(4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Launch,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Column {
-                                        Text(
-                                            text = "Open Full Tasks Screen",
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.titleSmall
-                                        )
-                                        Text(
-                                            text = "Dedicated view with Material 3 cards, priority filters & sorting",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (assignmentViewMode == "projects") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { assignmentViewMode = "projects" }
+                                            .testTag("tab_group_projects_module")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Groups,
+                                                contentDescription = null,
+                                                tint = if (assignmentViewMode == "projects") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Project Management",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (assignmentViewMode == "projects") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (assignmentViewMode == "tasks") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { assignmentViewMode = "tasks" }
+                                            .testTag("tab_tasks_deadlines")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Assignment,
+                                                contentDescription = null,
+                                                tint = if (assignmentViewMode == "tasks") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Tasks & Deadlines",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (assignmentViewMode == "tasks") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
                                     }
                                 }
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            }
+
+                            if (assignmentViewMode == "projects") {
+                                AcademicProjectManagementModule()
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .clickable { viewModel.openSubScreen(SubScreen.TASKS_LIST) }
+                                            .testTag("track_open_full_tasks_screen_btn"),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Launch,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                                Column {
+                                                    Text(
+                                                        text = "Open Full Tasks Screen",
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.titleSmall
+                                                    )
+                                                    Text(
+                                                        text = "Dedicated view with Material 3 cards, priority filters & sorting",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.ChevronRight,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    AcademicProjectsAndDeadlinesComponent(
+                                        tasks = academicTasks,
+                                        projects = academicProjects,
+                                        subjects = subjects,
+                                        onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
+                                        onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                                        onToggleProjectComplete = { viewModel.toggleAcademicProjectComplete(it) },
+                                        onDeleteProject = { viewModel.deleteAcademicProject(it) },
+                                        onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
+                                            viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
+                                        },
+                                        onAddProject = { title, subjectCode, subjectName, description, techStack, deadlineDate, totalMilestones, weightage, githubUrl, teamMembers ->
+                                            viewModel.addAcademicProject(title, subjectCode, subjectName, description, techStack, deadlineDate, totalMilestones, weightage, githubUrl, teamMembers)
+                                        },
+                                        title = "Academic Projects & Deadlines",
+                                        subtitle = "Room SQLite persistent capstone projects & task deadlines"
+                                    )
+
+                                    AssignmentsView(viewModel = viewModel)
+                                }
                             }
                         }
-                    }
-
-                    item {
-                        AcademicProjectsAndDeadlinesComponent(
-                            tasks = academicTasks,
-                            projects = academicProjects,
-                            subjects = subjects,
-                            onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
-                            onDeleteTask = { viewModel.deleteAcademicTask(it) },
-                            onToggleProjectComplete = { viewModel.toggleAcademicProjectComplete(it) },
-                            onDeleteProject = { viewModel.deleteAcademicProject(it) },
-                            onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
-                                viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
-                            },
-                            onAddProject = { title, subjectCode, subjectName, description, techStack, deadlineDate, totalMilestones, weightage, githubUrl, teamMembers ->
-                                viewModel.addAcademicProject(title, subjectCode, subjectName, description, techStack, deadlineDate, totalMilestones, weightage, githubUrl, teamMembers)
-                            },
-                            title = "Academic Projects & Deadlines",
-                            subtitle = "Room SQLite persistent capstone projects & task deadlines"
-                        )
-                    }
-                    item {
-                        AssignmentsView(viewModel = viewModel)
                     }
                 }
 
                 "Exams" -> {
                     item {
-                        AcademicTasksUpcomingDueListComponent(
-                            tasks = academicTasks.filter { it.category.equals("Exam", ignoreCase = true) || it.type == "EXAM_PREP" },
-                            subjects = subjects,
-                            onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
-                            onDeleteTask = { viewModel.deleteAcademicTask(it) },
-                            onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
-                                viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
-                            },
-                            title = "Exams & Tests Schedule",
-                            subtitle = "Upcoming examinations and practical tests"
-                        )
-                    }
-                    item {
-                        ExaminationsView(viewModel = viewModel)
+                        var examsViewMode by remember { mutableStateOf("grade_tracker") }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Sub-navigation selector for Course Grade Tracker vs Exam Schedule
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (examsViewMode == "grade_tracker") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { examsViewMode = "grade_tracker" }
+                                            .testTag("tab_course_grade_tracker")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Analytics,
+                                                contentDescription = null,
+                                                tint = if (examsViewMode == "grade_tracker") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Class Grade Tracker",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (examsViewMode == "grade_tracker") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (examsViewMode == "revision") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { examsViewMode = "revision" }
+                                            .testTag("tab_exam_revision")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.EventNote,
+                                                contentDescription = null,
+                                                tint = if (examsViewMode == "revision") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                "Exams & Revision",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (examsViewMode == "revision") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (examsViewMode == "grade_tracker") {
+                                CourseGradeTrackerComponent()
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    AcademicTasksUpcomingDueListComponent(
+                                        tasks = academicTasks.filter { it.category.equals("Exam", ignoreCase = true) || it.type == "EXAM_PREP" },
+                                        subjects = subjects,
+                                        onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
+                                        onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                                        onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
+                                            viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
+                                        },
+                                        title = "Exams & Tests Schedule",
+                                        subtitle = "Upcoming examinations and practical tests"
+                                    )
+
+                                    ExaminationsView(viewModel = viewModel)
+                                }
+                            }
+                        }
                     }
                 }
 
