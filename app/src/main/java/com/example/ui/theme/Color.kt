@@ -67,6 +67,11 @@ val OnError = Color(0xFFFFFFFF)
 val ErrorContainer = Color(0xFFFEF2F2)   // Red 50
 val OnErrorContainer = Color(0xFF991B1B)
 
+// Status: Success (Going, Completed, Attended)
+val Success = Color(0xFF10B981)          // Emerald 500
+val SuccessContainer = Color(0xFFECFDF5) // Emerald 50
+val OnSuccess = Color(0xFFFFFFFF)
+
 // Dark / Inverse
 val InverseSurface = Color(0xFF1E293B)   // Slate 800
 val InverseOnSurface = Color(0xFFF8FAFC)

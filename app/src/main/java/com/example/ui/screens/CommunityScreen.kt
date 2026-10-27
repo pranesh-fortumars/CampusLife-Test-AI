@@ -22,13 +22,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.ui.components.CommunityEventAggregatorComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SubScreen
 
 @Composable
 fun CommunityScreen(viewModel: CampusLifeViewModel) {
-    var selectedTab by remember { mutableStateOf("Chats") } // "Chats", "Clubs", "Directory"
+    var selectedTab by remember { mutableStateOf("Events") } // "Events", "Chats", "Clubs"
     var selectedCategory by remember { mutableStateOf("all") } // "all", "groups", "dms", "channels"
     var searchQuery by remember { mutableStateOf("") }
 
@@ -47,59 +48,88 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
             .background(MaterialTheme.colorScheme.background)
             .testTag("community_screen")
     ) {
-        // Search & Category Bar
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search messages, study groups, clubs...", fontSize = 14.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
-                        }
-                    } else {
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Default.Tune, contentDescription = "Filter", tint = Primary)
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = Primary
+        // Main Navigation Mode Chips: "Events & Seminars", "Chats & Huddles", "Clubs Directory"
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = selectedTab == "Events",
+                onClick = { selectedTab = "Events" },
+                label = { Text("Events & Seminars", fontSize = 12.sp) },
+                leadingIcon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Primary,
+                    selectedLabelColor = Color.White,
+                    selectedLeadingIconColor = Color.White
                 ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
+                modifier = Modifier.testTag("community_tab_events")
             )
+            FilterChip(
+                selected = selectedTab == "Chats",
+                onClick = { selectedTab = "Chats" },
+                label = { Text("Chats", fontSize = 12.sp) },
+                leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Primary,
+                    selectedLabelColor = Color.White,
+                    selectedLeadingIconColor = Color.White
+                ),
+                modifier = Modifier.testTag("community_tab_chats")
+            )
+            FilterChip(
+                selected = selectedTab == "Clubs",
+                onClick = { selectedTab = "Clubs" },
+                label = { Text("Clubs (48)", fontSize = 12.sp) },
+                leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Primary,
+                    selectedLabelColor = Color.White,
+                    selectedLeadingIconColor = Color.White
+                ),
+                modifier = Modifier.testTag("community_tab_clubs")
+            )
+        }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Main mode pills: "Study Groups & Chats" vs "Clubs & Societies"
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = selectedTab == "Chats",
-                    onClick = { selectedTab = "Chats" },
-                    label = { Text("Chats & Huddles") },
-                    leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White, selectedLeadingIconColor = Color.White)
-                )
-                FilterChip(
-                    selected = selectedTab == "Clubs",
-                    onClick = { selectedTab = "Clubs" },
-                    label = { Text("Clubs Directory (48)") },
-                    leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White, selectedLeadingIconColor = Color.White)
+        if (selectedTab == "Events") {
+            // Campus Club Meetings and Academic Research Seminars Aggregator
+            CommunityEventAggregatorComponent(
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // Search & Category Bar for Chats / Clubs
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search messages, study groups, clubs...", fontSize = 14.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear")
+                            }
+                        } else {
+                            IconButton(onClick = {}) {
+                                Icon(Icons.Default.Tune, contentDescription = "Filter", tint = Primary)
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = Primary
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
                 )
             }
-        }
 
         if (selectedTab == "Chats") {
             // Chat Filters
@@ -480,15 +510,18 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { selectedTab = "Events" }
                             ) {
                                 Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Event, contentDescription = null, tint = Primary, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(soc.nextEventTitle, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                                         Text(soc.nextEventTime, style = MaterialTheme.typography.bodySmall, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
+                                    Text("RSVP →", fontSize = 11.sp, color = Primary, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -498,8 +531,8 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TextButton(onClick = {}) {
-                                    Text("View Details")
+                                TextButton(onClick = { selectedTab = "Events" }) {
+                                    Text("View Events")
                                 }
                                 Button(
                                     onClick = {},
@@ -517,4 +550,5 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
             }
         }
     }
+}
 }

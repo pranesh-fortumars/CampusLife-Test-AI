@@ -10,6 +10,7 @@ import com.example.data.repository.AttendanceRepository
 import com.example.data.repository.GradeRepository
 import com.example.data.repository.TaskRepository
 import com.example.model.*
+import com.example.worker.EventNotificationHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -126,6 +127,10 @@ class CampusLifeViewModel(
 
     private val _conversations = MutableStateFlow(MockData.conversations)
     val conversations: StateFlow<List<ChatConversation>> = _conversations.asStateFlow()
+
+    // Community Events Aggregator State
+    private val _campusEvents = MutableStateFlow(CampusEventMockData.sampleEvents)
+    val campusEvents: StateFlow<List<CampusEvent>> = _campusEvents.asStateFlow()
 
     // Simulator state
     private val _simulatorCount = MutableStateFlow(3)
@@ -742,5 +747,86 @@ class CampusLifeViewModel(
                 _academicProjects.update { it + newProj }
             }
         }
+    }
+
+    // Community Events & Seminars Operations
+    fun updateEventRsvp(
+        eventId: String,
+        newStatus: RsvpStatus,
+        context: android.content.Context? = null
+    ) {
+        var updatedEvent: CampusEvent? = null
+        _campusEvents.update { events ->
+            events.map { event ->
+                if (event.id == eventId) {
+                    val wasGoing = event.rsvpStatus == RsvpStatus.GOING
+                    val isGoing = newStatus == RsvpStatus.GOING
+                    val attendeeDelta = when {
+                        !wasGoing && isGoing -> 1
+                        wasGoing && !isGoing -> -1
+                        else -> 0
+                    }
+                    val newCount = (event.attendeeCount + attendeeDelta).coerceAtLeast(0)
+                    val reminderState = if (isGoing) true else event.isReminderSet
+                    val modified = event.copy(
+                        rsvpStatus = newStatus,
+                        attendeeCount = newCount,
+                        isReminderSet = reminderState
+                    )
+                    updatedEvent = modified
+                    modified
+                } else {
+                    event
+                }
+            }
+        }
+
+        val statusText = when (newStatus) {
+            RsvpStatus.GOING -> "RSVP Confirmed: You are attending!"
+            RsvpStatus.INTERESTED -> "Marked as Interested"
+            RsvpStatus.DECLINED -> "RSVP Declined"
+            RsvpStatus.NONE -> "RSVP Cleared"
+        }
+        _userFeedbackMessage.value = statusText
+
+        if (context != null && updatedEvent != null && (newStatus == RsvpStatus.GOING || newStatus == RsvpStatus.INTERESTED)) {
+            EventNotificationHelper.postEventRsvpNotification(context, updatedEvent!!, newStatus)
+        }
+    }
+
+    fun toggleEventReminder(
+        eventId: String,
+        context: android.content.Context? = null
+    ) {
+        var reminderState = false
+        var targetEvent: CampusEvent? = null
+        _campusEvents.update { events ->
+            events.map { event ->
+                if (event.id == eventId) {
+                    val toggled = !event.isReminderSet
+                    reminderState = toggled
+                    val modified = event.copy(isReminderSet = toggled)
+                    targetEvent = modified
+                    modified
+                } else {
+                    event
+                }
+            }
+        }
+        _userFeedbackMessage.value = if (reminderState) "🔔 Reminder notification set (1h before)" else "🔕 Reminder cancelled"
+
+        if (context != null && reminderState && targetEvent != null) {
+            EventNotificationHelper.postUpcomingEventAlert(context, targetEvent!!)
+        }
+    }
+
+    fun addCampusEvent(newEvent: CampusEvent) {
+        _campusEvents.update { listOf(newEvent) + it }
+        _userFeedbackMessage.value = "Published event: ${newEvent.title}"
+    }
+
+    fun testTriggerEventNotification(context: android.content.Context, event: CampusEvent) {
+        val success = EventNotificationHelper.postUpcomingEventAlert(context, event)
+        _userFeedbackMessage.value = if (success) "Sent notification for ${event.title}" else "Notification posted (check status bar)"
     }
 }

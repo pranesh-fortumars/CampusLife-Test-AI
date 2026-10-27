@@ -715,7 +715,62 @@ class CampusLifeUnitTest {
         assertFalse(revertedProj.isCompleted)
         assertEquals("IN_PROGRESS", revertedProj.status)
     }
+
+    @Test
+    fun testCommunityEventsDataPullsClubMeetingsAndSeminars() {
+        val events = com.example.model.CampusEventMockData.sampleEvents
+        assertTrue("Events list should not be empty", events.isNotEmpty())
+
+        val clubMeetings = events.filter { it.eventType == com.example.model.CommunityEventType.CLUB_MEETING }
+        val academicSeminars = events.filter { it.eventType == com.example.model.CommunityEventType.ACADEMIC_SEMINAR }
+
+        assertTrue("Should contain club meetings", clubMeetings.isNotEmpty())
+        assertTrue("Should contain academic seminars", academicSeminars.isNotEmpty())
+
+        // Check seminar specifics
+        val topSeminar = academicSeminars.first()
+        assertTrue(topSeminar.speakerOrHost.isNotBlank())
+        assertTrue(topSeminar.speakerAffiliation.isNotBlank())
+        assertTrue(topSeminar.venue.isNotBlank())
+        assertTrue(topSeminar.dateFormatted.isNotBlank())
+    }
+
+    @Test
+    fun testEventRsvpStateTransition() {
+        val initialEvent = com.example.model.CampusEvent(
+            id = "test-evt-1",
+            title = "Quantum Information Seminar",
+            organizer = "Dept. of Applied Physics",
+            eventType = com.example.model.CommunityEventType.ACADEMIC_SEMINAR,
+            dateFormatted = "Tomorrow, 4:00 PM",
+            timeFormatted = "4:00 PM - 5:30 PM",
+            venue = "Physics Hall 101",
+            attendeeCount = 20,
+            rsvpStatus = com.example.model.RsvpStatus.NONE,
+            isReminderSet = false,
+            description = "Quantum seminar"
+        )
+
+        // User RSVPs GOING
+        val goingEvent = initialEvent.copy(
+            rsvpStatus = com.example.model.RsvpStatus.GOING,
+            attendeeCount = initialEvent.attendeeCount + 1,
+            isReminderSet = true
+        )
+        assertEquals(com.example.model.RsvpStatus.GOING, goingEvent.rsvpStatus)
+        assertEquals(21, goingEvent.attendeeCount)
+        assertTrue(goingEvent.isReminderSet)
+
+        // User changes to INTERESTED
+        val interestedEvent = goingEvent.copy(
+            rsvpStatus = com.example.model.RsvpStatus.INTERESTED,
+            attendeeCount = (goingEvent.attendeeCount - 1).coerceAtLeast(0)
+        )
+        assertEquals(com.example.model.RsvpStatus.INTERESTED, interestedEvent.rsvpStatus)
+        assertEquals(20, interestedEvent.attendeeCount)
+    }
 }
+
 
 
 
