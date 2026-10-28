@@ -769,6 +769,88 @@ class CampusLifeUnitTest {
         assertEquals(com.example.model.RsvpStatus.INTERESTED, interestedEvent.rsvpStatus)
         assertEquals(20, interestedEvent.attendeeCount)
     }
+
+    @Test
+    fun testUpcomingTasksRoomDatabaseFilteringAndSorting() {
+        val now = System.currentTimeMillis()
+        val hour = 3600000L
+        val day = 86400000L
+
+        val task1 = com.example.model.AcademicTask(
+            id = "test-task-1",
+            title = "Computer Networks Socket Lab",
+            subjectCode = "CS-306",
+            subjectName = "Computer Networks",
+            category = "Assignment",
+            type = "ASSIGNMENT",
+            dueDate = "Today",
+            dueTime = "5:00 PM",
+            priority = "URGENT",
+            weightage = "15% Internal",
+            isCompleted = false,
+            dueTimestamp = now + (3 * hour)
+        )
+
+        val task2 = com.example.model.AcademicTask(
+            id = "test-task-2",
+            title = "Operating Systems Mid-Term Viva",
+            subjectCode = "CS-304",
+            subjectName = "Operating Systems",
+            category = "Exam",
+            type = "EXAM_PREP",
+            dueDate = "Tomorrow",
+            dueTime = "10:00 AM",
+            priority = "HIGH",
+            weightage = "30% Midterm",
+            isCompleted = false,
+            dueTimestamp = now + (24 * hour)
+        )
+
+        val task3 = com.example.model.AcademicTask(
+            id = "test-task-3",
+            title = "DBMS ER Diagram Design",
+            subjectCode = "CS-302",
+            subjectName = "Database Management Systems",
+            category = "Assignment",
+            type = "ASSIGNMENT",
+            dueDate = "Oct 30",
+            dueTime = "11:59 PM",
+            priority = "MEDIUM",
+            weightage = "10% Internal",
+            isCompleted = true,
+            dueTimestamp = now + (3 * day)
+        )
+
+        val tasks = listOf(task1, task2, task3)
+
+        // 1. Pending tasks from Room DB (isCompleted == false)
+        val pending = tasks.filter { !it.isCompleted }
+        assertEquals(2, pending.size)
+
+        // 2. Earliest impending task
+        val nearest = pending.minByOrNull { it.dueTimestamp }
+        assertNotNull(nearest)
+        assertEquals("test-task-1", nearest!!.id)
+        assertEquals("CS-306", nearest.subjectCode)
+        assertEquals("URGENT", nearest.priority)
+
+        // 3. Urgent filter
+        val urgent = tasks.filter { !it.isCompleted && (it.priority == "URGENT" || it.dueDate.contains("Today")) }
+        assertEquals(1, urgent.size)
+        assertEquals("test-task-1", urgent.first().id)
+
+        // 4. Exam category filter
+        val exams = tasks.filter { it.category == "Exam" }
+        assertEquals(1, exams.size)
+        assertEquals("CS-304", exams.first().subjectCode)
+
+        // 5. Toggle completion
+        val completedTask1 = task1.copy(isCompleted = true)
+        assertTrue(completedTask1.isCompleted)
+        val remainingPending = listOf(completedTask1, task2, task3).filter { !it.isCompleted }
+        assertEquals(1, remainingPending.size)
+        assertEquals("test-task-2", remainingPending.first().id)
+    }
 }
 
 

@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.CourseAttendanceTrackerComponent
 import com.example.ui.components.MainAcademicDashboard
+import com.example.ui.components.UpcomingTasksDashboardComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SubScreen
@@ -64,7 +65,15 @@ fun HomeScreen(
             )
         }
 
-        // 2. Today's Next Class Card (Spotlight Schedule & 1-Tap Attendance Logging)
+        // 2. Main Dashboard Upcoming Tasks Component (Room Database)
+        item {
+            UpcomingTasksDashboardComponent(
+                viewModel = viewModel,
+                onNavigateToTrack = onNavigateToTrack
+            )
+        }
+
+        // 3. Today's Next Class Card (Spotlight Schedule & 1-Tap Attendance Logging)
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
