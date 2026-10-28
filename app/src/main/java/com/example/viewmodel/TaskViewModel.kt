@@ -178,8 +178,10 @@ class TaskViewModel(
         dueTime: String = "11:59 PM",
         priority: String = "HIGH",
         weightage: String = "",
-        note: String = ""
+        note: String = "",
+        dueTimestamp: Long? = null
     ) {
+        val calculatedTimestamp = dueTimestamp ?: com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis(dueDate)
         val newTask = AcademicTask(
             id = java.util.UUID.randomUUID().toString(),
             title = title.trim(),
@@ -192,9 +194,20 @@ class TaskViewModel(
             priority = priority,
             weightage = weightage.trim(),
             isCompleted = false,
-            note = note.trim()
+            note = note.trim(),
+            dueTimestamp = calculatedTimestamp
         )
         insertTask(newTask)
+    }
+
+    /**
+     * Updates an existing task's due date in Room database via Material Design 3 DatePicker.
+     */
+    fun rescheduleTaskDueDate(taskId: String, newDueDate: String, newTimestamp: Long) {
+        viewModelScope.launch {
+            repository.updateTaskDueDate(taskId, newDueDate, newTimestamp)
+            _userMessage.value = "Updated due date to $newDueDate in Room DB"
+        }
     }
 
     fun getTasksForSubject(subjectCode: String): kotlinx.coroutines.flow.Flow<List<AcademicTask>> {

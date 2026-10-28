@@ -51,6 +51,9 @@ interface TaskDao {
     @Query("UPDATE tasks SET isCompleted = :isCompleted WHERE id = :id")
     suspend fun setTaskCompleted(id: String, isCompleted: Boolean)
 
+    @Query("UPDATE tasks SET dueDate = :dueDate, dueTimestamp = :dueTimestamp WHERE id = :id")
+    suspend fun updateTaskDueDate(id: String, dueDate: String, dueTimestamp: Long)
+
     @Transaction
     suspend fun toggleTaskCompletion(id: String): Boolean {
         val task = getTaskById(id) ?: return false

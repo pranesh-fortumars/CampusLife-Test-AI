@@ -734,6 +734,8 @@ fun AddAcademicDeadlineDialog(
     var category by remember { mutableStateOf("Assignment") } // "Exam", "Assignment", "Project"
     var type by remember { mutableStateOf("ASSIGNMENT") } // ASSIGNMENT, PROJECT, LAB, QUIZ, EXAM_PREP
     var dueDate by remember { mutableStateOf("Tomorrow") }
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var dueTime by remember { mutableStateOf("11:59 PM") }
     var priority by remember { mutableStateOf("HIGH") }
     var weightage by remember { mutableStateOf("15% Weightage") }
@@ -871,24 +873,97 @@ fun AddAcademicDeadlineDialog(
                     }
                 }
 
-                // Due Date & Time
+                // Due Date & Time (Material Design 3 DatePicker)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
                         value = dueDate,
-                        onValueChange = { dueDate = it },
-                        label = { Text("Due Date") },
-                        modifier = Modifier.weight(1f),
+                        onValueChange = {
+                            dueDate = it
+                            selectedDateMillis = null
+                        },
+                        label = { Text("Due Date *") },
+                        placeholder = { Text("e.g. Oct 30, 2026") },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showDatePicker = true },
+                                modifier = Modifier.testTag("btn_open_date_picker_dialog")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "Open Date Picker",
+                                    tint = Primary
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .testTag("task_due_date_input"),
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = dueTime,
                         onValueChange = { dueTime = it },
                         label = { Text("Time") },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .testTag("task_due_time_input"),
                         singleLine = true
+                    )
+                }
+
+                // Quick Date Preset Chips & DatePicker Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledTonalButton(
+                        onClick = { showDatePicker = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_pick_date_preset")
+                    ) {
+                        Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Pick Date", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    listOf("Today", "Tomorrow", "In 3 Days").forEach { preset ->
+                        val isSelected = dueDate == preset
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSelected) Primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(1.dp, if (isSelected) Primary else OutlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    dueDate = preset
+                                    selectedDateMillis = TaskDateUtils.parseDateStringToEpochMillis(preset)
+                                }
+                        ) {
+                            Text(
+                                text = preset,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) Primary else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (showDatePicker) {
+                    TaskDatePickerDialog(
+                        initialSelectedDateMillis = selectedDateMillis ?: TaskDateUtils.parseDateStringToEpochMillis(dueDate),
+                        onDateSelected = { millis, formatted ->
+                            selectedDateMillis = millis
+                            dueDate = formatted
+                            showDatePicker = false
+                        },
+                        onDismiss = { showDatePicker = false }
                     )
                 }
 

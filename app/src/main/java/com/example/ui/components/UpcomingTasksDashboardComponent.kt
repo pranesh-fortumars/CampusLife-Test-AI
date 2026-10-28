@@ -69,6 +69,9 @@ fun UpcomingTasksDashboardComponent(
         onDeleteTask = { id -> viewModel.deleteAcademicTask(id) },
         onTriggerReminder = { viewModel.triggerUpcomingTasksReminder() },
         onNavigateToTrack = onNavigateToTrack,
+        onRescheduleTaskDueDate = { id, newDate, newTimestamp ->
+            viewModel.rescheduleTaskDueDate(id, newDate, newTimestamp)
+        },
         modifier = modifier
     )
 }
@@ -85,6 +88,7 @@ fun UpcomingTasksDashboardComponent(
     onDeleteTask: (String) -> Unit,
     onTriggerReminder: (() -> Unit)? = null,
     onNavigateToTrack: (() -> Unit)? = null,
+    onRescheduleTaskDueDate: ((taskId: String, newDueDate: String, newTimestamp: Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -496,7 +500,10 @@ fun UpcomingTasksDashboardComponent(
                                 expandedTaskId = if (expandedTaskId == task.id) null else task.id
                             },
                             onDelete = { taskToDelete = task },
-                            onTriggerReminder = onTriggerReminder
+                            onTriggerReminder = onTriggerReminder,
+                            onRescheduleDueDate = if (onRescheduleTaskDueDate != null) {
+                                { newDate, newTs -> onRescheduleTaskDueDate(task.id, newDate, newTs) }
+                            } else null
                         )
                     }
                 }
@@ -708,8 +715,10 @@ private fun UpcomingTaskItemCard(
     onToggleExpand: () -> Unit,
     onDelete: () -> Unit,
     onTriggerReminder: (() -> Unit)?,
+    onRescheduleDueDate: ((newDate: String, newTimestamp: Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showRescheduleDatePicker by remember { mutableStateOf(false) }
     val isUrgent = task.priority.equals("URGENT", ignoreCase = true)
 
     val priorityColor = when (task.priority.uppercase()) {
@@ -968,16 +977,45 @@ private fun UpcomingTaskItemCard(
                                 fontWeight = FontWeight.Bold
                             )
 
-                            if (onTriggerReminder != null) {
-                                TextButton(
-                                    onClick = onTriggerReminder,
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Check Alerts", fontSize = 10.sp)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (onRescheduleDueDate != null) {
+                                    OutlinedButton(
+                                        onClick = { showRescheduleDatePicker = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("btn_reschedule_${task.id}")
+                                    ) {
+                                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Change Due Date", fontSize = 10.sp)
+                                    }
+                                }
+
+                                if (onTriggerReminder != null) {
+                                    TextButton(
+                                        onClick = onTriggerReminder,
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Check Alerts", fontSize = 10.sp)
+                                    }
                                 }
                             }
+                        }
+
+                        if (showRescheduleDatePicker) {
+                            TaskDatePickerDialog(
+                                initialSelectedDateMillis = task.dueTimestamp,
+                                onDateSelected = { millis, formattedDate ->
+                                    onRescheduleDueDate?.invoke(formattedDate, millis)
+                                    showRescheduleDatePicker = false
+                                },
+                                onDismiss = { showRescheduleDatePicker = false }
+                            )
                         }
                     }
                 }
@@ -1011,6 +1049,8 @@ private fun AddTaskDialog(
     var category by remember { mutableStateOf("Assignment") }
     var priority by remember { mutableStateOf("HIGH") }
     var dueDate by remember { mutableStateOf("Tomorrow") }
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var dueTime by remember { mutableStateOf("11:59 PM") }
     var weightage by remember { mutableStateOf("15% Internal") }
     var note by remember { mutableStateOf("") }
@@ -1127,24 +1167,97 @@ private fun AddTaskDialog(
                     }
                 }
 
-                // Due Date & Time
+                // Due Date & Time (Material Design 3 DatePicker)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedTextField(
                         value = dueDate,
-                        onValueChange = { dueDate = it },
-                        label = { Text("Due Date") },
+                        onValueChange = {
+                            dueDate = it
+                            selectedDateMillis = null
+                        },
+                        label = { Text("Due Date *") },
+                        placeholder = { Text("e.g. Oct 30, 2026") },
                         singleLine = true,
-                        modifier = Modifier.weight(1f)
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showDatePicker = true },
+                                modifier = Modifier.testTag("btn_open_date_picker_dashboard")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "Pick Date",
+                                    tint = Primary
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .testTag("task_due_date_input")
                     )
                     OutlinedTextField(
                         value = dueTime,
                         onValueChange = { dueTime = it },
                         label = { Text("Due Time") },
                         singleLine = true,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .testTag("task_due_time_input")
+                    )
+                }
+
+                // Quick Date Preset Chips & DatePicker Action
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledTonalButton(
+                        onClick = { showDatePicker = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_pick_date_preset_dashboard")
+                    ) {
+                        Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Pick Date", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    listOf("Today", "Tomorrow", "In 3 Days").forEach { preset ->
+                        val isSelected = dueDate == preset
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSelected) Primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(1.dp, if (isSelected) Primary else OutlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    dueDate = preset
+                                    selectedDateMillis = TaskDateUtils.parseDateStringToEpochMillis(preset)
+                                }
+                        ) {
+                            Text(
+                                text = preset,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) Primary else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (showDatePicker) {
+                    TaskDatePickerDialog(
+                        initialSelectedDateMillis = selectedDateMillis ?: TaskDateUtils.parseDateStringToEpochMillis(dueDate),
+                        onDateSelected = { millis, formatted ->
+                            selectedDateMillis = millis
+                            dueDate = formatted
+                            showDatePicker = false
+                        },
+                        onDismiss = { showDatePicker = false }
                     )
                 }
 

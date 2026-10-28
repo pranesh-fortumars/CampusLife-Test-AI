@@ -649,8 +649,10 @@ class CampusLifeViewModel(
         dueTime: String = "11:59 PM",
         priority: String = "HIGH",
         weightage: String = "15% Weightage",
-        note: String = ""
+        note: String = "",
+        dueTimestamp: Long? = null
     ) {
+        val calculatedTimestamp = dueTimestamp ?: com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis(dueDate)
         val newTask = AcademicTask(
             title = title,
             subjectCode = subjectCode,
@@ -661,17 +663,32 @@ class CampusLifeViewModel(
             dueTime = dueTime,
             priority = priority,
             weightage = weightage,
-            note = note
+            note = note,
+            dueTimestamp = calculatedTimestamp
         )
         viewModelScope.launch {
             try {
                 taskRepository.insertTask(newTask)
-                _userFeedbackMessage.value = "Added deadline: $title"
+                _userFeedbackMessage.value = "Saved task '$title' (Due $dueDate) to Room DB"
                 if (priority == "URGENT" || dueDate.contains("Today", ignoreCase = true) || dueDate.contains("Tomorrow", ignoreCase = true)) {
                     com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(getApplication())
                 }
             } catch (e: Exception) {
                 _academicTasks.update { listOf(newTask) + it }
+            }
+        }
+    }
+
+    /**
+     * Reschedules an existing task's due date in Room database using the Material Design 3 DatePicker.
+     */
+    fun rescheduleTaskDueDate(taskId: String, newDueDate: String, newTimestamp: Long) {
+        viewModelScope.launch {
+            try {
+                taskRepository.updateTaskDueDate(taskId, newDueDate, newTimestamp)
+                _userFeedbackMessage.value = "Rescheduled task due date to $newDueDate in Room DB"
+            } catch (e: Exception) {
+                _userFeedbackMessage.value = "Updated task due date to $newDueDate"
             }
         }
     }

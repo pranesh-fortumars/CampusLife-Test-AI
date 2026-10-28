@@ -195,4 +195,8 @@ class TaskRepository(private val dao: TaskDao) {
     suspend fun deleteTask(id: String) {
         dao.deleteTaskById(id)
     }
+
+    suspend fun updateTaskDueDate(id: String, dueDate: String, dueTimestamp: Long) {
+        dao.updateTaskDueDate(id, dueDate.trim(), dueTimestamp)
+    }
 }

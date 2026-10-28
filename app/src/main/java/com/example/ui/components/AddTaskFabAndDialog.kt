@@ -93,6 +93,7 @@ fun AddTaskFabAndDialog(
         subjects = subjects,
         modifier = modifier,
         onTaskAdded = { title, code, name, category, type, date, time, priority, weight, note, scheduleReminder ->
+            val timestamp = TaskDateUtils.parseDateStringToEpochMillis(date)
             viewModel.addAcademicTask(
                 title = title,
                 subjectCode = code,
@@ -103,7 +104,8 @@ fun AddTaskFabAndDialog(
                 dueTime = time,
                 priority = priority,
                 weightage = weight,
-                note = note
+                note = note,
+                dueTimestamp = timestamp
             )
             if (scheduleReminder) {
                 TaskNotificationScheduler.triggerImmediateDueCheck(context)
@@ -131,6 +133,7 @@ fun AddTaskFabAndDialog(
         subjects = subjects,
         modifier = modifier,
         onTaskAdded = { title, code, name, category, type, date, time, priority, weight, note, scheduleReminder ->
+            val timestamp = TaskDateUtils.parseDateStringToEpochMillis(date)
             taskViewModel.addTask(
                 title = title,
                 subjectCode = code,
@@ -141,7 +144,8 @@ fun AddTaskFabAndDialog(
                 dueTime = time,
                 priority = priority,
                 weightage = weight,
-                note = note
+                note = note,
+                dueTimestamp = timestamp
             )
             if (scheduleReminder) {
                 TaskNotificationScheduler.triggerImmediateDueCheck(context)
@@ -251,6 +255,8 @@ fun AddTaskDialog(
     var category by remember { mutableStateOf("Assignment") } // Assignment, Exam, Project, Lab, Quiz
     var priority by remember { mutableStateOf("HIGH") } // URGENT, HIGH, MEDIUM, LOW
     var dueDate by remember { mutableStateOf("Tomorrow") }
+    var selectedDateMillis by remember { mutableStateOf<Long?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
     var dueTime by remember { mutableStateOf("11:59 PM") }
     var weightage by remember { mutableStateOf("15% Internal") }
     var note by remember { mutableStateOf("") }
@@ -468,18 +474,33 @@ fun AddTaskDialog(
                         }
                     }
 
-                    // Due Date & Time
+                    // Due Date & Time (Material Design 3 DatePicker integration)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedTextField(
                             value = dueDate,
-                            onValueChange = { dueDate = it },
-                            label = { Text("Due Date") },
-                            placeholder = { Text("e.g. Tomorrow, Oct 30") },
+                            onValueChange = {
+                                dueDate = it
+                                selectedDateMillis = null
+                            },
+                            label = { Text("Due Date *") },
+                            placeholder = { Text("e.g. Oct 30, 2026") },
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { showDatePicker = true },
+                                    modifier = Modifier.testTag("btn_open_date_picker")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = "Pick date from calendar",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            },
                             modifier = Modifier
                                 .weight(1.2f)
                                 .testTag("task_due_date_input")
@@ -497,27 +518,83 @@ fun AddTaskDialog(
                         )
                     }
 
-                    // Quick Date Chips
+                    // Quick Date Chips & DatePicker Action
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        FilledTonalButton(
+                            onClick = { showDatePicker = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("chip_open_date_picker")
+                        ) {
+                            Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Pick Date", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
                         listOf("Today", "Tomorrow", "In 3 Days", "Next Week").forEach { preset ->
+                            val isSelected = dueDate == preset
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .clickable { dueDate = preset }
+                                    .clickable {
+                                        dueDate = preset
+                                        selectedDateMillis = TaskDateUtils.parseDateStringToEpochMillis(preset)
+                                    }
                             ) {
                                 Text(
                                     text = preset,
                                     style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
+                    }
+
+                    // Room DB Persistence confirmation badge
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Due: $dueDate • Room SQLite persistence",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    if (showDatePicker) {
+                        TaskDatePickerDialog(
+                            initialSelectedDateMillis = selectedDateMillis ?: TaskDateUtils.parseDateStringToEpochMillis(dueDate),
+                            onDateSelected = { millis, formatted ->
+                                selectedDateMillis = millis
+                                dueDate = formatted
+                                showDatePicker = false
+                            },
+                            onDismiss = { showDatePicker = false }
+                        )
                     }
 
                     // Weightage Field

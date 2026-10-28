@@ -851,6 +851,77 @@ class CampusLifeUnitTest {
         assertEquals(1, remainingPending.size)
         assertEquals("test-task-2", remainingPending.first().id)
     }
+
+    @Test
+    fun testDatePickerFormattingAndParsing() {
+        val calendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+            set(2026, java.util.Calendar.NOVEMBER, 15, 0, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val targetMillis = calendar.timeInMillis
+
+        // Format epoch millis to string
+        val formatted = com.example.ui.components.TaskDateUtils.formatEpochMillisToDate(targetMillis)
+        assertEquals("Nov 15, 2026", formatted)
+
+        // Parse formatted string back to epoch millis
+        val parsedMillis = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis(formatted)
+        assertEquals(targetMillis, parsedMillis)
+
+        // Parse relative keywords
+        val todayMillis = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis("Today")
+        val tomorrowMillis = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis("Tomorrow")
+        assertTrue(tomorrowMillis > todayMillis)
+    }
+
+    @Test
+    fun testTasksSortedBySelectedDateTimestampInRoom() {
+        val nov10 = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis("Nov 10, 2026")
+        val nov20 = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis("Nov 20, 2026")
+        val dec01 = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis("Dec 01, 2026")
+
+        val taskEarly = com.example.data.local.TaskEntity(
+            id = "task-early",
+            title = "Networks Lab",
+            subjectCode = "CS-306",
+            subjectName = "Computer Networks",
+            dueDate = "Nov 10, 2026",
+            dueTimestamp = nov10
+        )
+        val taskMid = com.example.data.local.TaskEntity(
+            id = "task-mid",
+            title = "DBMS Milestone",
+            subjectCode = "CS-302",
+            subjectName = "DBMS",
+            dueDate = "Nov 20, 2026",
+            dueTimestamp = nov20
+        )
+        val taskLate = com.example.data.local.TaskEntity(
+            id = "task-late",
+            title = "Final Project Submission",
+            subjectCode = "CS-308",
+            subjectName = "Software Engineering",
+            dueDate = "Dec 01, 2026",
+            dueTimestamp = dec01
+        )
+
+        val unsortedList = listOf(taskLate, taskEarly, taskMid)
+        val sortedList = unsortedList.sortedBy { it.dueTimestamp }
+
+        assertEquals("task-early", sortedList[0].id)
+        assertEquals("task-mid", sortedList[1].id)
+        assertEquals("task-late", sortedList[2].id)
+
+        // Verify rescheduling updates dueDate and timestamp
+        val rescheduledEarly = taskEarly.copy(
+            dueDate = "Dec 05, 2026",
+            dueTimestamp = com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis("Dec 05, 2026")
+        )
+        val reSorted = listOf(taskLate, rescheduledEarly, taskMid).sortedBy { it.dueTimestamp }
+        assertEquals("task-mid", reSorted[0].id)
+        assertEquals("task-late", reSorted[1].id)
+        assertEquals("task-early", reSorted[2].id)
+    }
 }
 
 
