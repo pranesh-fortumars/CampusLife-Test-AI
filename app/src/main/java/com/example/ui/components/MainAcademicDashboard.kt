@@ -474,6 +474,7 @@ fun MainAcademicDashboard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AcademicDeadlineItemCard(
     task: AcademicTask,
@@ -494,37 +495,93 @@ fun AcademicDeadlineItemCard(
         else -> Triple(Color(0xFF4338CA), Color(0xFFEEF2FF), Icons.Default.Assignment)
     }
 
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLowest
-        ),
-        border = BorderStroke(1.dp, if (isUrgent && !task.isCompleted) Error.copy(alpha = 0.35f) else OutlineVariant.copy(alpha = 0.6f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (task.isCompleted) 0.dp else 1.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("task_card_${task.id}")
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.StartToEnd || dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                onToggleComplete()
+                false
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val isCompleting = !task.isCompleted
+            val bgColor = if (isCompleting) Tertiary else Warning
+            val alignment = when (dismissState.dismissDirection) {
+                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                else -> Alignment.Center
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(bgColor)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = task.isCompleted,
-                        onCheckedChange = { onToggleComplete() },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = Tertiary,
-                            uncheckedColor = MaterialTheme.colorScheme.outline
-                        ),
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isCompleting) Icons.Default.CheckCircle else Icons.Default.Replay,
+                        contentDescription = "Swipe to toggle completion",
+                        tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isCompleting) "Mark Completed ✔" else "Mark Pending ⏳",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        },
+        modifier = Modifier.testTag("swipe_task_card_${task.id}")
+    ) {
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLowest
+            ),
+            border = BorderStroke(1.dp, if (isUrgent && !task.isCompleted) Error.copy(alpha = 0.35f) else OutlineVariant.copy(alpha = 0.6f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (task.isCompleted) 0.dp else 1.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("task_card_${task.id}")
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Checkbox(
+                                checked = task.isCompleted,
+                                onCheckedChange = { onToggleComplete() },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = Tertiary,
+                                    uncheckedColor = MaterialTheme.colorScheme.outline
+                                ),
+                                modifier = Modifier.testTag("task_checkbox_${task.id}")
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
                     Column {
                         Text(
                             text = task.title,
@@ -662,6 +719,7 @@ fun AcademicDeadlineItemCard(
             }
         }
     }
+}
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

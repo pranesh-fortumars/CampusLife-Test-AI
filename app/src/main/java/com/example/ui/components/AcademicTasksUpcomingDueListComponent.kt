@@ -312,6 +312,7 @@ fun AcademicTasksUpcomingDueListComponent(
  * Material 3 Card item for an upcoming academic deadline, featuring due date badge,
  * category pill, subject information, weightage, and completion toggle.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UpcomingAcademicTaskItemCard(
     task: AcademicTask,
@@ -334,20 +335,73 @@ fun UpcomingAcademicTaskItemCard(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (isUrgent) Error.copy(alpha = 0.4f) else OutlineVariant.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (task.isCompleted) 0.dp else 1.dp),
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.StartToEnd || dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                onToggleComplete()
+                false
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val isCompleting = !task.isCompleted
+            val bgColor = if (isCompleting) Success else Warning
+            val alignment = when (dismissState.dismissDirection) {
+                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                else -> Alignment.Center
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(bgColor)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isCompleting) Icons.Default.CheckCircle else Icons.Default.Replay,
+                        contentDescription = "Swipe to mark complete",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isCompleting) "Mark Completed" else "Mark Pending",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        },
         modifier = modifier
             .fillMaxWidth()
-            .testTag("academic_task_card_${task.id}")
+            .testTag("task_swipe_dismiss_${task.id}")
     ) {
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (task.isCompleted) MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isUrgent) Error.copy(alpha = 0.4f) else OutlineVariant.copy(alpha = 0.5f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (task.isCompleted) 0.dp else 1.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("academic_task_card_${task.id}")
+        ) {
         Column(modifier = Modifier.padding(14.dp)) {
             // Row 1: Checkbox, Title, and Delete Button
             Row(
@@ -533,3 +587,5 @@ fun UpcomingAcademicTaskItemCard(
         }
     }
 }
+}
+

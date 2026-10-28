@@ -467,6 +467,26 @@ fun UpcomingTasksDashboardComponent(
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Swipe, contentDescription = null, tint = Primary, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Swipe card or tap checkbox to toggle completion in Room DB",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     filteredTasks.forEach { task ->
                         UpcomingTaskItemCard(
                             task = task,
@@ -679,6 +699,7 @@ private fun HeroNearestDeadlineCard(
 /**
  * Standard card representing a single task item from the Room database.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UpcomingTaskItemCard(
     task: AcademicTask,
@@ -698,207 +719,264 @@ private fun UpcomingTaskItemCard(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (task.isCompleted) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            1.dp,
-            if (isUrgent && !task.isCompleted) Error.copy(alpha = 0.35f) else OutlineVariant.copy(alpha = 0.5f)
-        ),
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggleExpand)
-            .testTag("task_item_${task.id}")
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+    // Material 3 Swipe-to-Dismiss Gesture State for marking completion in Room DB
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { dismissValue ->
+            if (dismissValue == SwipeToDismissBoxValue.StartToEnd || dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                onToggleComplete()
+                false // Rebound smoothly while updating completion state in Room DB
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = true,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            val isCompleting = !task.isCompleted
+            val bgColor = if (isCompleting) Success else Warning
+            val alignment = when (dismissState.dismissDirection) {
+                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                else -> Alignment.Center
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bgColor)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = alignment
             ) {
-                // Interactive Checkbox / Toggle
-                IconButton(
-                    onClick = onToggleComplete,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .testTag("task_checkbox_${task.id}")
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = if (task.isCompleted) Icons.Default.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                        contentDescription = if (task.isCompleted) "Completed" else "Mark Complete",
-                        tint = if (task.isCompleted) Success else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = if (isCompleting) Icons.Default.CheckCircle else Icons.Default.Replay,
+                        contentDescription = "Swipe to mark completion",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    // Category & Priority Row
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Priority Badge
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = priorityColor.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = task.priority.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = priorityColor,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-
-                        // Category Badge
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
-                        ) {
-                            Text(
-                                text = task.category,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-
-                        // Subject Code
-                        Text(
-                            text = task.subjectCode,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Primary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    // Title
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = task.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                        maxLines = if (isExpanded) Int.MAX_VALUE else 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    // Due date & Time
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Event,
-                            contentDescription = null,
-                            tint = if (isUrgent && !task.isCompleted) Error else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Text(
-                            text = "${task.dueDate} • ${task.dueTime}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 11.sp,
-                            fontWeight = if (isUrgent && !task.isCompleted) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isUrgent && !task.isCompleted) Error else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (task.weightage.isNotBlank()) {
-                            Text("•", fontSize = 11.sp, color = MaterialTheme.colorScheme.outlineVariant)
-                            Text(
-                                text = task.weightage,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-
-                // Delete Button
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .testTag("task_delete_${task.id}")
-                ) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = "Delete task",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp)
+                        text = if (isCompleting) "Mark Completed ✔" else "Mark Pending ⏳",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
                 }
             }
-
-            // Expanded details & note preview
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 42.dp, top = 8.dp, end = 4.dp)
+        },
+        modifier = modifier.testTag("task_swipe_dismiss_${task.id}")
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = if (task.isCompleted) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(
+                1.dp,
+                if (isUrgent && !task.isCompleted) Error.copy(alpha = 0.35f) else OutlineVariant.copy(alpha = 0.5f)
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleExpand)
+                .testTag("task_item_${task.id}")
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // Material 3 Checkbox with 48dp minimum accessible touch target
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("task_checkbox_container_${task.id}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Checkbox(
+                            checked = task.isCompleted,
+                            onCheckedChange = { onToggleComplete() },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = Success,
+                                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                checkmarkColor = Color.White
+                            ),
+                            modifier = Modifier.testTag("task_checkbox_${task.id}")
+                        )
+                    }
 
-                    Text(
-                        text = "Course: ${task.subjectName}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Spacer(modifier = Modifier.width(4.dp))
 
-                    if (task.note.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f),
-                            modifier = Modifier.fillMaxWidth()
+                    Column(modifier = Modifier.weight(1f)) {
+                        // Category & Priority Row
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Priority Badge
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = priorityColor.copy(alpha = 0.12f)
+                            ) {
+                                Text(
+                                    text = task.priority.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = priorityColor,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            // Category Badge
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest
+                            ) {
+                                Text(
+                                    text = task.category,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            // Subject Code
                             Text(
-                                text = "Note: ${task.note}",
+                                text = task.subjectCode,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Primary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Title
+                        Text(
+                            text = task.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                            maxLines = if (isExpanded) Int.MAX_VALUE else 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Due date & Time
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Event,
+                                contentDescription = null,
+                                tint = if (isUrgent && !task.isCompleted) Error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "${task.dueDate} • ${task.dueTime}",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(6.dp)
+                                fontWeight = if (isUrgent && !task.isCompleted) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isUrgent && !task.isCompleted) Error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            if (task.weightage.isNotBlank()) {
+                                Text("•", fontSize = 11.sp, color = MaterialTheme.colorScheme.outlineVariant)
+                                Text(
+                                    text = task.weightage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Delete Button
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("task_delete_${task.id}")
                     ) {
+                        Icon(
+                            Icons.Outlined.Delete,
+                            contentDescription = "Delete task",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                // Expanded details & note preview
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 42.dp, top = 8.dp, end = 4.dp)
+                    ) {
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Spacer(modifier = Modifier.height(6.dp))
+
                         Text(
-                            text = "Status: ${if (task.isCompleted) "Completed ✔" else "Pending"}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (task.isCompleted) Success else Warning,
-                            fontWeight = FontWeight.Bold
+                            text = "Course: ${task.subjectName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
                         )
 
-                        if (onTriggerReminder != null) {
-                            TextButton(
-                                onClick = onTriggerReminder,
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        if (task.note.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(12.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Check Alerts", fontSize = 10.sp)
+                                Text(
+                                    text = "Note: ${task.note}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(6.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Status: ${if (task.isCompleted) "Completed ✔" else "Pending"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (task.isCompleted) Success else Warning,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            if (onTriggerReminder != null) {
+                                TextButton(
+                                    onClick = onTriggerReminder,
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(12.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Check Alerts", fontSize = 10.sp)
+                                }
                             }
                         }
                     }
