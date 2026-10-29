@@ -954,7 +954,95 @@ class CampusLifeUnitTest {
         assertEquals(81.25, projectedDBMS, 0.05)
         assertTrue(projectedDBMS >= 75.0)
     }
+
+    @Test
+    fun testAcademicCalendarEventEntityPropertiesAndCountdown() {
+        val now = System.currentTimeMillis()
+        val oneDay = 24 * 60 * 60 * 1000L
+
+        val examEvent = com.example.data.local.AcademicCalendarEventEntity(
+            id = "test-exam-1",
+            title = "Operating Systems Mid-Term",
+            courseCode = "CS-304",
+            courseName = "Operating Systems",
+            eventType = "EXAM",
+            date = "Nov 04, 2026",
+            time = "10:00 AM - 12:00 PM",
+            timestamp = now + (5 * oneDay),
+            locationOrRoom = "LH-302",
+            weightage = "25% Mid-Term",
+            isCompleted = false
+        )
+
+        assertTrue(examEvent.isExam)
+        assertFalse(examEvent.isAssignment)
+        assertFalse(examEvent.isCompleted)
+        assertEquals("In 5 days", examEvent.urgencyLabel)
+
+        // Toggle completion
+        val completedEvent = examEvent.toggleCompleted()
+        assertTrue(completedEvent.isCompleted)
+        assertEquals("Completed", completedEvent.urgencyLabel)
+    }
+
+    @Test
+    fun testGpaCalculatorSgpaAndCumulativePerformance() {
+        // Course grades and credit hours
+        val c1 = com.example.ui.components.CalculatorCourseItem(courseCode = "CS-301", courseName = "Distributed Systems", credits = 4, grade = "A+") // 4 * 9.0 = 36.0
+        val c2 = com.example.ui.components.CalculatorCourseItem(courseCode = "CS-302", courseName = "DBMS", credits = 4, grade = "O") // 4 * 10.0 = 40.0
+        val c3 = com.example.ui.components.CalculatorCourseItem(courseCode = "CS-304", courseName = "Operating Systems", credits = 4, grade = "A+") // 4 * 9.0 = 36.0
+        val c4 = com.example.ui.components.CalculatorCourseItem(courseCode = "CS-306", courseName = "Computer Networks", credits = 3, grade = "A") // 3 * 8.0 = 24.0
+        val c5 = com.example.ui.components.CalculatorCourseItem(courseCode = "CS-308", courseName = "Software Engineering", credits = 3, grade = "O") // 3 * 10.0 = 30.0
+
+        val termCourses = listOf(c1, c2, c3, c4, c5)
+        val termCredits = termCourses.sumOf { it.credits } // 4 + 4 + 4 + 3 + 3 = 18 credits
+        val termQualityPoints = termCourses.sumOf { it.qualityPoints } // 36 + 40 + 36 + 24 + 30 = 166.0 points
+        val termSgpa = termQualityPoints / termCredits.toDouble() // 166 / 18 = 9.222
+
+        assertEquals(18, termCredits)
+        assertEquals(166.0, termQualityPoints, 0.001)
+        assertEquals(9.22, termSgpa, 0.01)
+
+        // Cumulative performance: Prior 64 credits at 8.78 CGPA
+        val priorCredits = 64
+        val priorCgpa = 8.78
+        val priorPoints = priorCredits * priorCgpa // 561.92
+
+        val totalCumulativeCredits = priorCredits + termCredits // 82 credits
+        val totalCumulativePoints = priorPoints + termQualityPoints // 561.92 + 166 = 727.92
+        val cumulativeGpa = totalCumulativePoints / totalCumulativeCredits.toDouble() // 727.92 / 82 = 8.877
+
+        assertEquals(82, totalCumulativeCredits)
+        assertEquals(8.88, cumulativeGpa, 0.01)
+
+        // AICTE conversion: (CGPA - 0.75) * 10.0
+        val aictePct = ((cumulativeGpa - 0.75) * 10.0)
+        assertEquals(81.3, aictePct, 0.1)
+
+        // US 4.0 Scale: (CGPA / 10.0) * 4.0
+        val usGpa = (cumulativeGpa / 10.0) * 4.0
+        assertEquals(3.55, usGpa, 0.05)
+    }
+
+    @Test
+    fun testTargetCgpaRequiredSgpaCalculation() {
+        val priorCredits = 64
+        val priorCgpa = 8.78
+        val priorPoints = priorCredits * priorCgpa // 561.92
+
+        val termCredits = 18
+        val targetCgpa = 9.00
+
+        val totalCombinedCredits = priorCredits + termCredits // 82
+        val targetTotalPoints = totalCombinedCredits * targetCgpa // 82 * 9.0 = 738.0
+        val neededTermPoints = targetTotalPoints - priorPoints // 738.0 - 561.92 = 176.08
+        val requiredSgpa = neededTermPoints / termCredits.toDouble() // 176.08 / 18 = 9.782
+
+        assertEquals(9.78, requiredSgpa, 0.01)
+        assertTrue(requiredSgpa <= 10.0) // Achievable
+    }
 }
+
 
 
 

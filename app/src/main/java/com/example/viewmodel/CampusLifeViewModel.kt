@@ -36,7 +36,9 @@ enum class SubScreen {
     EXECUTIVE_DESK,
     REVISION_PLAN,
     DAILY_ATTENDANCE_LOGGER,
-    TASKS_LIST
+    TASKS_LIST,
+    ACADEMIC_CALENDAR,
+    GPA_CALCULATOR
 }
 
 class CampusLifeViewModel(
@@ -45,7 +47,9 @@ class CampusLifeViewModel(
     private val taskRepository: TaskRepository,
     private val gradeRepository: GradeRepository,
     private val projectRepository: com.example.data.repository.AcademicProjectRepository =
-        com.example.data.repository.AcademicProjectRepository(AppDatabase.provideProjectDao(application))
+        com.example.data.repository.AcademicProjectRepository(AppDatabase.provideProjectDao(application)),
+    private val calendarRepository: com.example.data.repository.AcademicCalendarRepository =
+        com.example.data.repository.AcademicCalendarRepository(AppDatabase.provideAcademicCalendarDao(application))
 ) : AndroidViewModel(application) {
 
     constructor(
@@ -115,6 +119,9 @@ class CampusLifeViewModel(
 
     private val _academicProjects = MutableStateFlow<List<com.example.data.local.AcademicProjectEntity>>(emptyList())
     val academicProjects: StateFlow<List<com.example.data.local.AcademicProjectEntity>> = _academicProjects.asStateFlow()
+
+    private val _calendarEvents = MutableStateFlow<List<com.example.data.local.AcademicCalendarEventEntity>>(emptyList())
+    val calendarEvents: StateFlow<List<com.example.data.local.AcademicCalendarEventEntity>> = _calendarEvents.asStateFlow()
 
     private val _assignments = MutableStateFlow(MockData.assignments)
     val assignments: StateFlow<List<AssignmentItem>> = _assignments.asStateFlow()
@@ -261,6 +268,21 @@ class CampusLifeViewModel(
                 try {
                     projectRepository.allProjects.collect { projects ->
                         _academicProjects.value = projects
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    calendarRepository.seedCalendarIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    calendarRepository.allEvents.collect { events ->
+                        _calendarEvents.value = events
                     }
                 } catch (e: Exception) {
                     // Ignore
@@ -846,4 +868,99 @@ class CampusLifeViewModel(
         val success = EventNotificationHelper.postUpcomingEventAlert(context, event)
         _userFeedbackMessage.value = if (success) "Sent notification for ${event.title}" else "Notification posted (check status bar)"
     }
+
+    // Academic Calendar Operations
+    fun toggleCalendarEventCompleted(id: String) {
+        val event = _calendarEvents.value.find { it.id == id } ?: return
+        val nextCompleted = !event.isCompleted
+        viewModelScope.launch {
+            try {
+                calendarRepository.toggleCompleted(id, nextCompleted)
+                _userFeedbackMessage.value = if (nextCompleted) "Completed: ${event.title}" else "Marked pending: ${event.title}"
+            } catch (e: Exception) {
+                _calendarEvents.update { list ->
+                    list.map { if (it.id == id) it.copy(isCompleted = nextCompleted) else it }
+                }
+            }
+        }
+    }
+
+    fun deleteCalendarEvent(id: String) {
+        val event = _calendarEvents.value.find { it.id == id }
+        viewModelScope.launch {
+            try {
+                calendarRepository.deleteEventById(id)
+                _userFeedbackMessage.value = "Removed calendar deadline: ${event?.title ?: "Event"}"
+            } catch (e: Exception) {
+                _calendarEvents.update { list -> list.filter { it.id != id } }
+            }
+        }
+    }
+
+    fun addCalendarEvent(
+        title: String,
+        courseCode: String,
+        courseName: String,
+        eventType: String,
+        date: String,
+        time: String,
+        timestamp: Long,
+        locationOrRoom: String,
+        weightage: String,
+        description: String = ""
+    ) {
+        val newEvent = com.example.data.local.AcademicCalendarEventEntity(
+            title = title,
+            courseCode = courseCode,
+            courseName = courseName,
+            eventType = eventType,
+            date = date,
+            time = time,
+            timestamp = timestamp,
+            locationOrRoom = locationOrRoom,
+            weightage = weightage,
+            description = description
+        )
+        viewModelScope.launch {
+            try {
+                calendarRepository.insertEvent(newEvent)
+                _userFeedbackMessage.value = "Added to Academic Calendar: $title ($date)"
+            } catch (e: Exception) {
+                _calendarEvents.update { it + newEvent }
+            }
+        }
+    }
+
+    fun rescheduleCalendarEvent(id: String, newDate: String, newTimestamp: Long) {
+        viewModelScope.launch {
+            try {
+                calendarRepository.updateEventDate(id, newDate, newTimestamp)
+                _userFeedbackMessage.value = "Rescheduled event to $newDate"
+            } catch (e: Exception) {
+                _calendarEvents.update { list ->
+                    list.map { if (it.id == id) it.copy(date = newDate, timestamp = newTimestamp) else it }
+                }
+            }
+        }
+    }
+
+    fun deleteCourseGrade(semesterNumber: Int, courseId: String) {
+        _semesterGrades.update { list ->
+            list.map { sem ->
+                if (sem.semesterNumber == semesterNumber) {
+                    sem.copy(courses = sem.courses.filter { it.id != courseId })
+                } else sem
+            }
+        }
+        recalculateCgpa()
+        viewModelScope.launch {
+            try {
+                gradeRepository.deleteGrade(courseId)
+                _userFeedbackMessage.value = "Deleted course grade"
+            } catch (e: Exception) {
+                // In-memory already deleted
+            }
+        }
+    }
 }
+

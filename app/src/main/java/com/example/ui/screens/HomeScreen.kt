@@ -453,6 +453,65 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Tool 5: Academic Calendar
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.ACADEMIC_CALENDAR) }
+                            .testTag("home_tool_academic_calendar"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Academic Calendar", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Exams & Deadlines", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Tool 6: GPA Calculator
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.GPA_CALCULATOR) }
+                            .testTag("home_tool_gpa_calculator"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(TertiaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Calculate, contentDescription = null, tint = Tertiary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("GPA Calculator", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("SGPA & CGPA Tracker", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
 

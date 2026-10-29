@@ -185,6 +185,18 @@ fun CampusLifeApp(
                         onBack = { viewModel.closeSubScreen() }
                     )
                 }
+                SubScreen.ACADEMIC_CALENDAR -> {
+                    AcademicCalendarScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
+                SubScreen.GPA_CALCULATOR -> {
+                    GpaCalculatorScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
                 SubScreen.NONE -> {
                     when (currentTab) {
                         AppDestination.HOME -> {

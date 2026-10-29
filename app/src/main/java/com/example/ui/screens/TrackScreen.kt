@@ -125,6 +125,74 @@ fun TrackScreen(
                         AcademicSnapshotCard(overallAttendance = profile.overallAttendance)
                     }
 
+                    // 1b. Academic Calendar & GPA Calculator Quick Navigation Row
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { viewModel.openSubScreen(SubScreen.ACADEMIC_CALENDAR) }
+                                    .testTag("track_open_academic_calendar_card"),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text("Academic Calendar", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                        Text("Deadlines & Exams", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { viewModel.openSubScreen(SubScreen.GPA_CALCULATOR) }
+                                    .testTag("track_open_gpa_calculator_card"),
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.tertiary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Calculate, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text("GPA Calculator", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                        Text("SGPA & CGPA", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // 2. Attendance What-If Simulator with selectable subjects
                     item {
                         AttendanceSimulatorCard(
@@ -444,6 +512,53 @@ fun TrackScreen(
                         var examsViewMode by remember { mutableStateOf("grade_tracker") }
 
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // Academic Calendar Quick Launch Banner
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { viewModel.openSubScreen(SubScreen.ACADEMIC_CALENDAR) }
+                                    .testTag("exams_open_academic_calendar_banner"),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EventAvailable,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Semester Academic Calendar",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
+                                            Text(
+                                                text = "View all midterm, practical, and final exam deadlines in Room DB",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
                             // Sub-navigation selector for Course Grade Tracker vs Exam Schedule
                             Surface(
                                 shape = RoundedCornerShape(100),
@@ -545,6 +660,53 @@ fun TrackScreen(
                         val semesterGrades by viewModel.semesterGrades.collectAsState()
 
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            // GPA Calculator Quick Launch Banner
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .clickable { viewModel.openSubScreen(SubScreen.GPA_CALCULATOR) }
+                                    .testTag("cgpa_open_full_calculator_banner"),
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Calculate,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Open Dedicated GPA Calculator",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.titleSmall
+                                            )
+                                            Text(
+                                                text = "Full screen with credit hours, target simulator, and transcript calibration",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
                             // Sub-navigation selector for CGPA / Semester Calculator
                             Surface(
                                 shape = RoundedCornerShape(100),
