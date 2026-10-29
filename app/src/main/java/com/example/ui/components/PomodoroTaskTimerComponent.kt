@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,7 +32,11 @@ import androidx.compose.ui.window.Dialog
 import com.example.model.AcademicTask
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
+import java.util.UUID
 
+/**
+ * Operating modes for the Pomodoro Study & Break Timer.
+ */
 enum class PomodoroMode(val displayName: String, val defaultMinutes: Int, val emoji: String) {
     FOCUS("Focus Session", 25, "🎯"),
     SHORT_BREAK("Short Break", 5, "☕"),
@@ -38,8 +44,19 @@ enum class PomodoroMode(val displayName: String, val defaultMinutes: Int, val em
 }
 
 /**
- * Material 3 Pomodoro-style study timer component allowing students to start, pause,
- * and reset focus sessions specifically linked to their academic tasks.
+ * Record of a completed focus or break study session.
+ */
+data class CompletedFocusSession(
+    val id: String = UUID.randomUUID().toString(),
+    val mode: PomodoroMode,
+    val taskTitle: String,
+    val durationMinutes: Int,
+    val timestampFormatted: String
+)
+
+/**
+ * Material 3 Pomodoro-style study timer component allowing students to track focused study sessions,
+ * link sessions to academic tasks or courses, customize durations, and take structured scheduled breaks.
  */
 @Composable
 fun PomodoroTaskTimerComponent(
@@ -52,7 +69,7 @@ fun PomodoroTaskTimerComponent(
     // Current Pomodoro mode (Focus 25m, Short Break 5m, Long Break 15m)
     var currentMode by remember { mutableStateOf(PomodoroMode.FOCUS) }
 
-    // Selected academic task
+    // Selected academic task or course topic
     var selectedTaskId by remember {
         mutableStateOf(initialSelectedTaskId ?: tasks.firstOrNull { !it.isCompleted }?.id)
     }
@@ -60,18 +77,49 @@ fun PomodoroTaskTimerComponent(
         tasks.find { it.id == selectedTaskId }
     }
 
-    // Timer state
-    var totalSeconds by remember(currentMode) { mutableIntStateOf(currentMode.defaultMinutes * 60) }
-    var remainingSeconds by remember(currentMode) { mutableIntStateOf(currentMode.defaultMinutes * 60) }
+    // Dynamic timer duration in minutes (allows customizing beyond default)
+    var customDurationMinutes by remember(currentMode) { mutableIntStateOf(currentMode.defaultMinutes) }
+    var totalSeconds by remember(customDurationMinutes) { mutableIntStateOf(customDurationMinutes * 60) }
+    var remainingSeconds by remember(customDurationMinutes) { mutableIntStateOf(customDurationMinutes * 60) }
     var isRunning by remember { mutableStateOf(false) }
 
-    // Session cycle counters
-    var completedSessionsToday by remember { mutableIntStateOf(3) }
-    var currentCycleIndex by remember { mutableIntStateOf(1) } // 1 to 4
+    // Cycle & Streak metrics
+    var currentCycleIndex by remember { mutableIntStateOf(1) } // 1 to 4 focus sprints
     val maxCycle = 4
+
+    // Completed sessions history log
+    var sessionHistory by remember {
+        mutableStateOf(
+            listOf(
+                CompletedFocusSession(
+                    mode = PomodoroMode.FOCUS,
+                    taskTitle = "CS-304: Semaphore Synchronization Lab",
+                    durationMinutes = 25,
+                    timestampFormatted = "09:30 AM"
+                ),
+                CompletedFocusSession(
+                    mode = PomodoroMode.SHORT_BREAK,
+                    taskTitle = "Hydration & Eye Rest",
+                    durationMinutes = 5,
+                    timestampFormatted = "09:55 AM"
+                ),
+                CompletedFocusSession(
+                    mode = PomodoroMode.FOCUS,
+                    taskTitle = "CS-302: BCNF Normalization & SQL Queries",
+                    durationMinutes = 25,
+                    timestampFormatted = "10:00 AM"
+                )
+            )
+        )
+    }
+
+    val totalFocusMinutesToday = remember(sessionHistory) {
+        sessionHistory.filter { it.mode == PomodoroMode.FOCUS }.sumOf { it.durationMinutes }
+    }
 
     var showTaskPicker by remember { mutableStateOf(false) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
+    var soundEnabled by remember { mutableStateOf(true) }
 
     // Coroutine timer ticker
     LaunchedEffect(isRunning, remainingSeconds) {
@@ -80,12 +128,35 @@ fun PomodoroTaskTimerComponent(
             remainingSeconds -= 1
         } else if (isRunning && remainingSeconds == 0) {
             isRunning = false
+            val sessionTitle = activeTask?.title ?: if (currentMode == PomodoroMode.FOCUS) "General Academic Focus" else "Scheduled Break"
+            val newRecord = CompletedFocusSession(
+                mode = currentMode,
+                taskTitle = sessionTitle,
+                durationMinutes = customDurationMinutes,
+                timestampFormatted = "Just now"
+            )
+            sessionHistory = listOf(newRecord) + sessionHistory
+
             if (currentMode == PomodoroMode.FOCUS) {
-                completedSessionsToday += 1
-                onSessionCompleted?.invoke(activeTask?.id, currentMode.defaultMinutes)
-                feedbackMessage = "Focus session completed! Great work on ${activeTask?.title ?: "academics"} 🎉"
+                onSessionCompleted?.invoke(activeTask?.id, customDurationMinutes)
+                feedbackMessage = "Focus sprint completed! Great job on '$sessionTitle' 🎉"
+
+                // Transition to break
+                if (currentCycleIndex < maxCycle) {
+                    currentMode = PomodoroMode.SHORT_BREAK
+                } else {
+                    currentMode = PomodoroMode.LONG_BREAK
+                }
+                customDurationMinutes = currentMode.defaultMinutes
+                totalSeconds = customDurationMinutes * 60
+                remainingSeconds = totalSeconds
             } else {
-                feedbackMessage = "Break is over! Ready for the next focus sprint? ⚡"
+                feedbackMessage = "Break is over! Refreshed and ready for Sprint #$currentCycleIndex? ⚡"
+                currentCycleIndex = if (currentCycleIndex >= maxCycle) 1 else currentCycleIndex + 1
+                currentMode = PomodoroMode.FOCUS
+                customDurationMinutes = currentMode.defaultMinutes
+                totalSeconds = customDurationMinutes * 60
+                remainingSeconds = totalSeconds
             }
         }
     }
@@ -133,12 +204,12 @@ fun PomodoroTaskTimerComponent(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(38.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(PrimaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("🍅", fontSize = 18.sp)
+                        Text("🍅", fontSize = 20.sp)
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
@@ -149,7 +220,7 @@ fun PomodoroTaskTimerComponent(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Linked to Academic Tasks & Deadlines",
+                            text = "Focus Intervals & Scheduled Breaks",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -167,7 +238,7 @@ fun PomodoroTaskTimerComponent(
                         Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = Tertiary, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "$completedSessionsToday done today",
+                            text = "${totalFocusMinutesToday}m deep focus today",
                             style = MaterialTheme.typography.labelSmall,
                             color = Tertiary,
                             fontWeight = FontWeight.Bold
@@ -203,12 +274,12 @@ fun PomodoroTaskTimerComponent(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "ACTIVE ACADEMIC TASK",
+                                text = if (currentMode == PomodoroMode.FOCUS) "TARGET ACADEMIC TASK" else "SCHEDULED BREAK TIME",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = modeColor,
                                 fontWeight = FontWeight.Bold
                             )
-                            if (activeTask != null) {
+                            if (activeTask != null && currentMode == PomodoroMode.FOCUS) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(shape = RoundedCornerShape(4.dp), color = PrimaryContainer) {
                                     Text(
@@ -223,14 +294,20 @@ fun PomodoroTaskTimerComponent(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = activeTask?.title ?: "General Campus Study & Problem Solving",
+                            text = if (currentMode == PomodoroMode.FOCUS) (activeTask?.title ?: "General Campus Study & Problem Solving") else "${currentMode.displayName}: Rest & Recharge",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = if (activeTask != null) "Due: ${activeTask.dueDate} • Priority: ${activeTask.priority}" else "Tap to attach a specific course deadline or project",
+                            text = if (currentMode == PomodoroMode.FOCUS && activeTask != null) {
+                                "Due: ${activeTask.dueDate} • Priority: ${activeTask.priority}"
+                            } else if (currentMode == PomodoroMode.FOCUS) {
+                                "Tap to attach a specific course assignment or exam topic"
+                            } else {
+                                "Step away from screen, hydrate, and stretch muscles"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -274,8 +351,9 @@ fun PomodoroTaskTimerComponent(
                                 .clickable {
                                     if (currentMode != mode) {
                                         currentMode = mode
-                                        totalSeconds = mode.defaultMinutes * 60
-                                        remainingSeconds = mode.defaultMinutes * 60
+                                        customDurationMinutes = mode.defaultMinutes
+                                        totalSeconds = customDurationMinutes * 60
+                                        remainingSeconds = totalSeconds
                                         isRunning = false
                                     }
                                 }
@@ -342,17 +420,21 @@ fun PomodoroTaskTimerComponent(
 
                     Surface(
                         shape = RoundedCornerShape(100),
-                        color = if (isRunning) TertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+                        color = if (isRunning) {
+                            if (currentMode == PomodoroMode.FOCUS) TertiaryContainer else SecondaryContainer
+                        } else MaterialTheme.colorScheme.surfaceContainerHigh
                     ) {
                         Text(
                             text = when {
                                 !isRunning && remainingSeconds == totalSeconds -> "READY"
-                                isRunning -> "• IN FLOW"
+                                isRunning -> if (currentMode == PomodoroMode.FOCUS) "• IN FOCUS" else "• ON BREAK"
                                 else -> "PAUSED"
                             },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (isRunning) Tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isRunning) {
+                                if (currentMode == PomodoroMode.FOCUS) Tertiary else Secondary
+                            } else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                         )
                     }
@@ -377,6 +459,54 @@ fun PomodoroTaskTimerComponent(
                             fontSize = 11.sp
                         )
                     }
+                }
+            }
+
+            // Quick Interval Adjuster Chips (-5m / +5m)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        if (customDurationMinutes > 5) {
+                            customDurationMinutes -= 5
+                            totalSeconds = customDurationMinutes * 60
+                            remainingSeconds = totalSeconds
+                            isRunning = false
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp).testTag("pomodoro_minus_5m_btn")
+                ) {
+                    Text("-5 min", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh
+                ) {
+                    Text(
+                        text = "$customDurationMinutes min interval",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                FilledTonalButton(
+                    onClick = {
+                        if (customDurationMinutes < 90) {
+                            customDurationMinutes += 5
+                            totalSeconds = customDurationMinutes * 60
+                            remainingSeconds = totalSeconds
+                            isRunning = false
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp).testTag("pomodoro_plus_5m_btn")
+                ) {
+                    Text("+5 min", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -421,7 +551,13 @@ fun PomodoroTaskTimerComponent(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isRunning) "Pause Focus" else if (remainingSeconds < totalSeconds) "Resume" else "Start Focus",
+                        text = if (isRunning) {
+                            if (currentMode == PomodoroMode.FOCUS) "Pause Focus" else "Pause Break"
+                        } else if (remainingSeconds < totalSeconds) {
+                            "Resume"
+                        } else {
+                            if (currentMode == PomodoroMode.FOCUS) "Start Focus" else "Start Break"
+                        },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -444,7 +580,8 @@ fun PomodoroTaskTimerComponent(
                             currentCycleIndex = if (currentCycleIndex >= maxCycle) 1 else currentCycleIndex + 1
                             currentMode = PomodoroMode.FOCUS
                         }
-                        totalSeconds = currentMode.defaultMinutes * 60
+                        customDurationMinutes = currentMode.defaultMinutes
+                        totalSeconds = customDurationMinutes * 60
                         remainingSeconds = totalSeconds
                     },
                     modifier = Modifier
@@ -457,6 +594,11 @@ fun PomodoroTaskTimerComponent(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+
+            // Break Activity Suggestions Card (shown during breaks)
+            if (currentMode != PomodoroMode.FOCUS) {
+                BreakSuggestionCard(currentMode = currentMode)
             }
 
             // Task Actions & Completion Options
@@ -490,20 +632,27 @@ fun PomodoroTaskTimerComponent(
 
                     TextButton(
                         onClick = {
-                            onSessionCompleted?.invoke(activeTask.id, 25)
-                            feedbackMessage = "Logged 25m study time to ${activeTask.title}"
+                            onSessionCompleted?.invoke(activeTask.id, customDurationMinutes)
+                            val newRecord = CompletedFocusSession(
+                                mode = PomodoroMode.FOCUS,
+                                taskTitle = activeTask.title,
+                                durationMinutes = customDurationMinutes,
+                                timestampFormatted = "Just now"
+                            )
+                            sessionHistory = listOf(newRecord) + sessionHistory
+                            feedbackMessage = "Logged ${customDurationMinutes}m focus sprint to '${activeTask.title}'"
                         },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier.testTag("pomodoro_log_session_button")
                     ) {
                         Icon(Icons.Default.AddCircleOutline, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Log 25m Focus", style = MaterialTheme.typography.labelSmall)
+                        Text("Log ${customDurationMinutes}m Focus", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
 
-            // In-component status feedback
+            // Status feedback banner
             AnimatedVisibility(visible = feedbackMessage != null) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -532,6 +681,62 @@ fun PomodoroTaskTimerComponent(
                     }
                 }
             }
+
+            // Session History & Focus Logs Dropdown / Section
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Today's Study Sprints (${sessionHistory.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${totalFocusMinutesToday} mins total",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                sessionHistory.take(3).forEach { session ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Text(session.mode.emoji, fontSize = 13.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = session.taskTitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Text(
+                                text = "${session.durationMinutes}m • ${session.timestampFormatted}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -556,7 +761,7 @@ fun PomodoroTaskTimerComponent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Select Focus Task",
+                            text = "Select Focus Task or Topic",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -566,7 +771,7 @@ fun PomodoroTaskTimerComponent(
                     }
 
                     Text(
-                        text = "Choose an academic assignment, project, or exam topic to dedicate your Pomodoro focus session to:",
+                        text = "Attach an academic assignment, project, or exam syllabus topic to your Pomodoro timer:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -680,6 +885,56 @@ fun PomodoroTaskTimerComponent(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Scheduled Break Recommendations Card suggesting evidence-based recharge habits.
+ */
+@Composable
+fun BreakSuggestionCard(currentMode: PomodoroMode) {
+    val breakTips = if (currentMode == PomodoroMode.SHORT_BREAK) {
+        listOf(
+            "💧 Drink a full glass of water to rehydrate",
+            "👀 20-20-20 Rule: Focus on an object 20 feet away",
+            "🧘 Stretch neck, back, and wrists away from keyboard"
+        )
+    } else {
+        listOf(
+            "🚶 Campus Stroll: Step outside for fresh air",
+            "🍎 Nutritious Snack: Grab fruit or tea at campus canteen",
+            "🎧 Relax: Put on acoustic soundscapes or chat with peers"
+        )
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (currentMode == PomodoroMode.SHORT_BREAK) TertiaryContainer.copy(alpha = 0.6f) else SecondaryContainer.copy(alpha = 0.6f),
+        border = BorderStroke(1.dp, if (currentMode == PomodoroMode.SHORT_BREAK) Tertiary.copy(alpha = 0.25f) else Secondary.copy(alpha = 0.25f)),
+        modifier = Modifier.fillMaxWidth().testTag("pomodoro_break_suggestions_card")
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(if (currentMode == PomodoroMode.SHORT_BREAK) "☕" else "🛋️", fontSize = 16.sp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Scheduled Break Activities",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (currentMode == PomodoroMode.SHORT_BREAK) OnTertiaryContainer else OnSecondaryContainer
+                )
+            }
+            breakTips.forEach { tip ->
+                Text(
+                    text = "• $tip",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (currentMode == PomodoroMode.SHORT_BREAK) OnTertiaryContainer else OnSecondaryContainer
+                )
             }
         }
     }

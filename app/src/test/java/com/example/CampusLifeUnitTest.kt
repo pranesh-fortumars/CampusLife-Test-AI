@@ -1091,6 +1091,106 @@ class CampusLifeUnitTest {
         assertEquals(1, interviewingCount)
         assertEquals(1, offerCount)
     }
+
+    @Test
+    fun testPomodoroModeDurationsAndAttributes() {
+        val focusMode = com.example.ui.components.PomodoroMode.FOCUS
+        val shortBreakMode = com.example.ui.components.PomodoroMode.SHORT_BREAK
+        val longBreakMode = com.example.ui.components.PomodoroMode.LONG_BREAK
+
+        // Test default session lengths
+        assertEquals(25, focusMode.defaultMinutes)
+        assertEquals(5, shortBreakMode.defaultMinutes)
+        assertEquals(15, longBreakMode.defaultMinutes)
+
+        // Seconds conversion for default durations
+        assertEquals(25 * 60, focusMode.defaultMinutes * 60)
+        assertEquals(5 * 60, shortBreakMode.defaultMinutes * 60)
+        assertEquals(15 * 60, longBreakMode.defaultMinutes * 60)
+
+        // Check display titles & emojis
+        assertEquals("Focus Session", focusMode.displayName)
+        assertEquals("Short Break", shortBreakMode.displayName)
+        assertEquals("Long Break", longBreakMode.displayName)
+        assertEquals("🎯", focusMode.emoji)
+        assertEquals("☕", shortBreakMode.emoji)
+        assertEquals("🛋️", longBreakMode.emoji)
+    }
+
+    @Test
+    fun testPomodoroCycleProgressionAndLongBreakTrigger() {
+        var currentCycle = 1
+        val maxCycles = 4
+        var mode = com.example.ui.components.PomodoroMode.FOCUS
+
+        // Simulating 4 focus sprints with short breaks, culminating in a long break
+        for (i in 1..3) {
+            assertEquals(com.example.ui.components.PomodoroMode.FOCUS, mode)
+            assertEquals(i, currentCycle)
+
+            // When focus sprint finishes, if currentCycle < maxCycles, transition to SHORT_BREAK
+            val nextBreakMode = if (currentCycle < maxCycles) {
+                com.example.ui.components.PomodoroMode.SHORT_BREAK
+            } else {
+                com.example.ui.components.PomodoroMode.LONG_BREAK
+            }
+            assertEquals(com.example.ui.components.PomodoroMode.SHORT_BREAK, nextBreakMode)
+
+            // Finish short break and increment cycle
+            currentCycle++
+            mode = com.example.ui.components.PomodoroMode.FOCUS
+        }
+
+        // On 4th cycle
+        assertEquals(4, currentCycle)
+        val finalBreakMode = if (currentCycle < maxCycles) {
+            com.example.ui.components.PomodoroMode.SHORT_BREAK
+        } else {
+            com.example.ui.components.PomodoroMode.LONG_BREAK
+        }
+        // 4th cycle triggers LONG_BREAK!
+        assertEquals(com.example.ui.components.PomodoroMode.LONG_BREAK, finalBreakMode)
+
+        // Reset cycle after long break
+        val resetCycle = if (currentCycle >= maxCycles) 1 else currentCycle + 1
+        assertEquals(1, resetCycle)
+    }
+
+    @Test
+    fun testPomodoroCompletedSessionLogAndDeepWorkAccumulator() {
+        val history = listOf(
+            com.example.ui.components.CompletedFocusSession(
+                id = "session-1",
+                mode = com.example.ui.components.PomodoroMode.FOCUS,
+                taskTitle = "CS-304: Semaphore Synchronization Lab",
+                durationMinutes = 25,
+                timestampFormatted = "09:30 AM"
+            ),
+            com.example.ui.components.CompletedFocusSession(
+                id = "session-2",
+                mode = com.example.ui.components.PomodoroMode.SHORT_BREAK,
+                taskTitle = "Hydration & Eye Rest",
+                durationMinutes = 5,
+                timestampFormatted = "09:55 AM"
+            ),
+            com.example.ui.components.CompletedFocusSession(
+                id = "session-3",
+                mode = com.example.ui.components.PomodoroMode.FOCUS,
+                taskTitle = "CS-302: BCNF Normalization & SQL Queries",
+                durationMinutes = 30,
+                timestampFormatted = "10:00 AM"
+            )
+        )
+
+        val totalFocusMinutes = history.filter { it.mode == com.example.ui.components.PomodoroMode.FOCUS }
+            .sumOf { it.durationMinutes }
+        val totalBreakMinutes = history.filter { it.mode != com.example.ui.components.PomodoroMode.FOCUS }
+            .sumOf { it.durationMinutes }
+
+        assertEquals(55, totalFocusMinutes)
+        assertEquals(5, totalBreakMinutes)
+        assertEquals(3, history.size)
+    }
 }
 
 
