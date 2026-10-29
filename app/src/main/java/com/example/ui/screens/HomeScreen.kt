@@ -280,7 +280,7 @@ fun HomeScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Log Daily", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Manage Attendance", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
 
                         FilledTonalButton(

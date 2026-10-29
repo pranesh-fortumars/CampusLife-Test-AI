@@ -160,15 +160,15 @@ fun TrackScreen(
                                 }
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(
+                                    FilledTonalButton(
                                         onClick = { viewModel.openSubScreen(SubScreen.DAILY_ATTENDANCE_LOGGER) },
                                         shape = RoundedCornerShape(100),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                         modifier = Modifier.testTag("track_open_daily_attendance_btn")
                                     ) {
                                         Icon(Icons.Default.FactCheck, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Daily Logger", style = MaterialTheme.typography.labelSmall)
+                                        Text("Attendance Manager", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                                     }
 
                                     Button(

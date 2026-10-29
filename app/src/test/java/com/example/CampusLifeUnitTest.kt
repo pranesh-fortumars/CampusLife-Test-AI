@@ -922,6 +922,38 @@ class CampusLifeUnitTest {
         assertEquals("task-late", reSorted[1].id)
         assertEquals("task-early", reSorted[2].id)
     }
+
+    @Test
+    fun testAttendanceManagementAggregateAndProjectionCalculations() {
+        val s1 = Subject("CS-302", "DBMS", 4, "Dr. Roy", attendedClasses = 26, totalClasses = 30) // 86.67%
+        val s2 = Subject("CS-304", "OS", 4, "Prof. Muralidhar", attendedClasses = 23, totalClasses = 31) // 74.19%
+        val s3 = Subject("CS-306", "CN", 4, "Prof. Venkat", attendedClasses = 21, totalClasses = 26) // 80.77%
+        val subjects = listOf(s1, s2, s3)
+
+        // 1. Overall Aggregate Percentage Calculation
+        val totalAttended = subjects.sumOf { it.attendedClasses } // 26 + 23 + 21 = 70
+        val totalClasses = subjects.sumOf { it.totalClasses } // 30 + 31 + 26 = 87
+        val aggregatePct = (totalAttended.toDouble() / totalClasses) * 100.0 // 70 / 87 = 80.46%
+        assertEquals(70, totalAttended)
+        assertEquals(87, totalClasses)
+        assertEquals(80.46, aggregatePct, 0.05)
+
+        // 2. Safe vs At-Risk Count
+        val safeCount = subjects.count { it.attendancePercentage >= 75.0 }
+        val atRiskCount = subjects.count { it.attendancePercentage < 75.0 }
+        assertEquals(2, safeCount)
+        assertEquals(1, atRiskCount)
+
+        // 3. What-If Simulator: Student with 74.19% attends next 3 classes
+        val projectedOS = s2.calculateProjected(addAttended = 3, addMissed = 0)
+        assertEquals(76.47, projectedOS, 0.05)
+        assertTrue(projectedOS >= 75.0)
+
+        // 4. What-If Simulator: Student with 86.67% misses next 2 classes
+        val projectedDBMS = s1.calculateProjected(addAttended = 0, addMissed = 2)
+        assertEquals(81.25, projectedDBMS, 0.05)
+        assertTrue(projectedDBMS >= 75.0)
+    }
 }
 
 
