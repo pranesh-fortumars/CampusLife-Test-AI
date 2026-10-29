@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.MockData
+import com.example.ui.components.CareerKanbanBoardComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 
@@ -30,7 +31,9 @@ import com.example.viewmodel.CampusLifeViewModel
 fun GrowthScreen(viewModel: CampusLifeViewModel) {
     val profile by viewModel.profile.collectAsState()
     val projects by viewModel.projects.collectAsState()
+    val careerApplications by viewModel.careerApplications.collectAsState()
     var selectedFilter by remember { mutableStateOf("all") }
+    var growthSubTab by remember { mutableStateOf("kanban") } // "kanban" or "portfolio"
 
     val filteredProjects = projects.filter {
         selectedFilter == "all" || it.category == selectedFilter
@@ -95,9 +98,97 @@ fun GrowthScreen(viewModel: CampusLifeViewModel) {
             }
         }
 
-        // Section 1: Career Readiness Score Card
+        // Sub-Navigation: Job Kanban Board vs Portfolio & Skills
         item {
-            Card(
+            Surface(
+                shape = RoundedCornerShape(100),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(100),
+                        color = if (growthSubTab == "kanban") Primary else Color.Transparent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { growthSubTab = "kanban" }
+                            .testTag("growth_tab_kanban")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Work,
+                                contentDescription = null,
+                                tint = if (growthSubTab == "kanban") Color.White else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Job Kanban Board",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (growthSubTab == "kanban") Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(100),
+                        color = if (growthSubTab == "portfolio") Primary else Color.Transparent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { growthSubTab = "portfolio" }
+                            .testTag("growth_tab_portfolio")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = null,
+                                tint = if (growthSubTab == "portfolio") Color.White else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Portfolio & Skills",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (growthSubTab == "portfolio") Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (growthSubTab == "kanban") {
+            item {
+                CareerKanbanBoardComponent(
+                    applications = careerApplications,
+                    onMoveStatus = { id, newStatus ->
+                        viewModel.moveCareerApplicationStatus(id, newStatus)
+                    },
+                    onAddApplication = { newApp ->
+                        viewModel.addCareerApplication(newApp)
+                    },
+                    onDeleteApplication = { id ->
+                        viewModel.deleteCareerApplication(id)
+                    }
+                )
+            }
+        } else {
+            // Section 1: Career Readiness Score Card
+            item {
+                Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -472,3 +563,5 @@ fun GrowthScreen(viewModel: CampusLifeViewModel) {
         }
     }
 }
+}
+

@@ -1041,6 +1041,56 @@ class CampusLifeUnitTest {
         assertEquals(9.78, requiredSgpa, 0.01)
         assertTrue(requiredSgpa <= 10.0) // Achievable
     }
+
+    @Test
+    fun testCareerKanbanBoardStatusMovements() {
+        val initialApp = com.example.model.CareerApplication(
+            id = "test-uber-1",
+            companyName = "Uber",
+            roleTitle = "Backend Engineer Intern",
+            type = com.example.model.CareerItemType.INTERNSHIP,
+            status = com.example.model.ApplicationStatus.APPLIED,
+            location = "Bangalore",
+            compensation = "₹1.60L / mo"
+        )
+
+        // 1. Initial status is APPLIED
+        assertEquals(com.example.model.ApplicationStatus.APPLIED, initialApp.status)
+        assertTrue(initialApp.canMoveForward)
+        assertFalse(initialApp.canMoveBackward)
+        assertEquals(com.example.model.ApplicationStatus.INTERVIEWING, initialApp.nextStatus)
+
+        // 2. Move to INTERVIEWING
+        val interviewingApp = initialApp.copy(status = initialApp.nextStatus!!)
+        assertEquals(com.example.model.ApplicationStatus.INTERVIEWING, interviewingApp.status)
+        assertTrue(interviewingApp.canMoveForward)
+        assertTrue(interviewingApp.canMoveBackward)
+        assertEquals(com.example.model.ApplicationStatus.OFFER, interviewingApp.nextStatus)
+        assertEquals(com.example.model.ApplicationStatus.APPLIED, interviewingApp.prevStatus)
+
+        // 3. Move to OFFER
+        val offerApp = interviewingApp.copy(status = interviewingApp.nextStatus!!)
+        assertEquals(com.example.model.ApplicationStatus.OFFER, offerApp.status)
+        assertFalse(offerApp.canMoveForward)
+        assertTrue(offerApp.canMoveBackward)
+        assertEquals(com.example.model.ApplicationStatus.INTERVIEWING, offerApp.prevStatus)
+
+        // 4. Test pipeline count grouping
+        val apps = listOf(
+            initialApp,
+            interviewingApp.copy(id = "test-2"),
+            offerApp.copy(id = "test-3"),
+            initialApp.copy(id = "test-4", type = com.example.model.CareerItemType.NETWORKING)
+        )
+
+        val appliedCount = apps.count { it.status == com.example.model.ApplicationStatus.APPLIED }
+        val interviewingCount = apps.count { it.status == com.example.model.ApplicationStatus.INTERVIEWING }
+        val offerCount = apps.count { it.status == com.example.model.ApplicationStatus.OFFER }
+
+        assertEquals(2, appliedCount)
+        assertEquals(1, interviewingCount)
+        assertEquals(1, offerCount)
+    }
 }
 
 

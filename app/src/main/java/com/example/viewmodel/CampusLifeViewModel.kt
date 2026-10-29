@@ -38,7 +38,8 @@ enum class SubScreen {
     DAILY_ATTENDANCE_LOGGER,
     TASKS_LIST,
     ACADEMIC_CALENDAR,
-    GPA_CALCULATOR
+    GPA_CALCULATOR,
+    CAREER_KANBAN
 }
 
 class CampusLifeViewModel(
@@ -138,6 +139,10 @@ class CampusLifeViewModel(
     // Community Events Aggregator State
     private val _campusEvents = MutableStateFlow(CampusEventMockData.sampleEvents)
     val campusEvents: StateFlow<List<CampusEvent>> = _campusEvents.asStateFlow()
+
+    // Career & Job Applications Kanban State
+    private val _careerApplications = MutableStateFlow<List<CareerApplication>>(CareerMockData.defaultApplications)
+    val careerApplications: StateFlow<List<CareerApplication>> = _careerApplications.asStateFlow()
 
     // Simulator state
     private val _simulatorCount = MutableStateFlow(3)
@@ -962,5 +967,41 @@ class CampusLifeViewModel(
             }
         }
     }
+
+    // Career Kanban Board Operations
+    fun moveCareerApplicationStatus(applicationId: String, newStatus: ApplicationStatus) {
+        val app = _careerApplications.value.find { it.id == applicationId } ?: return
+        val oldStatus = app.status
+        _careerApplications.update { list ->
+            list.map { item ->
+                if (item.id == applicationId) {
+                    item.copy(
+                        status = newStatus,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                } else item
+            }
+        }
+        _userFeedbackMessage.value = "Moved ${app.companyName} (${app.roleTitle}): ${oldStatus.displayName} → ${newStatus.displayName} 🎉"
+    }
+
+    fun addCareerApplication(newApplication: CareerApplication) {
+        _careerApplications.update { listOf(newApplication) + it }
+        _userFeedbackMessage.value = "Added ${newApplication.companyName} to ${newApplication.status.displayName} board!"
+    }
+
+    fun deleteCareerApplication(applicationId: String) {
+        val app = _careerApplications.value.find { it.id == applicationId }
+        _careerApplications.update { list -> list.filter { it.id != applicationId } }
+        _userFeedbackMessage.value = "Removed ${app?.companyName ?: "application"} from board"
+    }
+
+    fun updateCareerApplication(updated: CareerApplication) {
+        _careerApplications.update { list ->
+            list.map { if (it.id == updated.id) updated else it }
+        }
+        _userFeedbackMessage.value = "Updated ${updated.companyName} details"
+    }
 }
+
 

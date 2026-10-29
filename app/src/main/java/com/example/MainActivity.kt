@@ -197,6 +197,12 @@ fun CampusLifeApp(
                         onBack = { viewModel.closeSubScreen() }
                     )
                 }
+                SubScreen.CAREER_KANBAN -> {
+                    CareerTrackerScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
                 SubScreen.NONE -> {
                     when (currentTab) {
                         AppDestination.HOME -> {
