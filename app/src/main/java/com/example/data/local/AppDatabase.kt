@@ -16,9 +16,10 @@ import androidx.room.RoomDatabase
         TaskEntity::class,
         CourseGradeEntity::class,
         AcademicProjectEntity::class,
-        AcademicCalendarEventEntity::class
+        AcademicCalendarEventEntity::class,
+        CourseScheduleEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +29,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun gradeDao(): GradeDao
     abstract fun projectDao(): AcademicProjectDao
     abstract fun academicCalendarDao(): AcademicCalendarDao
+    abstract fun courseScheduleDao(): CourseScheduleDao
 
     companion object {
         const val DATABASE_NAME = "campuslife_db"
@@ -91,8 +93,15 @@ abstract class AppDatabase : RoomDatabase() {
         /**
          * Singleton provider function that supplies the AcademicCalendarDao directly.
          */
-        fun provideAcademicCalendarDao(context: Context): AcademicCalendarDao {
-            return getDatabase(context).academicCalendarDao()
+         fun provideAcademicCalendarDao(context: Context): AcademicCalendarDao {
+             return getDatabase(context).academicCalendarDao()
+         }
+
+        /**
+         * Singleton provider function that supplies the CourseScheduleDao directly.
+         */
+        fun provideCourseScheduleDao(context: Context): CourseScheduleDao {
+            return getDatabase(context).courseScheduleDao()
         }
     }
 }
@@ -112,4 +121,5 @@ object DatabaseProvider {
     fun provideGradeDao(context: Context): GradeDao = AppDatabase.provideGradeDao(context)
     fun provideProjectDao(context: Context): AcademicProjectDao = AppDatabase.provideProjectDao(context)
     fun provideAcademicCalendarDao(context: Context): AcademicCalendarDao = AppDatabase.provideAcademicCalendarDao(context)
+    fun provideCourseScheduleDao(context: Context): CourseScheduleDao = AppDatabase.provideCourseScheduleDao(context)
 }

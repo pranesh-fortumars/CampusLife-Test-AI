@@ -1191,6 +1191,141 @@ class CampusLifeUnitTest {
         assertEquals(5, totalBreakMinutes)
         assertEquals(3, history.size)
     }
+
+    @Test
+    fun testCourseScheduleEntityToDomainAndReminderSettings() {
+        val entity = com.example.data.local.CourseScheduleEntity(
+            id = "sched-cs302",
+            courseCode = "CS-302",
+            courseName = "Database Management Systems",
+            slotType = "LECTURE",
+            daysOfWeek = "MON,WED,FRI",
+            timeStart = "10:30 AM",
+            timeEnd = "11:45 AM",
+            room = "LH-102 (Block A)",
+            faculty = "Dr. Ananya Roy",
+            batchOrGroup = "All Batches",
+            notes = "Query Optimization & B+ Trees",
+            reminderEnabled = true,
+            reminderMinutesBefore = 15,
+            isAttendedToday = false
+        )
+
+        val slot = entity.toDomain()
+        assertEquals("sched-cs302", slot.id)
+        assertEquals("CS-302", slot.courseCode)
+        assertEquals("Database Management Systems", slot.courseName)
+        assertEquals(com.example.model.ScheduleSlotType.LECTURE, slot.slotType)
+        assertEquals("LH-102 (Block A)", slot.room)
+        assertEquals("10:30 AM – 11:45 AM", slot.durationText)
+        assertTrue(slot.reminderEnabled)
+        assertEquals(15, slot.reminderMinutesBefore)
+        assertFalse(slot.isAttendedToday)
+
+        // Day of week occurrence
+        assertTrue(slot.occursOn(com.example.model.DayOfWeekEnum.MON))
+        assertTrue(slot.occursOn(com.example.model.DayOfWeekEnum.WED))
+        assertTrue(slot.occursOn(com.example.model.DayOfWeekEnum.FRI))
+        assertFalse(slot.occursOn(com.example.model.DayOfWeekEnum.TUE))
+        assertFalse(slot.occursOn(com.example.model.DayOfWeekEnum.THU))
+
+        // Conversion back to entity
+        val converted = com.example.data.local.CourseScheduleEntity.fromDomain(slot)
+        assertEquals(entity.id, converted.id)
+        assertEquals(entity.courseCode, converted.courseCode)
+        assertEquals(entity.room, converted.room)
+        assertEquals("Mon,Wed,Fri", converted.daysOfWeek)
+        assertEquals(15, converted.reminderMinutesBefore)
+    }
+
+    @Test
+    fun testAssignmentTrackerRoomEntityToggleAndPriorities() {
+        val initialTask = com.example.data.local.TaskEntity(
+            id = "assign-os-1",
+            title = "OS Virtual Memory & Page Replacement",
+            subjectCode = "CS-304",
+            subjectName = "Operating Systems",
+            category = "Assignment",
+            type = "ASSIGNMENT",
+            dueDate = "Tomorrow",
+            dueTime = "11:59 PM",
+            priority = "URGENT",
+            weightage = "15% Internal",
+            isCompleted = false,
+            progressPercent = 0,
+            faculty = "Dr. R. Venkat",
+            note = "Implement LRU and Clock page replacement algorithms"
+        )
+
+        // Initial task status
+        assertFalse(initialTask.isCompleted)
+        assertEquals(0, initialTask.progressPercent)
+        assertEquals("URGENT", initialTask.priority)
+
+        // Toggle completed
+        val completedTask = initialTask.toggleCompleted()
+        assertTrue(completedTask.isCompleted)
+        assertEquals(100, completedTask.progressPercent)
+
+        // Toggle back to pending
+        val revertedTask = completedTask.toggleCompleted()
+        assertFalse(revertedTask.isCompleted)
+        assertEquals(0, revertedTask.progressPercent)
+
+        // Domain conversion
+        val domain = initialTask.toDomain()
+        assertEquals("assign-os-1", domain.id)
+        assertEquals("CS-304", domain.subjectCode)
+        assertFalse(domain.isCompleted)
+    }
+
+    @Test
+    fun testAssignmentTrackerFilterAndMetricCalculations() {
+        val tasks = listOf(
+            com.example.model.AcademicTask(
+                id = "t1",
+                title = "Networks Socket Assignment",
+                subjectCode = "CS-306",
+                subjectName = "Computer Networks",
+                category = "Assignment",
+                priority = "URGENT",
+                dueDate = "Today",
+                isCompleted = false
+            ),
+            com.example.model.AcademicTask(
+                id = "t2",
+                title = "DBMS Relational Calculus PS",
+                subjectCode = "CS-302",
+                subjectName = "Database Management Systems",
+                category = "Assignment",
+                priority = "HIGH",
+                dueDate = "Tomorrow",
+                isCompleted = false
+            ),
+            com.example.model.AcademicTask(
+                id = "t3",
+                title = "Cloud Infrastructure Lab 1",
+                subjectCode = "CS-314",
+                subjectName = "Cloud Systems",
+                category = "Assignment",
+                priority = "MEDIUM",
+                dueDate = "Next Week",
+                isCompleted = true
+            )
+        )
+
+        val totalCount = tasks.size
+        val pendingCount = tasks.count { !it.isCompleted }
+        val completedCount = tasks.count { it.isCompleted }
+        val urgentHighCount = tasks.count { !it.isCompleted && (it.priority == "URGENT" || it.priority == "HIGH") }
+        val completionRatio = completedCount.toFloat() / totalCount.toFloat()
+
+        assertEquals(3, totalCount)
+        assertEquals(2, pendingCount)
+        assertEquals(1, completedCount)
+        assertEquals(2, urgentHighCount)
+        assertEquals(0.333f, completionRatio, 0.01f)
+    }
 }
 
 

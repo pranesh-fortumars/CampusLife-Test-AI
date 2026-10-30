@@ -28,11 +28,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         com.example.worker.TaskNotificationHelper.createNotificationChannel(this)
+        com.example.worker.ScheduleReminderHelper.createNotificationChannel(this)
         val navigateToTasks = intent.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
+        val navigateToTimetable = intent.getStringExtra("EXTRA_NAVIGATE_TO") == "TIMETABLE"
 
         setContent {
             CampusLifeTheme {
-                CampusLifeApp(initialOpenTasks = navigateToTasks)
+                CampusLifeApp(
+                    initialOpenTasks = navigateToTasks,
+                    initialOpenTimetable = navigateToTimetable
+                )
             }
         }
     }
@@ -41,6 +46,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun CampusLifeApp(
     initialOpenTasks: Boolean = false,
+    initialOpenTimetable: Boolean = false,
     viewModel: CampusLifeViewModel = run {
         val context = androidx.compose.ui.platform.LocalContext.current
         val app = context.applicationContext as android.app.Application
@@ -74,6 +80,8 @@ fun CampusLifeApp(
         }
         if (initialOpenTasks) {
             viewModel.openSubScreen(SubScreen.TASKS_LIST)
+        } else if (initialOpenTimetable) {
+            viewModel.openSubScreen(SubScreen.COURSE_SCHEDULE)
         }
     }
 
@@ -199,6 +207,12 @@ fun CampusLifeApp(
                 }
                 SubScreen.CAREER_KANBAN -> {
                     CareerTrackerScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
+                SubScreen.COURSE_SCHEDULE -> {
+                    CourseScheduleManagerScreen(
                         viewModel = viewModel,
                         onBack = { viewModel.closeSubScreen() }
                     )

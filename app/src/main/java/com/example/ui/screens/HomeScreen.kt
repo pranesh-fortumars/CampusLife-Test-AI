@@ -512,6 +512,65 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Tool 7: Course Schedule Manager
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.COURSE_SCHEDULE) }
+                            .testTag("home_tool_course_schedule"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Schedule, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Schedule Manager", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Rooms & Reminders", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Tool 8: Assignment Tracker
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.TASKS_LIST) }
+                            .testTag("home_tool_assignment_tracker"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SecondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Assignment, contentDescription = null, tint = Secondary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Assignment Tracker", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Room DB Persistence", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
 

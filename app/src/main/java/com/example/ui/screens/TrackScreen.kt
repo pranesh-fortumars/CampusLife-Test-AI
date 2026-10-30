@@ -37,6 +37,8 @@ import com.example.ui.components.AcademicProjectsAndDeadlinesComponent
 import com.example.ui.components.AcademicProjectManagementModule
 import com.example.ui.components.CourseGradeTrackerComponent
 import com.example.ui.components.WeeklyClassScheduleComponent
+import com.example.ui.components.AssignmentTrackerComponent
+import com.example.ui.components.CourseScheduleManagerComponent
 import com.example.model.toCourseAttendance
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
@@ -347,20 +349,26 @@ fun TrackScreen(
 
                 "Timetable" -> {
                     item {
-                        WeeklyClassScheduleComponent(
-                            onLogAttendance = { courseCode, isAttended ->
-                                viewModel.quickLogClass(courseCode, isAttended)
-                            }
+                        val courseSchedules by viewModel.courseSchedules.collectAsState()
+                        CourseScheduleManagerComponent(
+                            schedules = courseSchedules,
+                            onAddSchedule = { slot -> viewModel.addCourseSchedule(slot) },
+                            onDeleteSchedule = { slotId -> viewModel.deleteCourseSchedule(slotId) },
+                            onToggleReminder = { slotId, enabled, mins ->
+                                viewModel.toggleScheduleReminder(slotId, enabled, mins)
+                            },
+                            onTestReminder = { slot -> viewModel.testClassScheduleReminder(slot) },
+                            onToggleAttendedToday = { slotId -> viewModel.toggleScheduleAttendedToday(slotId) }
                         )
                     }
                 }
 
                 "Assignments" -> {
                     item {
-                        var assignmentViewMode by remember { mutableStateOf("projects") }
+                        var assignmentViewMode by remember { mutableStateOf("tracker") } // "tracker", "projects", "deadlines"
 
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            // Sub-navigation selector for Group Projects vs Deadlines
+                            // Sub-navigation selector for Assignment Tracker vs Group Projects vs Deadlines
                             Surface(
                                 shape = RoundedCornerShape(100),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -372,6 +380,35 @@ fun TrackScreen(
                                     modifier = Modifier.padding(4.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (assignmentViewMode == "tracker") Primary else Color.Transparent,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { assignmentViewMode = "tracker" }
+                                            .testTag("tab_assignment_tracker")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Assignment,
+                                                contentDescription = null,
+                                                tint = if (assignmentViewMode == "tracker") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                "Tracker",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (assignmentViewMode == "tracker") Color.White else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+
                                     Surface(
                                         shape = RoundedCornerShape(100),
                                         color = if (assignmentViewMode == "projects") Primary else Color.Transparent,
@@ -389,11 +426,11 @@ fun TrackScreen(
                                                 Icons.Default.Groups,
                                                 contentDescription = null,
                                                 tint = if (assignmentViewMode == "projects") Color.White else MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(16.dp)
+                                                modifier = Modifier.size(15.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
                                             Text(
-                                                "Project Management",
+                                                "Projects",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (assignmentViewMode == "projects") Color.White else MaterialTheme.colorScheme.onSurface
@@ -403,10 +440,10 @@ fun TrackScreen(
 
                                     Surface(
                                         shape = RoundedCornerShape(100),
-                                        color = if (assignmentViewMode == "tasks") Primary else Color.Transparent,
+                                        color = if (assignmentViewMode == "deadlines") Primary else Color.Transparent,
                                         modifier = Modifier
                                             .weight(1f)
-                                            .clickable { assignmentViewMode = "tasks" }
+                                            .clickable { assignmentViewMode = "deadlines" }
                                             .testTag("tab_tasks_deadlines")
                                     ) {
                                         Row(
@@ -415,24 +452,35 @@ fun TrackScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
-                                                Icons.Default.Assignment,
+                                                Icons.Default.Event,
                                                 contentDescription = null,
-                                                tint = if (assignmentViewMode == "tasks") Color.White else MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(16.dp)
+                                                tint = if (assignmentViewMode == "deadlines") Color.White else MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(15.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
                                             Text(
-                                                "Tasks & Deadlines",
+                                                "Deadlines",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
-                                                color = if (assignmentViewMode == "tasks") Color.White else MaterialTheme.colorScheme.onSurface
+                                                color = if (assignmentViewMode == "deadlines") Color.White else MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
                                 }
                             }
 
-                            if (assignmentViewMode == "projects") {
+                            if (assignmentViewMode == "tracker") {
+                                AssignmentTrackerComponent(
+                                    tasks = academicTasks,
+                                    subjects = subjects,
+                                    onToggleComplete = { viewModel.toggleAcademicTaskComplete(it) },
+                                    onRescheduleDueDate = { id, date, millis -> viewModel.rescheduleTaskDueDate(id, date, millis) },
+                                    onDeleteTask = { viewModel.deleteAcademicTask(it) },
+                                    onAddTask = { title, code, name, category, type, date, time, priority, weight, note ->
+                                        viewModel.addAcademicTask(title, code, name, category, type, date, time, priority, weight, note)
+                                    }
+                                )
+                            } else if (assignmentViewMode == "projects") {
                                 AcademicProjectManagementModule()
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {

@@ -39,7 +39,8 @@ enum class SubScreen {
     TASKS_LIST,
     ACADEMIC_CALENDAR,
     GPA_CALCULATOR,
-    CAREER_KANBAN
+    CAREER_KANBAN,
+    COURSE_SCHEDULE
 }
 
 class CampusLifeViewModel(
@@ -50,7 +51,9 @@ class CampusLifeViewModel(
     private val projectRepository: com.example.data.repository.AcademicProjectRepository =
         com.example.data.repository.AcademicProjectRepository(AppDatabase.provideProjectDao(application)),
     private val calendarRepository: com.example.data.repository.AcademicCalendarRepository =
-        com.example.data.repository.AcademicCalendarRepository(AppDatabase.provideAcademicCalendarDao(application))
+        com.example.data.repository.AcademicCalendarRepository(AppDatabase.provideAcademicCalendarDao(application)),
+    private val scheduleRepository: com.example.data.repository.CourseScheduleRepository =
+        com.example.data.repository.CourseScheduleRepository(AppDatabase.provideCourseScheduleDao(application))
 ) : AndroidViewModel(application) {
 
     constructor(
@@ -123,6 +126,9 @@ class CampusLifeViewModel(
 
     private val _calendarEvents = MutableStateFlow<List<com.example.data.local.AcademicCalendarEventEntity>>(emptyList())
     val calendarEvents: StateFlow<List<com.example.data.local.AcademicCalendarEventEntity>> = _calendarEvents.asStateFlow()
+
+    private val _courseSchedules = MutableStateFlow<List<ScheduleSlot>>(ScheduleMockData.defaultScheduleSlots)
+    val courseSchedules: StateFlow<List<ScheduleSlot>> = _courseSchedules.asStateFlow()
 
     private val _assignments = MutableStateFlow(MockData.assignments)
     val assignments: StateFlow<List<AssignmentItem>> = _assignments.asStateFlow()
@@ -293,6 +299,23 @@ class CampusLifeViewModel(
                     // Ignore
                 }
             }
+
+            launch {
+                try {
+                    scheduleRepository.seedInitialSchedulesIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    scheduleRepository.allSchedules.collect { schedules ->
+                        if (schedules.isNotEmpty()) {
+                            _courseSchedules.value = schedules
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
         }
     }
 
@@ -393,6 +416,88 @@ class CampusLifeViewModel(
             "Logged $durationMinutes min Pomodoro session for '$taskTitle'! 🍅"
         } else {
             "Completed $durationMinutes min Pomodoro study sprint! 🎉"
+        }
+    }
+
+    /**
+     * Add a student-defined class schedule slot with room location, timing, and reminder
+     */
+    fun addCourseSchedule(slot: ScheduleSlot) {
+        viewModelScope.launch {
+            try {
+                scheduleRepository.insertSchedule(slot)
+                _userFeedbackMessage.value = "Added ${slot.courseCode} (${slot.room}) to Schedule!"
+                if (slot.reminderEnabled) {
+                    com.example.worker.ScheduleReminderHelper.createNotificationChannel(getApplication())
+                }
+            } catch (e: Exception) {
+                _courseSchedules.update { it + slot }
+            }
+        }
+    }
+
+    /**
+     * Delete a class schedule slot
+     */
+    fun deleteCourseSchedule(slotId: String) {
+        viewModelScope.launch {
+            try {
+                scheduleRepository.deleteSchedule(slotId)
+                _userFeedbackMessage.value = "Removed class from schedule"
+            } catch (e: Exception) {
+                _courseSchedules.update { list -> list.filter { it.id != slotId } }
+            }
+        }
+    }
+
+    /**
+     * Toggle or update reminder notification preferences for a scheduled class
+     */
+    fun toggleScheduleReminder(slotId: String, enabled: Boolean, minutesBefore: Int = 15) {
+        viewModelScope.launch {
+            try {
+                scheduleRepository.updateReminder(slotId, enabled, minutesBefore)
+                val status = if (enabled) "Enabled ($minutesBefore min alert)" else "Disabled"
+                _userFeedbackMessage.value = "Schedule reminder $status"
+            } catch (e: Exception) {
+                _courseSchedules.update { list ->
+                    list.map { if (it.id == slotId) it.copy(reminderEnabled = enabled, reminderMinutesBefore = minutesBefore) else it }
+                }
+            }
+        }
+    }
+
+    /**
+     * Posts a test reminder notification for an upcoming lecture/lab to verify alerts
+     */
+    fun testClassScheduleReminder(slot: ScheduleSlot) {
+        val posted = com.example.worker.ScheduleReminderHelper.postClassReminderNotification(
+            context = getApplication(),
+            slot = slot,
+            minutesBefore = slot.reminderMinutesBefore
+        )
+        if (posted) {
+            _userFeedbackMessage.value = "Reminder notification sent for ${slot.courseCode} in ${slot.room}!"
+        } else {
+            _userFeedbackMessage.value = "Scheduled reminder: ${slot.courseCode} at ${slot.timeStart} (${slot.room})"
+        }
+    }
+
+    /**
+     * Mark or unmark attendance for today's session of this schedule slot
+     */
+    fun toggleScheduleAttendedToday(slotId: String) {
+        val slot = _courseSchedules.value.find { it.id == slotId } ?: return
+        val newAttended = !slot.isAttendedToday
+        viewModelScope.launch {
+            try {
+                scheduleRepository.updateAttendedToday(slotId, newAttended)
+                _userFeedbackMessage.value = if (newAttended) "Marked attended for today!" else "Unmarked today's attendance"
+            } catch (e: Exception) {
+                _courseSchedules.update { list ->
+                    list.map { if (it.id == slotId) it.copy(isAttendedToday = newAttended) else it }
+                }
+            }
         }
     }
 

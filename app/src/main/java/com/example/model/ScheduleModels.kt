@@ -40,6 +40,8 @@ data class ScheduleSlot(
     val faculty: String,                   // e.g. "Dr. Ananya Roy"
     val batchOrGroup: String = "All Batches",
     val notes: String = "",
+    val reminderEnabled: Boolean = true,
+    val reminderMinutesBefore: Int = 15,
     val isLiveNow: Boolean = false,
     val isAttendedToday: Boolean = false
 ) {
