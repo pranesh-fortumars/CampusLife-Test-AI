@@ -42,6 +42,9 @@ interface AcademicProjectDao {
     @Query("UPDATE academic_projects SET deadlineDate = :deadlineDate, dueTimestamp = :dueTimestamp WHERE id = :id")
     suspend fun updateProjectDeadline(id: String, deadlineDate: String, dueTimestamp: Long)
 
+    @Query("UPDATE academic_projects SET totalFocusMinutes = totalFocusMinutes + :additionalMinutes WHERE id = :id")
+    suspend fun addFocusTimeToProject(id: String, additionalMinutes: Int)
+
     @Query("SELECT * FROM academic_projects WHERE status = :status ORDER BY dueTimestamp ASC")
     fun getProjectsByStatus(status: String): Flow<List<AcademicProjectEntity>>
 

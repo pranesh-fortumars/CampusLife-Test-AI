@@ -1531,7 +1531,64 @@ class CampusLifeUnitTest {
         assertTrue("Course 2 should be below statutory 75% threshold", course2.attendancePercentage < 75.0)
         assertEquals(18, course2.neededToReach75) // (0.75 * (30 + x) - 18) -> x = 18
     }
+
+    @Test
+    fun testProjectFocusSessionLoggingAndTotalTimeCalculations() {
+        val now = System.currentTimeMillis()
+        val session1 = com.example.data.local.ProjectFocusSessionEntity(
+            id = "sess-1",
+            projectId = "proj-101",
+            projectTitle = "Distributed Key-Value Store",
+            subjectCode = "CS-302",
+            durationMinutes = 50,
+            durationSeconds = 3000L,
+            timestamp = now,
+            sessionDate = "Oct 31, 2026",
+            sessionNotes = "Built consensus election module",
+            sessionType = "DEEP_WORK"
+        )
+
+        assertEquals("50m", session1.formattedDuration)
+        assertEquals(3000L, session1.durationSeconds)
+        assertEquals("CS-302", session1.subjectCode)
+
+        val session2 = session1.copy(
+            id = "sess-2",
+            durationMinutes = 75,
+            durationSeconds = 4500L,
+            sessionNotes = "Refactored snapshot compression"
+        )
+        assertEquals("1h 15m", session2.formattedDuration)
+
+        // Summary DTO verification
+        val summary = com.example.data.local.ProjectTimeSpentSummary(
+            projectId = "proj-101",
+            projectTitle = "Distributed Key-Value Store",
+            totalMinutes = 125,
+            sessionCount = 2
+        )
+        assertEquals(125, summary.totalMinutes)
+        assertEquals(2, summary.sessionCount)
+        assertEquals("2h 5m", summary.formattedTotalTime)
+
+        // AcademicProjectEntity focus time integration
+        val project = com.example.data.local.AcademicProjectEntity(
+            id = "proj-101",
+            title = "Distributed Key-Value Store",
+            subjectCode = "CS-302",
+            subjectName = "Database Systems",
+            totalFocusMinutes = 125
+        )
+        assertEquals(125, project.totalFocusMinutes)
+        assertEquals("2h 5m", project.formattedFocusTime)
+
+        // Updating focus time
+        val updatedProject = project.copy(totalFocusMinutes = project.totalFocusMinutes + 25)
+        assertEquals(150, updatedProject.totalFocusMinutes)
+        assertEquals("2h 30m", updatedProject.formattedFocusTime)
+    }
 }
+
 
 
 

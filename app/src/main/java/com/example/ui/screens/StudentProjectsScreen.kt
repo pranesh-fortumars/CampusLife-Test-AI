@@ -318,6 +318,9 @@ fun StudentProjectsScreen(
                         },
                         onDelete = {
                             viewModel.deleteAcademicProject(project.id)
+                        },
+                        onStartFocusTimer = {
+                            viewModel.openFocusTimerForProject(project)
                         }
                     )
                 }
@@ -526,7 +529,8 @@ private fun StudentProjectCard(
     onStatusChange: (ProjectStatus) -> Unit,
     onEditDeadline: () -> Unit,
     onToggleComplete: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onStartFocusTimer: () -> Unit
 ) {
     var expandedStatusMenu by remember { mutableStateOf(false) }
 
@@ -736,6 +740,21 @@ private fun StudentProjectCard(
                         )
                     }
                 }
+
+                if (project.totalFocusMinutes > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            text = "⏱️ ${project.formattedFocusTime}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -878,42 +897,62 @@ private fun StudentProjectCard(
                     )
                 }
 
-                // Quick Status Advance Pill
-                when (project.normalizedStatus) {
-                    ProjectStatus.PLANNED -> {
-                        Button(
-                            onClick = { onStatusChange(ProjectStatus.IN_PROGRESS) },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFF59E0B)
-                            ),
-                            modifier = Modifier.testTag("quick_start_${project.id}")
-                        ) {
-                            Text("Start Work ⚡", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilledTonalIconButton(
+                        onClick = onStartFocusTimer,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("start_timer_btn_${project.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = "Start Focus Timer",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                    ProjectStatus.IN_PROGRESS -> {
-                        Button(
-                            onClick = { onStatusChange(ProjectStatus.DONE) },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF10B981)
-                            ),
-                            modifier = Modifier.testTag("quick_done_${project.id}")
-                        ) {
-                            Text("Complete ✅", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+
+                    // Quick Status Advance Pill
+                    when (project.normalizedStatus) {
+                        ProjectStatus.PLANNED -> {
+                            Button(
+                                onClick = { onStatusChange(ProjectStatus.IN_PROGRESS) },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFF59E0B)
+                                ),
+                                modifier = Modifier.testTag("quick_start_${project.id}")
+                            ) {
+                                Text("Start Work ⚡", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
                         }
-                    }
-                    ProjectStatus.DONE -> {
-                        FilledTonalButton(
-                            onClick = { onStatusChange(ProjectStatus.IN_PROGRESS) },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("reopen_${project.id}")
-                        ) {
-                            Text("Reopen ↩", style = MaterialTheme.typography.labelSmall)
+                        ProjectStatus.IN_PROGRESS -> {
+                            Button(
+                                onClick = { onStatusChange(ProjectStatus.DONE) },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF10B981)
+                                ),
+                                modifier = Modifier.testTag("quick_done_${project.id}")
+                            ) {
+                                Text("Complete ✅", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        ProjectStatus.DONE -> {
+                            FilledTonalButton(
+                                onClick = { onStatusChange(ProjectStatus.IN_PROGRESS) },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.testTag("reopen_${project.id}")
+                            ) {
+                                Text("Reopen ↩", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                 }

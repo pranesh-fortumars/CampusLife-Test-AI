@@ -55,7 +55,12 @@ class CampusLifeViewModel(
     private val calendarRepository: com.example.data.repository.AcademicCalendarRepository =
         com.example.data.repository.AcademicCalendarRepository(AppDatabase.provideAcademicCalendarDao(application)),
     private val scheduleRepository: com.example.data.repository.CourseScheduleRepository =
-        com.example.data.repository.CourseScheduleRepository(AppDatabase.provideCourseScheduleDao(application))
+        com.example.data.repository.CourseScheduleRepository(AppDatabase.provideCourseScheduleDao(application)),
+    private val focusSessionRepository: com.example.data.repository.ProjectFocusSessionRepository =
+        com.example.data.repository.ProjectFocusSessionRepository(
+            AppDatabase.provideProjectFocusSessionDao(application),
+            AppDatabase.provideProjectDao(application)
+        )
 ) : AndroidViewModel(application) {
 
     constructor(
@@ -125,6 +130,18 @@ class CampusLifeViewModel(
 
     private val _academicProjects = MutableStateFlow<List<com.example.data.local.AcademicProjectEntity>>(emptyList())
     val academicProjects: StateFlow<List<com.example.data.local.AcademicProjectEntity>> = _academicProjects.asStateFlow()
+
+    private val _projectFocusSessions = MutableStateFlow<List<com.example.data.local.ProjectFocusSessionEntity>>(emptyList())
+    val projectFocusSessions: StateFlow<List<com.example.data.local.ProjectFocusSessionEntity>> = _projectFocusSessions.asStateFlow()
+
+    private val _projectTimeSummaries = MutableStateFlow<List<com.example.data.local.ProjectTimeSpentSummary>>(emptyList())
+    val projectTimeSummaries: StateFlow<List<com.example.data.local.ProjectTimeSpentSummary>> = _projectTimeSummaries.asStateFlow()
+
+    private val _totalFocusMinutesOverall = MutableStateFlow(0)
+    val totalFocusMinutesOverall: StateFlow<Int> = _totalFocusMinutesOverall.asStateFlow()
+
+    private val _selectedProjectForTimer = MutableStateFlow<com.example.data.local.AcademicProjectEntity?>(null)
+    val selectedProjectForTimer: StateFlow<com.example.data.local.AcademicProjectEntity?> = _selectedProjectForTimer.asStateFlow()
 
     private val _calendarEvents = MutableStateFlow<List<com.example.data.local.AcademicCalendarEventEntity>>(emptyList())
     val calendarEvents: StateFlow<List<com.example.data.local.AcademicCalendarEventEntity>> = _calendarEvents.asStateFlow()
@@ -318,6 +335,41 @@ class CampusLifeViewModel(
                     // Ignore
                 }
             }
+
+            launch {
+                try {
+                    focusSessionRepository.seedInitialSessionsIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    focusSessionRepository.allSessions.collect { sessions ->
+                        _projectFocusSessions.value = sessions
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    focusSessionRepository.projectTimeSummary.collect { summaries ->
+                        _projectTimeSummaries.value = summaries
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    focusSessionRepository.totalMinutesOverall.collect { total ->
+                        _totalFocusMinutesOverall.value = total
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
         }
     }
 
@@ -412,12 +464,106 @@ class CampusLifeViewModel(
         _userFeedbackMessage.value = "Saved ${courses.size} courses to Semester $semesterNumber records!"
     }
 
+    fun selectProjectForTimer(project: com.example.data.local.AcademicProjectEntity?) {
+        _selectedProjectForTimer.value = project
+    }
+
+    fun openFocusTimerForProject(project: com.example.data.local.AcademicProjectEntity) {
+        _selectedProjectForTimer.value = project
+        _subScreen.value = SubScreen.FOCUS_TIMER
+    }
+
+    fun logProjectFocusSession(
+        projectId: String,
+        projectTitle: String,
+        subjectCode: String = "",
+        durationMinutes: Int,
+        notes: String = "",
+        sessionType: String = "FOCUS"
+    ) {
+        viewModelScope.launch {
+            try {
+                focusSessionRepository.logProjectFocusSession(
+                    projectId = projectId,
+                    projectTitle = projectTitle,
+                    subjectCode = subjectCode,
+                    durationMinutes = durationMinutes,
+                    notes = notes,
+                    sessionType = sessionType
+                )
+                _userFeedbackMessage.value = "Logged ${durationMinutes}m focus session for '$projectTitle'! ⏱️"
+            } catch (e: Exception) {
+                val fallbackSession = com.example.data.local.ProjectFocusSessionEntity(
+                    projectId = projectId,
+                    projectTitle = projectTitle,
+                    subjectCode = subjectCode,
+                    durationMinutes = durationMinutes,
+                    durationSeconds = (durationMinutes * 60).toLong(),
+                    sessionNotes = notes,
+                    sessionType = sessionType
+                )
+                _projectFocusSessions.update { listOf(fallbackSession) + it }
+                _academicProjects.update { list ->
+                    list.map {
+                        if (it.id == projectId) it.copy(totalFocusMinutes = it.totalFocusMinutes + durationMinutes)
+                        else it
+                    }
+                }
+                _userFeedbackMessage.value = "Logged ${durationMinutes}m focus session for '$projectTitle'!"
+            }
+        }
+    }
+
+    fun deleteProjectFocusSession(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                focusSessionRepository.deleteSession(sessionId)
+                _userFeedbackMessage.value = "Deleted focus session record"
+            } catch (e: Exception) {
+                _projectFocusSessions.update { list -> list.filter { it.id != sessionId } }
+            }
+        }
+    }
+
     fun logFocusSession(taskId: String?, durationMinutes: Int) {
-        val taskTitle = if (taskId != null) _academicTasks.value.find { it.id == taskId }?.title else null
-        _userFeedbackMessage.value = if (taskTitle != null) {
-            "Logged $durationMinutes min Pomodoro session for '$taskTitle'! 🍅"
+        val selectedProj = _selectedProjectForTimer.value
+        if (selectedProj != null) {
+            logProjectFocusSession(
+                projectId = selectedProj.id,
+                projectTitle = selectedProj.title,
+                subjectCode = selectedProj.subjectCode,
+                durationMinutes = durationMinutes,
+                notes = "Focus sprint completed"
+            )
+            return
+        }
+
+        val task = if (taskId != null) _academicTasks.value.find { it.id == taskId } else null
+        val matchedProj = if (task != null) {
+            _academicProjects.value.find { it.subjectCode == task.subjectCode || it.title.contains(task.title, ignoreCase = true) }
+        } else null
+
+        if (matchedProj != null) {
+            logProjectFocusSession(
+                projectId = matchedProj.id,
+                projectTitle = matchedProj.title,
+                subjectCode = matchedProj.subjectCode,
+                durationMinutes = durationMinutes,
+                notes = "Session for task: ${task?.title ?: ""}"
+            )
         } else {
-            "Completed $durationMinutes min Pomodoro study sprint! 🎉"
+            val defaultProj = _academicProjects.value.firstOrNull()
+            if (defaultProj != null) {
+                logProjectFocusSession(
+                    projectId = defaultProj.id,
+                    projectTitle = defaultProj.title,
+                    subjectCode = defaultProj.subjectCode,
+                    durationMinutes = durationMinutes,
+                    notes = task?.title ?: "Independent study sprint"
+                )
+            } else {
+                _userFeedbackMessage.value = "Completed $durationMinutes min Pomodoro study sprint! 🎉"
+            }
         }
     }
 

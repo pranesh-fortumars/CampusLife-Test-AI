@@ -46,8 +46,20 @@ data class AcademicProjectEntity(
     val githubUrl: String = "https://github.com/rahul-dtu/distributed-cache",
     val teamMembers: String = "Rahul Sharma, Sneha Patel, Vikram Joshi",
     val isCompleted: Boolean = false,
+    val totalFocusMinutes: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 ) {
+    val formattedFocusTime: String
+        get() {
+            val hours = totalFocusMinutes / 60
+            val mins = totalFocusMinutes % 60
+            return when {
+                hours > 0 && mins > 0 -> "${hours}h ${mins}m"
+                hours > 0 -> "${hours}h"
+                else -> "${mins}m"
+            }
+        }
+
     val normalizedStatus: ProjectStatus
         get() = if (isCompleted) ProjectStatus.DONE else ProjectStatus.fromString(status)
 

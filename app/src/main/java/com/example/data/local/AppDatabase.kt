@@ -17,9 +17,10 @@ import androidx.room.RoomDatabase
         CourseGradeEntity::class,
         AcademicProjectEntity::class,
         AcademicCalendarEventEntity::class,
-        CourseScheduleEntity::class
+        CourseScheduleEntity::class,
+        ProjectFocusSessionEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): AcademicProjectDao
     abstract fun academicCalendarDao(): AcademicCalendarDao
     abstract fun courseScheduleDao(): CourseScheduleDao
+    abstract fun projectFocusSessionDao(): ProjectFocusSessionDao
 
     companion object {
         const val DATABASE_NAME = "campuslife_db"
@@ -103,6 +105,13 @@ abstract class AppDatabase : RoomDatabase() {
         fun provideCourseScheduleDao(context: Context): CourseScheduleDao {
             return getDatabase(context).courseScheduleDao()
         }
+
+        /**
+         * Singleton provider function that supplies the ProjectFocusSessionDao directly.
+         */
+        fun provideProjectFocusSessionDao(context: Context): ProjectFocusSessionDao {
+            return getDatabase(context).projectFocusSessionDao()
+        }
     }
 }
 
@@ -122,4 +131,5 @@ object DatabaseProvider {
     fun provideProjectDao(context: Context): AcademicProjectDao = AppDatabase.provideProjectDao(context)
     fun provideAcademicCalendarDao(context: Context): AcademicCalendarDao = AppDatabase.provideAcademicCalendarDao(context)
     fun provideCourseScheduleDao(context: Context): CourseScheduleDao = AppDatabase.provideCourseScheduleDao(context)
+    fun provideProjectFocusSessionDao(context: Context): ProjectFocusSessionDao = AppDatabase.provideProjectFocusSessionDao(context)
 }
