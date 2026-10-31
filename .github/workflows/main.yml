@@ -5,30 +5,35 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Source Code
-      uses: actions/checkout@v4
+      # Step 1: Check out repository source code
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
 
-    - name: Setup Java JDK
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-        cache: 'gradle'
+      # Step 2: Set up Java Development Kit (JDK 17)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Grant Execute Permission for Gradle Wrapper
-      run: chmod +x gradlew
+      # Step 3: Set up Gradle (Handles missing gradlew, wrapper generation & permissions automatically)
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug
+      # Step 4: Build Debug APK using Gradle directly
+      - name: Build Debug APK
+        run: gradle assembleDebug
 
-    - name: Upload Generated APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug-apk
-        path: app/build/outputs/apk/debug/*.apk
+      # Step 5: Upload the generated APK as an artifact downloadable from GitHub
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
