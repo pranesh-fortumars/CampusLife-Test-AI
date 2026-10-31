@@ -41,7 +41,8 @@ enum class SubScreen {
     ACADEMIC_CALENDAR,
     GPA_CALCULATOR,
     CAREER_KANBAN,
-    COURSE_SCHEDULE
+    COURSE_SCHEDULE,
+    STUDENT_PROJECTS
 }
 
 class CampusLifeViewModel(
@@ -854,6 +855,34 @@ class CampusLifeViewModel(
         }
     }
 
+    fun updateAcademicProjectStatus(id: String, newStatus: String) {
+        val normalized = com.example.data.local.ProjectStatus.fromString(newStatus)
+        val isDone = normalized == com.example.data.local.ProjectStatus.DONE
+        viewModelScope.launch {
+            try {
+                projectRepository.updateProjectStatus(id, normalized.code, isDone)
+                _userFeedbackMessage.value = "Project moved to ${normalized.displayName}"
+            } catch (e: Exception) {
+                _academicProjects.update { list ->
+                    list.map { if (it.id == id) it.withStatus(normalized) else it }
+                }
+            }
+        }
+    }
+
+    fun updateAcademicProjectDeadline(id: String, deadlineDate: String, dueTimestamp: Long) {
+        viewModelScope.launch {
+            try {
+                projectRepository.updateProjectDeadline(id, deadlineDate, dueTimestamp)
+                _userFeedbackMessage.value = "Updated deadline to $deadlineDate"
+            } catch (e: Exception) {
+                _academicProjects.update { list ->
+                    list.map { if (it.id == id) it.withDeadline(deadlineDate, dueTimestamp) else it }
+                }
+            }
+        }
+    }
+
     fun deleteAcademicProject(id: String) {
         viewModelScope.launch {
             try {
@@ -870,13 +899,17 @@ class CampusLifeViewModel(
         subjectCode: String,
         subjectName: String,
         description: String,
-        techStack: String,
-        deadlineDate: String,
-        totalMilestones: Int,
-        weightage: String,
-        githubUrl: String,
-        teamMembers: String
+        techStack: String = "Kotlin, Jetpack Compose, Room",
+        deadlineDate: String = "Nov 15, 2026",
+        totalMilestones: Int = 4,
+        weightage: String = "25% Capstone Project",
+        githubUrl: String = "",
+        teamMembers: String = "",
+        dueTimestamp: Long = System.currentTimeMillis() + (14 * 86400000L),
+        status: String = "IN_PROGRESS"
     ) {
+        val normalized = com.example.data.local.ProjectStatus.fromString(status)
+        val isDone = normalized == com.example.data.local.ProjectStatus.DONE
         val newProj = com.example.data.local.AcademicProjectEntity(
             title = title,
             subjectCode = subjectCode,
@@ -884,15 +917,19 @@ class CampusLifeViewModel(
             description = description,
             techStack = techStack,
             deadlineDate = deadlineDate,
+            dueTimestamp = dueTimestamp,
             totalMilestones = totalMilestones,
+            milestonesCompleted = if (isDone) totalMilestones else 0,
+            status = normalized.code,
             weightage = weightage,
             githubUrl = githubUrl,
-            teamMembers = teamMembers
+            teamMembers = teamMembers,
+            isCompleted = isDone
         )
         viewModelScope.launch {
             try {
                 projectRepository.insertProject(newProj)
-                _userFeedbackMessage.value = "Added capstone project: $title"
+                _userFeedbackMessage.value = "Added project: $title"
             } catch (e: Exception) {
                 _academicProjects.update { it + newProj }
             }

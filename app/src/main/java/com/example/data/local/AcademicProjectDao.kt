@@ -36,14 +36,25 @@ interface AcademicProjectDao {
     @Query("UPDATE academic_projects SET isCompleted = :isCompleted, status = :status WHERE id = :id")
     suspend fun setProjectCompletion(id: String, isCompleted: Boolean, status: String)
 
+    @Query("UPDATE academic_projects SET status = :status, isCompleted = :isCompleted WHERE id = :id")
+    suspend fun updateProjectStatus(id: String, status: String, isCompleted: Boolean)
+
+    @Query("UPDATE academic_projects SET deadlineDate = :deadlineDate, dueTimestamp = :dueTimestamp WHERE id = :id")
+    suspend fun updateProjectDeadline(id: String, deadlineDate: String, dueTimestamp: Long)
+
+    @Query("SELECT * FROM academic_projects WHERE status = :status ORDER BY dueTimestamp ASC")
+    fun getProjectsByStatus(status: String): Flow<List<AcademicProjectEntity>>
+
     @Transaction
     suspend fun toggleProjectCompletion(id: String): Boolean {
         val proj = getProjectById(id) ?: return false
         val newStatus = !proj.isCompleted
-        setProjectCompletion(id, newStatus, if (newStatus) "COMPLETED" else "IN_PROGRESS")
+        val code = if (newStatus) "DONE" else "IN_PROGRESS"
+        setProjectCompletion(id, newStatus, code)
         return newStatus
     }
 
     @Query("SELECT COUNT(*) FROM academic_projects")
     suspend fun getProjectCount(): Int
 }
+

@@ -41,6 +41,7 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+compose-charts = { group = "io.github.ehsannarmani", name = "compose-charts", version = "0.1.2" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

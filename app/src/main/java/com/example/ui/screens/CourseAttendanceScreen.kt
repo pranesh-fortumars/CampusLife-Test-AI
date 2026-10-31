@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.model.Subject
+import com.example.ui.components.charts.CourseAttendanceBarChart
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 
@@ -125,7 +126,17 @@ fun CourseAttendanceScreen(
                 )
             }
 
-            // 2. Filter Pills
+            // 2. Bar Chart Data Visualization using Charting Library
+            item {
+                CourseAttendanceBarChart(
+                    subjects = subjects,
+                    onCourseSelected = { sub ->
+                        viewModel.selectSubjectDetail(sub)
+                    }
+                )
+            }
+
+            // 3. Filter Pills
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

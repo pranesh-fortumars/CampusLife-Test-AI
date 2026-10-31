@@ -85,6 +85,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.coil.compose)
+    implementation(libs.compose.charts)
 
     testImplementation(libs.junit)
     testImplementation(libs.androidx.junit)

@@ -1418,7 +1418,121 @@ class CampusLifeUnitTest {
         assertEquals(2, safeCount)
         assertEquals(1, atRiskCount)
     }
+
+    @Test
+    fun testStudentProjectStatusTrackingAndRoomPersistence() {
+        val now = System.currentTimeMillis()
+        val plannedProject = com.example.data.local.AcademicProjectEntity(
+            id = "proj-test-1",
+            title = "Autonomous Robot Swarm",
+            subjectCode = "CS-308",
+            subjectName = "Robotics & Embedded Systems",
+            status = "PLANNED",
+            deadlineDate = "Dec 10, 2026",
+            dueTimestamp = now + (40 * 86400000L),
+            totalMilestones = 5,
+            milestonesCompleted = 0,
+            isCompleted = false
+        )
+
+        assertEquals(com.example.data.local.ProjectStatus.PLANNED, plannedProject.normalizedStatus)
+        assertEquals("Planned", plannedProject.displayStatus)
+        assertFalse(plannedProject.isCompleted)
+        assertEquals(0, plannedProject.progressPercentage)
+
+        // Advance to IN_PROGRESS
+        val inProgressProject = plannedProject.withStatus(com.example.data.local.ProjectStatus.IN_PROGRESS).copy(milestonesCompleted = 2)
+        assertEquals(com.example.data.local.ProjectStatus.IN_PROGRESS, inProgressProject.normalizedStatus)
+        assertEquals("In Progress", inProgressProject.displayStatus)
+        assertFalse(inProgressProject.isCompleted)
+        assertEquals(40, inProgressProject.progressPercentage)
+
+        // Advance to DONE
+        val doneProject = inProgressProject.withStatus(com.example.data.local.ProjectStatus.DONE)
+        assertEquals(com.example.data.local.ProjectStatus.DONE, doneProject.normalizedStatus)
+        assertEquals("Done", doneProject.displayStatus)
+        assertTrue(doneProject.isCompleted)
+        assertEquals(5, doneProject.milestonesCompleted)
+        assertEquals(100, doneProject.progressPercentage)
+
+        // Reopen to Planned
+        val reopenedProject = doneProject.withStatus(com.example.data.local.ProjectStatus.PLANNED)
+        assertEquals(com.example.data.local.ProjectStatus.PLANNED, reopenedProject.normalizedStatus)
+        assertFalse(reopenedProject.isCompleted)
+    }
+
+    @Test
+    fun testStudentProjectDeadlineManagementAndCalculations() {
+        val now = 1000000000000L // Fixed baseline timestamp
+        val day = 86400000L
+
+        // Overdue project
+        val overdueProject = com.example.data.local.AcademicProjectEntity(
+            id = "p-overdue",
+            title = "Compiler Parser",
+            subjectCode = "CS-304",
+            subjectName = "Compiler Design",
+            status = "IN_PROGRESS",
+            deadlineDate = "Oct 25, 2026",
+            dueTimestamp = now - (3 * day),
+            isCompleted = false
+        )
+        assertTrue(overdueProject.getDaysRemaining(now) < 0)
+        assertTrue(overdueProject.getDeadlineStatus(now).contains("Overdue by 3d"))
+
+        // Due today project
+        val dueTodayProject = overdueProject.copy(dueTimestamp = now)
+        assertEquals("Due today", dueTodayProject.getDeadlineStatus(now))
+
+        // Due in 5 days
+        val dueSoonProject = overdueProject.copy(dueTimestamp = now + (5 * day))
+        assertEquals("5 days left", dueSoonProject.getDeadlineStatus(now))
+
+        // Completed project shows Completed regardless of date
+        val completedProject = overdueProject.copy(isCompleted = true, status = "DONE")
+        assertEquals("Completed", completedProject.getDeadlineStatus(now))
+
+        // Test withDeadline helper
+        val updatedDeadline = overdueProject.withDeadline("Nov 30, 2026", now + (30 * day))
+        assertEquals("Nov 30, 2026", updatedDeadline.deadlineDate)
+        assertEquals(now + (30 * day), updatedDeadline.dueTimestamp)
+        assertEquals("30 days left", updatedDeadline.getDeadlineStatus(now))
+    }
+
+    @Test
+    fun testCourseAttendanceBarChartDataMapping() {
+        val courses = listOf(
+            com.example.model.Subject(
+                code = "CS-302",
+                name = "Database Systems",
+                credits = 4,
+                faculty = "Dr. Ananya Roy",
+                attendedClasses = 24,
+                totalClasses = 30, // 80.0%
+                targetPercentage = 75.0
+            ),
+            com.example.model.Subject(
+                code = "CS-304",
+                name = "Operating Systems",
+                credits = 4,
+                faculty = "Dr. R. Venkat",
+                attendedClasses = 18,
+                totalClasses = 30, // 60.0% (At risk)
+                targetPercentage = 75.0
+            )
+        )
+
+        val course1 = courses[0]
+        assertEquals(80.0, course1.attendancePercentage, 0.01)
+        assertTrue("Course 1 should meet or exceed 75% threshold", course1.attendancePercentage >= 75.0)
+
+        val course2 = courses[1]
+        assertEquals(60.0, course2.attendancePercentage, 0.01)
+        assertTrue("Course 2 should be below statutory 75% threshold", course2.attendancePercentage < 75.0)
+        assertEquals(18, course2.neededToReach75) // (0.75 * (30 + x) - 18) -> x = 18
+    }
 }
+
 
 
 

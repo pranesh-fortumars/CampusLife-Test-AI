@@ -223,6 +223,12 @@ fun CampusLifeApp(
                         onBack = { viewModel.closeSubScreen() }
                     )
                 }
+                SubScreen.STUDENT_PROJECTS -> {
+                    StudentProjectsScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
                 SubScreen.NONE -> {
                     when (currentTab) {
                         AppDestination.HOME -> {

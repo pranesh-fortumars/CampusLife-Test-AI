@@ -571,6 +571,65 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Tool 9: Student Projects
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.STUDENT_PROJECTS) }
+                            .testTag("home_tool_student_projects"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Student Projects", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Status & Deadlines (Room)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Tool 10: Attendance Visualizer Chart
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.COURSE_ATTENDANCE) }
+                            .testTag("home_tool_course_attendance_chart"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(TertiaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.BarChart, contentDescription = null, tint = Tertiary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Attendance Charts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Bar Chart & Safe Bunks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
 

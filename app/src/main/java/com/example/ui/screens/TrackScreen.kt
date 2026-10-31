@@ -481,7 +481,54 @@ fun TrackScreen(
                                     }
                                 )
                             } else if (assignmentViewMode == "projects") {
-                                AcademicProjectManagementModule()
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .clickable { viewModel.openSubScreen(SubScreen.STUDENT_PROJECTS) }
+                                            .testTag("track_open_student_projects_screen_btn"),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Launch,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                                Column {
+                                                    Text(
+                                                        text = "Manage Student Projects Screen",
+                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.titleSmall
+                                                    )
+                                                    Text(
+                                                        text = "Status tracking (Planned, In Progress, Done) & Room deadline management",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.ChevronRight,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    AcademicProjectManagementModule()
+                                }
                             } else {
                                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                     Surface(

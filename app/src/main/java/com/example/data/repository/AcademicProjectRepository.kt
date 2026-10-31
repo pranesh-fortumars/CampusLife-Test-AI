@@ -22,6 +22,14 @@ class AcademicProjectRepository(private val dao: AcademicProjectDao) {
         dao.updateProject(project)
     }
 
+    suspend fun updateProjectStatus(id: String, status: String, isCompleted: Boolean) {
+        dao.updateProjectStatus(id, status, isCompleted)
+    }
+
+    suspend fun updateProjectDeadline(id: String, deadlineDate: String, dueTimestamp: Long) {
+        dao.updateProjectDeadline(id, deadlineDate, dueTimestamp)
+    }
+
     suspend fun toggleProjectCompletion(id: String): Boolean {
         return dao.toggleProjectCompletion(id)
     }
