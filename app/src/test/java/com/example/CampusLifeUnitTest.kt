@@ -1326,6 +1326,98 @@ class CampusLifeUnitTest {
         assertEquals(2, urgentHighCount)
         assertEquals(0.333f, completionRatio, 0.01f)
     }
+
+    @Test
+    fun testBasicTaskViewModelSchemaAndTracking() {
+        val task = com.example.model.AcademicTask(
+            id = "test-task-basic",
+            title = "Discrete Mathematics Problem Set 3",
+            subjectCode = "CS-201",
+            subjectName = "Discrete Structures",
+            category = "Task",
+            type = "TASK",
+            dueDate = "Friday, Nov 3",
+            dueTime = "11:59 PM",
+            priority = "HIGH",
+            isCompleted = false
+        )
+
+        assertEquals("Discrete Mathematics Problem Set 3", task.title)
+        assertEquals("Friday, Nov 3", task.dueDate)
+        assertEquals("HIGH", task.priority)
+        assertFalse(task.isCompleted)
+
+        // Room Entity conversion
+        val entity = com.example.data.local.TaskEntity.fromDomain(task)
+        assertEquals(task.id, entity.id)
+        assertEquals(task.title, entity.title)
+        assertEquals(task.dueDate, entity.dueDate)
+        assertEquals(task.priority, entity.priority)
+        assertEquals(task.isCompleted, entity.isCompleted)
+
+        val mappedBack = entity.toDomain()
+        assertEquals(task.title, mappedBack.title)
+        assertEquals(task.dueDate, mappedBack.dueDate)
+        assertEquals(task.priority, mappedBack.priority)
+    }
+
+    @Test
+    fun testCourseAttendancePercentageCalculationAndThresholds() {
+        val courses = listOf(
+            com.example.model.Subject(
+                code = "CS-302",
+                name = "Database Management Systems",
+                credits = 4,
+                faculty = "Dr. Ananya Roy",
+                attendedClasses = 26,
+                totalClasses = 30,
+                targetPercentage = 75.0
+            ),
+            com.example.model.Subject(
+                code = "CS-304",
+                name = "Operating Systems",
+                credits = 4,
+                faculty = "Dr. R. Venkat",
+                attendedClasses = 22,
+                totalClasses = 31,
+                targetPercentage = 75.0
+            ),
+            com.example.model.Subject(
+                code = "CS-306",
+                name = "Computer Networks",
+                credits = 4,
+                faculty = "Prof. Neha Gupta",
+                attendedClasses = 24,
+                totalClasses = 28,
+                targetPercentage = 75.0
+            )
+        )
+
+        // Course 1: 26/30 = 86.67% (Safe >= 75%)
+        assertEquals(86.67, courses[0].attendancePercentage, 0.1)
+        assertTrue(courses[0].attendancePercentage >= courses[0].targetPercentage)
+        assertTrue(courses[0].safeBunksLeft >= 3)
+
+        // Course 2: 22/31 = 70.97% (At Risk < 75%)
+        assertEquals(70.97, courses[1].attendancePercentage, 0.1)
+        assertTrue(courses[1].attendancePercentage < courses[1].targetPercentage)
+        assertTrue(courses[1].neededToReach75 > 0)
+
+        // Course 3: 24/28 = 85.71% (Safe)
+        assertEquals(85.71, courses[2].attendancePercentage, 0.1)
+        assertTrue(courses[2].attendancePercentage >= courses[2].targetPercentage)
+
+        // Overall aggregate percentage: (26 + 22 + 24) / (30 + 31 + 28) = 72 / 89 = 80.90%
+        val totalAttended = courses.sumOf { it.attendedClasses }
+        val totalClasses = courses.sumOf { it.totalClasses }
+        val overall = (totalAttended.toDouble() / totalClasses) * 100.0
+        assertEquals(80.90, overall, 0.1)
+
+        val safeCount = courses.count { it.attendancePercentage >= it.targetPercentage }
+        val atRiskCount = courses.count { it.attendancePercentage < it.targetPercentage }
+        assertEquals(2, safeCount)
+        assertEquals(1, atRiskCount)
+    }
 }
 
 

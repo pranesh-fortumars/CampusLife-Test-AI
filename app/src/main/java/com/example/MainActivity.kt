@@ -187,6 +187,12 @@ fun CampusLifeApp(
                         onBack = { viewModel.closeSubScreen() }
                     )
                 }
+                SubScreen.COURSE_ATTENDANCE -> {
+                    CourseAttendanceScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
                 SubScreen.TASKS_LIST -> {
                     TasksListScreen(
                         viewModel = viewModel,

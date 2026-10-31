@@ -168,6 +168,28 @@ class TaskViewModel(
         insertTask(task)
     }
 
+    /**
+     * Basic task tracker adding an academic task with title, due date, and priority level.
+     */
+    fun addTask(
+        title: String,
+        dueDate: String = "Upcoming",
+        priority: String = "HIGH"
+    ) {
+        addTask(
+            title = title,
+            subjectCode = "ACAD",
+            subjectName = "Academic Tasks",
+            category = "Task",
+            type = "TASK",
+            dueDate = dueDate,
+            dueTime = "11:59 PM",
+            priority = priority,
+            weightage = "",
+            note = ""
+        )
+    }
+
     fun addTask(
         title: String,
         subjectCode: String,

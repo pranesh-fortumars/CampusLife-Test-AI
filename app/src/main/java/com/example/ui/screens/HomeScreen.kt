@@ -265,7 +265,7 @@ fun HomeScreen(
 
                         FilledTonalButton(
                             onClick = {
-                                viewModel.openSubScreen(SubScreen.DAILY_ATTENDANCE_LOGGER)
+                                viewModel.openSubScreen(SubScreen.COURSE_ATTENDANCE)
                             },
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
