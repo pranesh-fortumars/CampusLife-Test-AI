@@ -18,9 +18,11 @@ import androidx.room.RoomDatabase
         AcademicProjectEntity::class,
         AcademicCalendarEventEntity::class,
         CourseScheduleEntity::class,
-        ProjectFocusSessionEntity::class
+        ProjectFocusSessionEntity::class,
+        CareerEventEntity::class,
+        CommunityPostEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +34,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun academicCalendarDao(): AcademicCalendarDao
     abstract fun courseScheduleDao(): CourseScheduleDao
     abstract fun projectFocusSessionDao(): ProjectFocusSessionDao
+    abstract fun careerEventDao(): CareerEventDao
+    abstract fun communityPostDao(): CommunityPostDao
 
     companion object {
         const val DATABASE_NAME = "campuslife_db"
@@ -112,6 +116,20 @@ abstract class AppDatabase : RoomDatabase() {
         fun provideProjectFocusSessionDao(context: Context): ProjectFocusSessionDao {
             return getDatabase(context).projectFocusSessionDao()
         }
+
+        /**
+         * Singleton provider function that supplies the CareerEventDao directly.
+         */
+        fun provideCareerEventDao(context: Context): CareerEventDao {
+            return getDatabase(context).careerEventDao()
+        }
+
+        /**
+         * Singleton provider function that supplies the CommunityPostDao directly.
+         */
+        fun provideCommunityPostDao(context: Context): CommunityPostDao {
+            return getDatabase(context).communityPostDao()
+        }
     }
 }
 
@@ -132,4 +150,6 @@ object DatabaseProvider {
     fun provideAcademicCalendarDao(context: Context): AcademicCalendarDao = AppDatabase.provideAcademicCalendarDao(context)
     fun provideCourseScheduleDao(context: Context): CourseScheduleDao = AppDatabase.provideCourseScheduleDao(context)
     fun provideProjectFocusSessionDao(context: Context): ProjectFocusSessionDao = AppDatabase.provideProjectFocusSessionDao(context)
+    fun provideCareerEventDao(context: Context): CareerEventDao = AppDatabase.provideCareerEventDao(context)
+    fun provideCommunityPostDao(context: Context): CommunityPostDao = AppDatabase.provideCommunityPostDao(context)
 }

@@ -48,49 +48,69 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
             .background(MaterialTheme.colorScheme.background)
             .testTag("community_screen")
     ) {
-        // Main Navigation Mode Chips: "Events & Seminars", "Chats & Huddles", "Clubs Directory"
-        Row(
+        // Main Navigation Mode Chips: "Study Feed", "Events & Seminars", "Chats & Huddles", "Clubs Directory"
+        LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterChip(
-                selected = selectedTab == "Events",
-                onClick = { selectedTab = "Events" },
-                label = { Text("Events & Seminars", fontSize = 12.sp) },
-                leadingIcon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Primary,
-                    selectedLabelColor = Color.White,
-                    selectedLeadingIconColor = Color.White
-                ),
-                modifier = Modifier.testTag("community_tab_events")
-            )
-            FilterChip(
-                selected = selectedTab == "Chats",
-                onClick = { selectedTab = "Chats" },
-                label = { Text("Chats", fontSize = 12.sp) },
-                leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Primary,
-                    selectedLabelColor = Color.White,
-                    selectedLeadingIconColor = Color.White
-                ),
-                modifier = Modifier.testTag("community_tab_chats")
-            )
-            FilterChip(
-                selected = selectedTab == "Clubs",
-                onClick = { selectedTab = "Clubs" },
-                label = { Text("Clubs (48)", fontSize = 12.sp) },
-                leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Primary,
-                    selectedLabelColor = Color.White,
-                    selectedLeadingIconColor = Color.White
-                ),
-                modifier = Modifier.testTag("community_tab_clubs")
-            )
+            item {
+                FilterChip(
+                    selected = false,
+                    onClick = { viewModel.openSubScreen(SubScreen.COMMUNITY_FEED) },
+                    label = { Text("Study Feed 💡", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    leadingIcon = { Icon(Icons.Default.Forum, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Primary.copy(alpha = 0.12f),
+                        labelColor = Primary,
+                        iconColor = Primary
+                    ),
+                    modifier = Modifier.testTag("community_tab_study_feed")
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedTab == "Events",
+                    onClick = { selectedTab = "Events" },
+                    label = { Text("Events & Seminars", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Primary,
+                        selectedLabelColor = Color.White,
+                        selectedLeadingIconColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("community_tab_events")
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedTab == "Chats",
+                    onClick = { selectedTab = "Chats" },
+                    label = { Text("Chats", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Primary,
+                        selectedLabelColor = Color.White,
+                        selectedLeadingIconColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("community_tab_chats")
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selectedTab == "Clubs",
+                    onClick = { selectedTab = "Clubs" },
+                    label = { Text("Clubs (48)", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Primary,
+                        selectedLabelColor = Color.White,
+                        selectedLeadingIconColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("community_tab_clubs")
+                )
+            }
         }
 
         if (selectedTab == "Events") {

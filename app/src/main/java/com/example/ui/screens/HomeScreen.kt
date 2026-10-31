@@ -630,6 +630,65 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Tool 11: Career Deadlines & Drives
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.CAREER_EVENTS) }
+                            .testTag("home_tool_career_events"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(PrimaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Career Deadlines", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Alerts & Drives (Room)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Tool 12: Community Study Feed
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { viewModel.openSubScreen(SubScreen.COMMUNITY_FEED) }
+                            .testTag("home_tool_community_feed"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SecondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Forum, contentDescription = null, tint = Secondary, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("Study Feed", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("Questions & Tips (Room)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
 

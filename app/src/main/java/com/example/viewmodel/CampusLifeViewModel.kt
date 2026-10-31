@@ -42,7 +42,9 @@ enum class SubScreen {
     GPA_CALCULATOR,
     CAREER_KANBAN,
     COURSE_SCHEDULE,
-    STUDENT_PROJECTS
+    STUDENT_PROJECTS,
+    COMMUNITY_FEED,
+    CAREER_EVENTS
 }
 
 class CampusLifeViewModel(
@@ -60,7 +62,11 @@ class CampusLifeViewModel(
         com.example.data.repository.ProjectFocusSessionRepository(
             AppDatabase.provideProjectFocusSessionDao(application),
             AppDatabase.provideProjectDao(application)
-        )
+        ),
+    private val careerEventRepository: com.example.data.repository.CareerEventRepository =
+        com.example.data.repository.CareerEventRepository(AppDatabase.provideCareerEventDao(application)),
+    private val communityFeedRepository: com.example.data.repository.CommunityFeedRepository =
+        com.example.data.repository.CommunityFeedRepository(AppDatabase.provideCommunityPostDao(application))
 ) : AndroidViewModel(application) {
 
     constructor(
@@ -168,6 +174,14 @@ class CampusLifeViewModel(
     // Career & Job Applications Kanban State
     private val _careerApplications = MutableStateFlow<List<CareerApplication>>(CareerMockData.defaultApplications)
     val careerApplications: StateFlow<List<CareerApplication>> = _careerApplications.asStateFlow()
+
+    // Upcoming Career Events & Internship Deadlines (Room DB)
+    private val _careerEvents = MutableStateFlow<List<com.example.data.local.CareerEventEntity>>(emptyList())
+    val careerEvents: StateFlow<List<com.example.data.local.CareerEventEntity>> = _careerEvents.asStateFlow()
+
+    // Community Feed Study Questions & Tips (Room DB)
+    private val _communityPosts = MutableStateFlow<List<com.example.data.local.CommunityPostEntity>>(emptyList())
+    val communityPosts: StateFlow<List<com.example.data.local.CommunityPostEntity>> = _communityPosts.asStateFlow()
 
     // Simulator state
     private val _simulatorCount = MutableStateFlow(3)
@@ -365,6 +379,36 @@ class CampusLifeViewModel(
                 try {
                     focusSessionRepository.totalMinutesOverall.collect { total ->
                         _totalFocusMinutesOverall.value = total
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    careerEventRepository.seedInitialCareerEventsIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    careerEventRepository.allEvents.collect { events ->
+                        _careerEvents.value = events
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+
+            launch {
+                try {
+                    communityFeedRepository.seedInitialCommunityPostsIfEmpty()
+                } catch (e: Exception) {
+                    // Ignore
+                }
+                try {
+                    communityFeedRepository.allPosts.collect { posts ->
+                        _communityPosts.value = posts
                     }
                 } catch (e: Exception) {
                     // Ignore
@@ -1290,6 +1334,170 @@ class CampusLifeViewModel(
             list.map { if (it.id == updated.id) updated else it }
         }
         _userFeedbackMessage.value = "Updated ${updated.companyName} details"
+    }
+
+    // Room Persistent Career Events & Internship Deadlines
+    fun addCareerEvent(
+        title: String,
+        company: String,
+        role: String,
+        eventType: String = "INTERNSHIP_DEADLINE",
+        deadlineDate: String = "Nov 15, 2026",
+        dueTimestamp: Long = System.currentTimeMillis() + (14 * 86400000L),
+        locationOrUrl: String = "",
+        stipendOrPackage: String = "",
+        eligibility: String = "",
+        description: String = "",
+        reminderEnabled: Boolean = true,
+        context: android.content.Context? = null
+    ) {
+        val newEvent = com.example.data.local.CareerEventEntity(
+            title = title,
+            company = company,
+            role = role,
+            eventType = eventType,
+            deadlineDate = deadlineDate,
+            dueTimestamp = dueTimestamp,
+            locationOrUrl = locationOrUrl,
+            stipendOrPackage = stipendOrPackage,
+            eligibility = eligibility,
+            description = description,
+            reminderEnabled = reminderEnabled
+        )
+        viewModelScope.launch {
+            try {
+                careerEventRepository.insertEvent(newEvent)
+                _userFeedbackMessage.value = "Saved deadline: $company ($role)"
+                if (reminderEnabled) {
+                    val appContext = context ?: getApplication()
+                    com.example.worker.CareerNotificationHelper.triggerCareerDeadlineNotification(appContext, newEvent)
+                }
+            } catch (e: Exception) {
+                _careerEvents.update { it + newEvent }
+                _userFeedbackMessage.value = "Saved deadline: $company ($role)"
+            }
+        }
+    }
+
+    fun toggleCareerReminder(eventId: String, context: android.content.Context? = null) {
+        val event = _careerEvents.value.find { it.id == eventId } ?: return
+        val newState = !event.reminderEnabled
+        viewModelScope.launch {
+            try {
+                careerEventRepository.toggleReminder(eventId, newState)
+                if (newState) {
+                    val appContext = context ?: getApplication()
+                    com.example.worker.CareerNotificationHelper.triggerCareerDeadlineNotification(appContext, event)
+                    _userFeedbackMessage.value = "🔔 Notification alert set for ${event.company}!"
+                } else {
+                    _userFeedbackMessage.value = "Disabled reminder for ${event.company}"
+                }
+            } catch (e: Exception) {
+                _careerEvents.update { list ->
+                    list.map { if (it.id == eventId) it.copy(reminderEnabled = newState) else it }
+                }
+            }
+        }
+    }
+
+    fun triggerCareerDeadlineNotification(event: com.example.data.local.CareerEventEntity, context: android.content.Context? = null) {
+        val appContext = context ?: getApplication()
+        val success = com.example.worker.CareerNotificationHelper.triggerCareerDeadlineNotification(appContext, event)
+        if (success) {
+            _userFeedbackMessage.value = "Triggered alert for ${event.company} (${event.deadlineDate}) 🔔"
+        } else {
+            _userFeedbackMessage.value = "Notification sent for ${event.company}"
+        }
+    }
+
+    fun updateCareerEventStatus(eventId: String, status: String) {
+        viewModelScope.launch {
+            try {
+                careerEventRepository.updateStatus(eventId, status)
+                _userFeedbackMessage.value = "Updated event status to $status"
+            } catch (e: Exception) {
+                _careerEvents.update { list ->
+                    list.map { if (it.id == eventId) it.copy(status = status) else it }
+                }
+            }
+        }
+    }
+
+    fun deleteCareerEvent(eventId: String) {
+        viewModelScope.launch {
+            try {
+                careerEventRepository.deleteEvent(eventId)
+                _userFeedbackMessage.value = "Removed career event"
+            } catch (e: Exception) {
+                _careerEvents.update { list -> list.filter { it.id != eventId } }
+            }
+        }
+    }
+
+    // Community Feed Study Questions & Tips operations
+    fun addCommunityPost(
+        authorName: String,
+        authorRole: String,
+        postType: String,
+        title: String,
+        content: String,
+        subjectCode: String = "",
+        subjectName: String = "",
+        tags: String = "#Study"
+    ) {
+        viewModelScope.launch {
+            try {
+                communityFeedRepository.createPost(
+                    authorName = authorName,
+                    authorRole = authorRole,
+                    postType = postType,
+                    title = title,
+                    content = content,
+                    subjectCode = subjectCode,
+                    subjectName = subjectName,
+                    tags = tags
+                )
+                val typeLabel = if (postType == "QUESTION") "Question" else "Study Tip"
+                _userFeedbackMessage.value = "Posted study $typeLabel to community feed! 🚀"
+            } catch (e: Exception) {
+                val fallbackPost = com.example.data.local.CommunityPostEntity(
+                    authorName = authorName,
+                    authorRole = authorRole,
+                    postType = postType,
+                    title = title,
+                    content = content,
+                    subjectCode = subjectCode,
+                    subjectName = subjectName,
+                    tags = tags
+                )
+                _communityPosts.update { listOf(fallbackPost) + it }
+                _userFeedbackMessage.value = "Posted to community feed!"
+            }
+        }
+    }
+
+    fun upvoteCommunityPost(postId: String) {
+        viewModelScope.launch {
+            try {
+                communityFeedRepository.upvotePost(postId)
+                _userFeedbackMessage.value = "Upvoted study post! 👍"
+            } catch (e: Exception) {
+                _communityPosts.update { list ->
+                    list.map { if (it.id == postId) it.copy(upvotes = it.upvotes + 1) else it }
+                }
+            }
+        }
+    }
+
+    fun deleteCommunityPost(postId: String) {
+        viewModelScope.launch {
+            try {
+                communityFeedRepository.deletePost(postId)
+                _userFeedbackMessage.value = "Deleted post"
+            } catch (e: Exception) {
+                _communityPosts.update { list -> list.filter { it.id != postId } }
+            }
+        }
     }
 }
 

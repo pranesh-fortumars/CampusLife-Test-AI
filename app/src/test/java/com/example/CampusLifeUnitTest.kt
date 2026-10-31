@@ -1587,6 +1587,138 @@ class CampusLifeUnitTest {
         assertEquals(150, updatedProject.totalFocusMinutes)
         assertEquals("2h 30m", updatedProject.formattedFocusTime)
     }
+
+    @Test
+    fun testCareerEventEntityUrgencyBadgeAndDaysRemaining() {
+        val now = 1700000000000L
+        val day = 86400000L
+
+        // Event closing in 5 days
+        val eventIn5Days = com.example.data.local.CareerEventEntity(
+            id = "c-1",
+            title = "Google Summer SWE Intern",
+            company = "Google",
+            role = "SWE Intern",
+            eventType = "INTERNSHIP_DEADLINE",
+            deadlineDate = "Nov 20, 2026",
+            dueTimestamp = now + (5 * day),
+            status = "UPCOMING"
+        )
+        assertEquals(5L, eventIn5Days.getDaysRemaining(now))
+        assertEquals("5 days left", eventIn5Days.getUrgencyBadge(now))
+        assertEquals("Internship Deadline", eventIn5Days.displayType)
+
+        // Event closing today
+        val eventToday = eventIn5Days.copy(dueTimestamp = now + (2 * 3600000L))
+        assertEquals("Closes Today!", eventToday.getUrgencyBadge(now))
+
+        // Event closing tomorrow
+        val eventTomorrow = eventIn5Days.copy(dueTimestamp = now + day + 1000L)
+        assertEquals("Closes Tomorrow!", eventTomorrow.getUrgencyBadge(now))
+
+        // Applied event
+        val appliedEvent = eventIn5Days.copy(status = "APPLIED")
+        assertEquals("Applied ✓", appliedEvent.getUrgencyBadge(now))
+
+        // Closed event
+        val closedEvent = eventIn5Days.copy(status = "CLOSED")
+        assertEquals("Closed", closedEvent.getUrgencyBadge(now))
+
+        // Expired event
+        val expiredEvent = eventIn5Days.copy(dueTimestamp = now - (3 * day))
+        assertEquals("Expired 3d ago", expiredEvent.getUrgencyBadge(now))
+    }
+
+    @Test
+    fun testCareerEventEntityStatusAndTypeDisplay() {
+        val oaEvent = com.example.data.local.CareerEventEntity(
+            id = "c-2",
+            title = "Amazon Online Coding Assessment",
+            company = "Amazon",
+            role = "SDE Intern",
+            eventType = "ONLINE_ASSESSMENT"
+        )
+        assertEquals("Online Assessment", oaEvent.displayType)
+        assertTrue(oaEvent.reminderEnabled)
+        assertFalse(oaEvent.notificationTriggered)
+
+        val talkEvent = com.example.data.local.CareerEventEntity(
+            id = "c-3",
+            title = "Microsoft Campus Tech Talk",
+            company = "Microsoft",
+            role = "Cloud Architect",
+            eventType = "CAREER_TALK"
+        )
+        assertEquals("Campus Talk", talkEvent.displayType)
+
+        val driveEvent = com.example.data.local.CareerEventEntity(
+            id = "c-4",
+            title = "Atlassian Placement Drive",
+            company = "Atlassian",
+            role = "Full-Stack Intern",
+            eventType = "PLACEMENT_DRIVE"
+        )
+        assertEquals("Placement Drive", driveEvent.displayType)
+    }
+
+    @Test
+    fun testCommunityPostEntityQuestionAndTipTypes() {
+        val questionPost = com.example.data.local.CommunityPostEntity(
+            id = "post-q1",
+            authorName = "Vikram Joshi",
+            authorRole = "3rd Year CSE",
+            postType = "QUESTION",
+            title = "Raft Leader Election Split Vote question",
+            content = "How does Raft handle network partitions?",
+            subjectCode = "CS-308",
+            subjectName = "Software Engineering",
+            upvotes = 19,
+            answersCount = 5
+        )
+
+        assertTrue(questionPost.isQuestion)
+        assertFalse(questionPost.isTip)
+        assertEquals("CS-308", questionPost.subjectCode)
+        assertEquals(19, questionPost.upvotes)
+        assertEquals(5, questionPost.answersCount)
+
+        val tipPost = com.example.data.local.CommunityPostEntity(
+            id = "post-t1",
+            authorName = "Sneha Patel",
+            authorRole = "Teaching Assistant",
+            postType = "TIP",
+            title = "DBMS B+ Tree Clustered Index Tip",
+            content = "Always prefer clustered indexes on sorted range keys.",
+            subjectCode = "CS-302",
+            subjectName = "Database Systems",
+            upvotes = 34,
+            isPinned = true
+        )
+
+        assertFalse(tipPost.isQuestion)
+        assertTrue(tipPost.isTip)
+        assertTrue(tipPost.isPinned)
+        assertEquals(34, tipPost.upvotes)
+    }
+
+    @Test
+    fun testCommunityPostUpvoteIncrementAndFormatting() {
+        val initialPost = com.example.data.local.CommunityPostEntity(
+            id = "post-x",
+            authorName = "Ananya Roy",
+            authorRole = "OS CR",
+            postType = "TIP",
+            title = "Belady's Anomaly Theorem",
+            content = "FIFO experiences Belady's anomaly, LRU does not.",
+            upvotes = 10
+        )
+
+        val upvoted = initialPost.copy(upvotes = initialPost.upvotes + 1)
+        assertEquals(11, upvoted.upvotes)
+
+        val withAnswer = upvoted.copy(answersCount = upvoted.answersCount + 1)
+        assertEquals(1, withAnswer.answersCount)
+    }
 }
 
 

@@ -29,14 +29,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         com.example.worker.TaskNotificationHelper.createNotificationChannel(this)
         com.example.worker.ScheduleReminderHelper.createNotificationChannel(this)
+        com.example.worker.CareerNotificationHelper.createCareerNotificationChannel(this)
         val navigateToTasks = intent.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
         val navigateToTimetable = intent.getStringExtra("EXTRA_NAVIGATE_TO") == "TIMETABLE"
+        val navigateToCareer = intent.getStringExtra("EXTRA_NAVIGATE_TO") == "CAREER"
 
         setContent {
             CampusLifeTheme {
                 CampusLifeApp(
                     initialOpenTasks = navigateToTasks,
-                    initialOpenTimetable = navigateToTimetable
+                    initialOpenTimetable = navigateToTimetable,
+                    initialOpenCareer = navigateToCareer
                 )
             }
         }
@@ -47,6 +50,7 @@ class MainActivity : ComponentActivity() {
 fun CampusLifeApp(
     initialOpenTasks: Boolean = false,
     initialOpenTimetable: Boolean = false,
+    initialOpenCareer: Boolean = false,
     viewModel: CampusLifeViewModel = run {
         val context = androidx.compose.ui.platform.LocalContext.current
         val app = context.applicationContext as android.app.Application
@@ -82,6 +86,8 @@ fun CampusLifeApp(
             viewModel.openSubScreen(SubScreen.TASKS_LIST)
         } else if (initialOpenTimetable) {
             viewModel.openSubScreen(SubScreen.COURSE_SCHEDULE)
+        } else if (initialOpenCareer) {
+            viewModel.openSubScreen(SubScreen.CAREER_EVENTS)
         }
     }
 
@@ -225,6 +231,18 @@ fun CampusLifeApp(
                 }
                 SubScreen.STUDENT_PROJECTS -> {
                     StudentProjectsScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
+                SubScreen.COMMUNITY_FEED -> {
+                    CommunityFeedScreen(
+                        viewModel = viewModel,
+                        onBack = { viewModel.closeSubScreen() }
+                    )
+                }
+                SubScreen.CAREER_EVENTS -> {
+                    CareerTrackerScreen(
                         viewModel = viewModel,
                         onBack = { viewModel.closeSubScreen() }
                     )
