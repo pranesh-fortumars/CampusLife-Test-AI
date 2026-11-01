@@ -23,15 +23,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Step 3: Set up Gradle (Handles missing gradlew, wrapper generation & permissions automatically)
+      # Step 3: Set up Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      # Step 4: Build Debug APK using Gradle directly
+      # Step 4: Restore debug.keystore from base64
+      - name: Restore Keystore
+        run: |
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+          else
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      # Step 5: Build Debug APK using Gradle
       - name: Build Debug APK
         run: gradle assembleDebug
 
-      # Step 5: Upload the generated APK as an artifact downloadable from GitHub
+      # Step 6: Upload the generated APK as an artifact downloadable from GitHub
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
