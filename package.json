@@ -1,0 +1,10 @@
+{
+  "name": "campuslife-ota-distribution",
+  "version": "1.1.0",
+  "private": true,
+  "description": "CampusLife Android APK Distribution Hub & OTA Updater on Vercel",
+  "scripts": {
+    "build": "echo 'Static artifacts and APKs ready in public/'",
+    "start": "npx serve public"
+  }
+}

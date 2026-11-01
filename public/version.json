@@ -1,0 +1,10 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1",
+  "apkUrl": "/CampusLife.apk",
+  "downloadUrl": "/CampusLife.apk",
+  "appName": "CampusLife",
+  "releaseNotes": "Latest CampusLife Android release with OTA updates, Class Schedules, Deadlines, Community Feed, and Attendance % logging.",
+  "publishedDate": "2026-11-01",
+  "minSupportedVersion": 1
+}

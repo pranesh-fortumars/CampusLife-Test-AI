@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK & Deploy to Vercel
 
 on:
   push:
@@ -35,8 +35,55 @@ jobs:
     - name: Build Debug APK
       run: gradle assembleDebug
 
+    - name: Prepare Vercel Public OTA Artifacts
+      run: |
+        mkdir -p public
+        cp app/build/outputs/apk/debug/app-debug.apk public/CampusLife.apk
+        cp app/build/outputs/apk/debug/app-debug.apk public/app-debug.apk
+        
+        # Dynamically bump version metadata so user phones immediately detect the update
+        RUN_NUM=${{ github.run_number }}
+        COMMIT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+        VERSION_CODE=$(( RUN_NUM + 1 ))
+        
+        cat <<EOF > public/version.json
+        {
+          "versionCode": $VERSION_CODE,
+          "versionName": "1.0.$RUN_NUM",
+          "apkUrl": "/CampusLife.apk",
+          "downloadUrl": "/CampusLife.apk",
+          "appName": "CampusLife",
+          "releaseNotes": "Automated build #$RUN_NUM ($COMMIT_SHA) with updated schedules, attendance tracking, and OTA updates.",
+          "publishedDate": "$(date -u +%Y-%m-%d)",
+          "minSupportedVersion": 1
+        }
+        EOF
+        
+        echo "Prepared public/ artifacts:"
+        ls -lh public/
+
     - name: Upload Generated APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
         path: app/build/outputs/apk/debug/*.apk
+
+    - name: Deploy to Vercel
+      env:
+        VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      run: |
+        if [ -n "$VERCEL_TOKEN" ]; then
+          echo "Deploying APK and OTA version endpoints to Vercel production..."
+          npx --yes vercel --prod --yes --token="$VERCEL_TOKEN"
+        else
+          echo "=========================================================================="
+          echo "NOTICE: VERCEL_TOKEN is not yet configured in GitHub Repository Secrets."
+          echo "To enable 100% automated Vercel deployments on push:"
+          echo "1. Go to your GitHub repository -> Settings -> Secrets and variables -> Actions"
+          echo "2. Add Secret 'VERCEL_TOKEN' (from https://vercel.com/account/tokens)"
+          echo "3. Add Secret 'VERCEL_ORG_ID' and 'VERCEL_PROJECT_ID' (from .vercel/project.json or project settings)"
+          echo "Your APK artifact is still safely built and downloadable from the Artifacts tab!"
+          echo "=========================================================================="
+        fi

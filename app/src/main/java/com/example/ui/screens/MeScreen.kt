@@ -26,6 +26,7 @@ import com.example.data.MockData
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SubScreen
+import kotlinx.coroutines.launch
 
 @Composable
 fun MeScreen(
@@ -352,6 +353,244 @@ fun MeScreen(
                         onClick = { viewModel.openSubScreen(SubScreen.ID_VERIFICATION) }
                     )
                 }
+            }
+        }
+
+        // App Updates & Vercel OTA Synchronization
+        item {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val coroutineScope = rememberCoroutineScope()
+            val isChecking by com.example.util.AppUpdateManager.isChecking.collectAsState()
+            val isDownloading by com.example.util.AppUpdateManager.isDownloading.collectAsState()
+            val downloadProgress by com.example.util.AppUpdateManager.downloadProgress.collectAsState()
+            val updateAvailable by com.example.util.AppUpdateManager.updateAvailable.collectAsState()
+            val remoteVersion by com.example.util.AppUpdateManager.remoteVersion.collectAsState()
+            val statusMessage by com.example.util.AppUpdateManager.statusMessage.collectAsState()
+
+            var showEditUrlDialog by remember { mutableStateOf(false) }
+            var vercelUrlInput by remember { mutableStateOf(com.example.util.AppUpdateManager.getVercelUrl(context)) }
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("app_updates_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+                                Text("In-App Updates (Vercel OTA)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = "Current: v${com.example.BuildConfig.VERSION_NAME} (Build ${com.example.BuildConfig.VERSION_CODE})",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = if (updateAvailable) ErrorContainer else TertiaryContainer
+                        ) {
+                            Text(
+                                text = if (updateAvailable) "Update Ready" else "Up to Date",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (updateAvailable) OnErrorContainer else OnTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+
+                    // Vercel deployment link preview
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Vercel Source Link", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = com.example.util.AppUpdateManager.getVercelUrl(context),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Primary,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    vercelUrlInput = com.example.util.AppUpdateManager.getVercelUrl(context)
+                                    showEditUrlDialog = true
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Vercel URL", modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    }
+
+                    // Status feedback message if any
+                    statusMessage?.let { msg ->
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Download progress indicator
+                    if (isDownloading) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            LinearProgressIndicator(
+                                progress = { downloadProgress / 100f },
+                                modifier = Modifier.fillMaxWidth().height(6.dp)
+                            )
+                            Text("Downloading update: $downloadProgress%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+
+                    // Remote version release notes card if update is available
+                    if (updateAvailable && remoteVersion != null) {
+                        val remote = remoteVersion!!
+                        Surface(
+                            color = TertiaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "🚀 New Version ${remote.versionName} Available!",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = OnTertiaryContainer
+                                )
+                                Text(
+                                    text = remote.releaseNotes,
+                                    fontSize = 12.sp,
+                                    color = OnTertiaryContainer.copy(alpha = 0.85f)
+                                )
+                            }
+                        }
+                    }
+
+                    // Action buttons row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Check for updates button
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    com.example.util.AppUpdateManager.checkForUpdates(context)
+                                }
+                            },
+                            enabled = !isChecking && !isDownloading,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_check_vercel_updates"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            if (isChecking) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Checking...")
+                            } else {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Check Updates")
+                            }
+                        }
+
+                        // Install or Open Web Page button
+                        if (updateAvailable) {
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        com.example.util.AppUpdateManager.downloadAndInstall(context)
+                                    }
+                                },
+                                enabled = !isDownloading,
+                                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_install_vercel_update"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Install Update")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    com.example.util.AppUpdateManager.openVercelPageInBrowser(context)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_open_vercel_page"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Open Vercel")
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (showEditUrlDialog) {
+                AlertDialog(
+                    onDismissRequest = { showEditUrlDialog = false },
+                    title = { Text("Configure Vercel Deployment Link") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Enter the public Vercel production URL where the latest APK and version.json are hosted:", fontSize = 12.sp)
+                            OutlinedTextField(
+                                value = vercelUrlInput,
+                                onValueChange = { vercelUrlInput = it },
+                                label = { Text("Vercel URL") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            com.example.util.AppUpdateManager.setVercelUrl(context, vercelUrlInput)
+                            showEditUrlDialog = false
+                        }) {
+                            Text("Save Link")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showEditUrlDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
         }
     }

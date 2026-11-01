@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusLife - Android APK Download & OTA Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Navbar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white">CampusLife</h1>
+                    <p class="text-xs text-slate-400">College Student Super App</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    ● v1.1 Live (Vercel OTA)
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Content -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-12 md:py-20 flex-1">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+            
+            <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+                <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">
+                    <span>🚀 Continuous Deployment via GitHub Actions & Vercel</span>
+                </div>
+
+                <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
+                    Track Academics. Master Schedules. <br class="hidden sm:inline"/>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-violet-400 to-pink-400">Excel on Campus.</span>
+                </h2>
+
+                <p class="text-slate-400 text-base sm:text-lg max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                    The all-in-one college student super app built with Kotlin & Jetpack Compose. Room SQLite persistence, live attendance percentage forecasting, community study feeds, and instant in-app OTA updates directly from this Vercel deployment!
+                </p>
+
+                <!-- Actions -->
+                <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+                    <a href="/CampusLife.apk" download="CampusLife.apk" id="downloadBtn"
+                       class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-center text-base shadow-xl shadow-indigo-600/25 transition-all duration-200 transform hover:-translate-y-0.5 flex items-center justify-center space-x-3">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2a1 1 0 0 1 1 1v10.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 1 1 1.414-1.414L11 13.586V3a1 1 0 0 1 1-1zm-7 16a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"/>
+                        </svg>
+                        <span>Download APK (Direct)</span>
+                    </a>
+
+                    <a href="/version.json" target="_blank"
+                       class="w-full sm:w-auto px-6 py-4 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-200 font-semibold text-center text-sm transition-all duration-200 flex items-center justify-center space-x-2">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                        </svg>
+                        <span>OTA API (version.json)</span>
+                    </a>
+                </div>
+
+                <!-- Update note -->
+                <div class="pt-2 text-xs text-slate-500 flex items-center justify-center lg:justify-start space-x-2">
+                    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Instant phone updates: In-app updater auto-detects new commits on this link.</span>
+                </div>
+            </div>
+
+            <!-- Download & QR Card -->
+            <div class="lg:col-span-5 flex justify-center">
+                <div class="w-full max-w-sm bg-slate-800/80 border border-slate-700 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                    <div class="absolute -right-12 -top-12 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+                    <div class="text-center space-y-4">
+                        <div class="inline-block p-3 rounded-2xl bg-white shadow-inner">
+                            <!-- Dynamic QR Code pointing to this download link -->
+                            <img id="qrCodeImg"
+                                 src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Fcampuslife-app.vercel.app%2FCampusLife.apk"
+                                 alt="Scan to Download APK"
+                                 class="w-44 h-44 rounded-lg object-contain mx-auto" />
+                        </div>
+
+                        <div>
+                            <p class="font-bold text-white text-base">Scan with Phone Camera</p>
+                            <p class="text-xs text-slate-400">Installs directly on Android 8.0+</p>
+                        </div>
+
+                        <div class="border-t border-slate-700/80 pt-4 text-left space-y-2 text-xs text-slate-300">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Package Name:</span>
+                                <span class="font-mono text-indigo-300">com.example</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Min Android:</span>
+                                <span>API 26 (Android 8.0+)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Architecture:</span>
+                                <span>Universal (arm64, x86_64)</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">OTA Channel:</span>
+                                <span class="text-emerald-400 font-semibold">Vercel Auto-Sync</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Features Grid -->
+        <section class="mt-20 pt-12 border-t border-slate-800">
+            <h3 class="text-xl font-bold text-white text-center mb-8">What's Packed Inside CampusLife</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <div class="p-6 rounded-2xl bg-slate-800/40 border border-slate-700/60 hover:border-slate-600 transition">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-lg mb-4">
+                        📊
+                    </div>
+                    <h4 class="font-bold text-white text-base mb-1">Attendance % & Safe Bunks</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        Track statutory 75% thresholds, log +Present and +Missed with 1-tap, and calculate safe bunks before exams.
+                    </p>
+                </div>
+
+                <div class="p-6 rounded-2xl bg-slate-800/40 border border-slate-700/60 hover:border-slate-600 transition">
+                    <div class="w-10 h-10 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center font-bold text-lg mb-4">
+                        🗓️
+                    </div>
+                    <h4 class="font-bold text-white text-base mb-1">Class Schedules & Deadlines</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        Room SQLite backed daily timetable, room locations, assignment deadlines, and notification alarm triggers.
+                    </p>
+                </div>
+
+                <div class="p-6 rounded-2xl bg-slate-800/40 border border-slate-700/60 hover:border-slate-600 transition">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-lg mb-4">
+                        💬
+                    </div>
+                    <h4 class="font-bold text-white text-base mb-1">Peer Study Feed & Career</h4>
+                    <p class="text-xs text-slate-400 leading-relaxed">
+                        Ask study questions, share revision tips with upvotes, and track internship deadlines via high-importance channels.
+                    </p>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 bg-slate-900/60 py-6 text-center text-xs text-slate-500">
+        <div class="max-w-6xl mx-auto px-4">
+            <p>CampusLife Android APK Distribution Hub • Hosted seamlessly on Vercel • Automated via GitHub Actions</p>
+        </div>
+    </footer>
+
+    <script>
+        // Update QR code to current domain
+        try {
+            const currentOrigin = window.location.origin;
+            const apkUrl = encodeURIComponent(currentOrigin + '/CampusLife.apk');
+            const qrImg = document.getElementById('qrCodeImg');
+            if (qrImg) {
+                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + apkUrl;
+            }
+        } catch (e) {}
+    </script>
+</body>
+</html>
