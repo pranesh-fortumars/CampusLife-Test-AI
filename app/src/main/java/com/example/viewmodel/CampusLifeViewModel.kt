@@ -759,6 +759,14 @@ class CampusLifeViewModel(
         logAttendance(subjectCode, type, note = "Quick log")
     }
 
+    fun logClassAttended(subjectCode: String) {
+        quickLogClass(subjectCode, true)
+    }
+
+    fun logClassMissed(subjectCode: String) {
+        quickLogClass(subjectCode, false)
+    }
+
     /**
      * Undo last attendance log for subject
      */

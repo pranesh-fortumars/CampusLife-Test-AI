@@ -706,7 +706,7 @@ class CampusLifeUnitTest {
         // Toggle completion status
         val completedProj = project.toggleCompleted()
         assertTrue(completedProj.isCompleted)
-        assertEquals("COMPLETED", completedProj.status)
+        assertEquals("DONE", completedProj.status)
         assertEquals(5, completedProj.milestonesCompleted)
         assertEquals(100, completedProj.progressPercentage)
 
@@ -1718,6 +1718,99 @@ class CampusLifeUnitTest {
 
         val withAnswer = upvoted.copy(answersCount = upvoted.answersCount + 1)
         assertEquals(1, withAnswer.answersCount)
+    }
+
+    @Test
+    fun testStudentScheduleAndDeadlineEntityScheduleType() {
+        val schedule = com.example.data.local.StudentScheduleAndDeadlineEntity(
+            id = "s-101",
+            title = "Database Systems Lecture",
+            courseCode = "CS-302",
+            courseName = "DBMS",
+            itemType = "SCHEDULE",
+            dayOfWeek = "MON",
+            timeSlot = "09:00 AM - 10:15 AM",
+            roomOrLocation = "LH-102"
+        )
+
+        assertTrue(schedule.isSchedule)
+        assertFalse(schedule.isDeadline)
+        assertEquals("MON", schedule.dayOfWeek)
+        assertEquals("Class • MON", schedule.getUrgencyLabel())
+        assertEquals("LH-102", schedule.roomOrLocation)
+    }
+
+    @Test
+    fun testStudentScheduleAndDeadlineEntityUrgencyLabels() {
+        val now = 1700000000000L
+        val day = 86400000L
+
+        val deadline = com.example.data.local.StudentScheduleAndDeadlineEntity(
+            id = "d-201",
+            title = "Operating Systems Lab Exam",
+            courseCode = "CS-304",
+            courseName = "Operating Systems",
+            itemType = "DEADLINE",
+            dueDateString = "Nov 15, 2026",
+            dueTimestamp = now + (5 * day),
+            isCompleted = false
+        )
+
+        assertTrue(deadline.isDeadline)
+        assertFalse(deadline.isSchedule)
+        assertEquals(5L, deadline.getDaysRemaining(now))
+        assertEquals("5 days left", deadline.getUrgencyLabel(now))
+
+        // Due today
+        val dueToday = deadline.copy(dueTimestamp = now + (3 * 3600000L))
+        assertEquals("Due Today!", dueToday.getUrgencyLabel(now))
+
+        // Due tomorrow
+        val dueTomorrow = deadline.copy(dueTimestamp = now + day + 1000L)
+        assertEquals("Due Tomorrow", dueTomorrow.getUrgencyLabel(now))
+
+        // Overdue
+        val overdue = deadline.copy(dueTimestamp = now - (2 * day))
+        assertEquals("Overdue", overdue.getUrgencyLabel(now))
+
+        // Completed
+        val completed = deadline.copy(isCompleted = true)
+        assertEquals("Completed ✓", completed.getUrgencyLabel(now))
+    }
+
+    @Test
+    fun testAttendanceLoggingRecalculation() {
+        val subject = Subject(
+            code = "CS-302",
+            name = "DBMS",
+            credits = 4,
+            faculty = "Dr. Roy",
+            attendedClasses = 20,
+            totalClasses = 25
+        )
+        // 20/25 = 80.0%
+        assertEquals(80.0, subject.attendancePercentage, 0.01)
+        assertTrue(subject.attendancePercentage >= 75.0)
+
+        // Student logs 1 class missed -> 20 / 26 = 76.92%
+        val afterMiss = subject.copy(
+            attendedClasses = subject.attendedClasses,
+            totalClasses = subject.totalClasses + 1
+        )
+        assertEquals(26, afterMiss.totalClasses)
+        assertEquals(20, afterMiss.attendedClasses)
+        assertEquals(6, afterMiss.missedClasses)
+        assertEquals(76.92, afterMiss.attendancePercentage, 0.01)
+
+        // Student logs 1 class attended -> 21 / 27 = 77.77%
+        val afterAttend = afterMiss.copy(
+            attendedClasses = afterMiss.attendedClasses + 1,
+            totalClasses = afterMiss.totalClasses + 1
+        )
+        assertEquals(27, afterAttend.totalClasses)
+        assertEquals(21, afterAttend.attendedClasses)
+        assertEquals(6, afterAttend.missedClasses)
+        assertEquals(77.77, afterAttend.attendancePercentage, 0.01)
     }
 }
 

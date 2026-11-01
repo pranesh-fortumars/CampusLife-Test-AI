@@ -20,9 +20,10 @@ import androidx.room.RoomDatabase
         CourseScheduleEntity::class,
         ProjectFocusSessionEntity::class,
         CareerEventEntity::class,
-        CommunityPostEntity::class
+        CommunityPostEntity::class,
+        StudentScheduleAndDeadlineEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun projectFocusSessionDao(): ProjectFocusSessionDao
     abstract fun careerEventDao(): CareerEventDao
     abstract fun communityPostDao(): CommunityPostDao
+    abstract fun studentScheduleAndDeadlineDao(): StudentScheduleAndDeadlineDao
 
     companion object {
         const val DATABASE_NAME = "campuslife_db"
@@ -130,6 +132,13 @@ abstract class AppDatabase : RoomDatabase() {
         fun provideCommunityPostDao(context: Context): CommunityPostDao {
             return getDatabase(context).communityPostDao()
         }
+
+        /**
+         * Singleton provider function that supplies the StudentScheduleAndDeadlineDao directly.
+         */
+        fun provideStudentScheduleAndDeadlineDao(context: Context): StudentScheduleAndDeadlineDao {
+            return getDatabase(context).studentScheduleAndDeadlineDao()
+        }
     }
 }
 
@@ -152,4 +161,5 @@ object DatabaseProvider {
     fun provideProjectFocusSessionDao(context: Context): ProjectFocusSessionDao = AppDatabase.provideProjectFocusSessionDao(context)
     fun provideCareerEventDao(context: Context): CareerEventDao = AppDatabase.provideCareerEventDao(context)
     fun provideCommunityPostDao(context: Context): CommunityPostDao = AppDatabase.provideCommunityPostDao(context)
+    fun provideStudentScheduleAndDeadlineDao(context: Context): StudentScheduleAndDeadlineDao = AppDatabase.provideStudentScheduleAndDeadlineDao(context)
 }
