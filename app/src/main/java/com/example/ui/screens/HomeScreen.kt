@@ -231,7 +231,7 @@ fun HomeScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     CategoryTile(
                         title = "Courses",
@@ -245,7 +245,7 @@ fun HomeScreen(
                         }
                     )
                     CategoryTile(
-                        title = "Notes & Files",
+                        title = "Notes",
                         icon = Icons.Default.FolderOpen,
                         color = EmeraldTertiary,
                         containerColor = EmeraldTertiaryContainer,
@@ -266,9 +266,46 @@ fun HomeScreen(
                             onNavigateToSearch()
                         }
                     )
+                    CategoryTile(
+                        title = "Exams & Cal",
+                        icon = Icons.Default.Event,
+                        color = Color(0xFFBE123C),
+                        containerColor = Color(0xFFFFF1F2),
+                        modifier = Modifier.weight(1f),
+                        onClick = onNavigateToSchedule
+                    )
                 }
             }
         }
+
+        // Upcoming Academic Milestones & Exam Schedules Preview
+        item {
+            val calendarEvents by viewModel.calendarEvents.collectAsState()
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Exams & Semester Dates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onNavigateToSchedule) {
+                        Text("View All", fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                calendarEvents.take(2).forEach { event ->
+                    com.example.ui.components.AcademicCalendarEventCard(
+                        event = event,
+                        onToggleReminder = { viewModel.toggleEventReminder(event) },
+                        onDelete = { viewModel.deleteAcademicEvent(event) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+
 
         // Today's Timetable Section
         item {

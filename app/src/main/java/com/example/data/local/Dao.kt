@@ -101,3 +101,34 @@ interface TaskDao {
     @Query("SELECT COUNT(*) FROM tasks")
     suspend fun getCount(): Int
 }
+
+@Dao
+interface AcademicCalendarDao {
+    @Query("SELECT * FROM academic_calendar_events ORDER BY daysRemaining ASC, id ASC")
+    fun getAllEvents(): Flow<List<AcademicCalendarEventEntity>>
+
+    @Query("SELECT * FROM academic_calendar_events WHERE type = :type ORDER BY daysRemaining ASC, id ASC")
+    fun getEventsByType(type: String): Flow<List<AcademicCalendarEventEntity>>
+
+    @Query("SELECT * FROM academic_calendar_events WHERE title LIKE '%' || :query || '%' OR description LIKE '%' || :query || '%' OR type LIKE '%' || :query || '%' OR locationOrVenue LIKE '%' || :query || '%' ORDER BY daysRemaining ASC")
+    fun searchEvents(query: String): Flow<List<AcademicCalendarEventEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvent(event: AcademicCalendarEventEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllEvents(events: List<AcademicCalendarEventEntity>)
+
+    @Update
+    suspend fun updateEvent(event: AcademicCalendarEventEntity)
+
+    @Delete
+    suspend fun deleteEvent(event: AcademicCalendarEventEntity)
+
+    @Query("UPDATE academic_calendar_events SET isReminderSet = :isReminderSet WHERE id = :id")
+    suspend fun updateReminder(id: Long, isReminderSet: Boolean)
+
+    @Query("SELECT COUNT(*) FROM academic_calendar_events")
+    suspend fun getCount(): Int
+}
+

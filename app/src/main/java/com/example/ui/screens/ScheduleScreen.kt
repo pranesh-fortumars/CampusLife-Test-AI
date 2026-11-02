@@ -22,8 +22,7 @@ import com.example.viewmodel.CampusLifeViewModel
 @Composable
 fun ScheduleScreen(viewModel: CampusLifeViewModel) {
     val courses by viewModel.courses.collectAsState()
-
-    var showAddDialog by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -31,39 +30,83 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 2.dp
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text(
-                            "Class Schedule & Rooms",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                "Academics & Schedule",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Timetables, exam schedules & holiday reminders",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.testTag("schedule_tabs")
+                    ) {
+                        Tab(
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0 },
+                            text = { Text("Timetable & Bunks", fontWeight = FontWeight.SemiBold) },
+                            icon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.testTag("tab_timetable")
                         )
-                        Text(
-                            "Timetable & Statutory 75% Attendance",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Tab(
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1 },
+                            text = { Text("Calendar & Exams", fontWeight = FontWeight.SemiBold) },
+                            icon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.testTag("tab_academic_calendar")
                         )
                     }
                 }
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-                .testTag("schedule_screen"),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        if (selectedTab == 1) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background)
+                    .testTag("academic_calendar_tab_view"),
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                item {
+                    com.example.ui.components.AcademicCalendarComponent(
+                        viewModel = viewModel
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background)
+                    .testTag("schedule_screen"),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+
             // Overview banner
             item {
                 Card(

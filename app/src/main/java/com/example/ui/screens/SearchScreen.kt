@@ -42,9 +42,11 @@ fun SearchScreen(
     val materials by viewModel.materials.collectAsState()
     val posts by viewModel.posts.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
+    val calendarEvents by viewModel.calendarEvents.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
 
     var showAttendanceDialogForCourse by remember { mutableStateOf<CourseEntity?>(null) }
+
 
     Scaffold(
         topBar = {
@@ -143,7 +145,9 @@ fun SearchScreen(
                                 SearchCategory.MATERIALS -> summary.materialsCount
                                 SearchCategory.POSTS -> summary.postsCount
                                 SearchCategory.TASKS -> summary.tasksCount
+                                SearchCategory.CALENDAR -> summary.calendarCount
                             }
+
                             val isSelected = selectedCategory == category
 
                             FilterChip(
@@ -410,8 +414,28 @@ fun SearchScreen(
                     )
                 }
             }
+
+            // 5. Academic Calendar, Exam & Holiday Reminders Section
+            if ((selectedCategory == SearchCategory.ALL || selectedCategory == SearchCategory.CALENDAR) && calendarEvents.isNotEmpty()) {
+                item {
+                    SectionHeader(
+                        title = "Semester Dates, Exams & Holidays",
+                        count = calendarEvents.size,
+                        icon = Icons.Default.Event
+                    )
+                }
+
+                items(calendarEvents, key = { "cal_${it.id}" }) { event ->
+                    com.example.ui.components.AcademicCalendarEventCard(
+                        event = event,
+                        onToggleReminder = { viewModel.toggleEventReminder(event) },
+                        onDelete = { viewModel.deleteAcademicEvent(event) }
+                    )
+                }
+            }
         }
     }
+
 
     // Attendance quick log dialog
     showAttendanceDialogForCourse?.let { course ->

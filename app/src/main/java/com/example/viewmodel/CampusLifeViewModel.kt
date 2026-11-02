@@ -22,7 +22,8 @@ enum class SearchCategory(val label: String) {
     COURSES("Courses"),
     MATERIALS("Study Notes"),
     POSTS("Peer Posts"),
-    TASKS("Tasks")
+    TASKS("Tasks"),
+    CALENDAR("Academic Dates")
 }
 
 data class SearchSummary(
@@ -30,7 +31,8 @@ data class SearchSummary(
     val coursesCount: Int,
     val materialsCount: Int,
     val postsCount: Int,
-    val tasksCount: Int
+    val tasksCount: Int,
+    val calendarCount: Int = 0
 )
 
 class CampusLifeViewModel(application: Application) : AndroidViewModel(application) {
@@ -40,6 +42,8 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     private val materialDao = db.studyMaterialDao()
     private val postDao = db.communityPostDao()
     private val taskDao = db.taskDao()
+    private val academicCalendarDao = db.academicCalendarDao()
+
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -130,16 +134,39 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val calendarEvents: StateFlow<List<AcademicCalendarEventEntity>> = _searchQuery
+        .flatMapLatest { query ->
+            if (query.isBlank()) academicCalendarDao.getAllEvents()
+            else academicCalendarDao.searchEvents(query.trim())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _selectedCalendarFilter = MutableStateFlow("ALL")
+    val selectedCalendarFilter: StateFlow<String> = _selectedCalendarFilter.asStateFlow()
+
+    fun setCalendarFilter(filter: String) {
+        _selectedCalendarFilter.value = filter
+    }
+
+    val filteredAcademicEvents: StateFlow<List<AcademicCalendarEventEntity>> = combine(
+        calendarEvents,
+        _selectedCalendarFilter
+    ) { events, filter ->
+        if (filter == "ALL") events else events.filter { it.type == filter }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Combined search summary count
-    val searchSummary: StateFlow<SearchSummary> = combine(courses, materials, posts, tasks) { c, m, p, t ->
+    val searchSummary: StateFlow<SearchSummary> = combine(courses, materials, posts, tasks, calendarEvents) { c, m, p, t, cal ->
         SearchSummary(
-            totalCount = c.size + m.size + p.size + t.size,
+            totalCount = c.size + m.size + p.size + t.size + cal.size,
             coursesCount = c.size,
             materialsCount = m.size,
             postsCount = p.size,
-            tasksCount = t.size
+            tasksCount = t.size,
+            calendarCount = cal.size
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SearchSummary(0, 0, 0, 0, 0))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SearchSummary(0, 0, 0, 0, 0, 0))
 
     // Attendance logging actions
     fun logAttendance(course: CourseEntity, isPresent: Boolean) {
@@ -173,6 +200,44 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    // Academic Calendar Events actions
+    fun toggleEventReminder(event: AcademicCalendarEventEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            academicCalendarDao.updateReminder(event.id, !event.isReminderSet)
+        }
+    }
+
+    fun addAcademicEvent(
+        title: String,
+        type: String,
+        startDate: String,
+        endDate: String,
+        locationOrVenue: String,
+        description: String,
+        daysRemaining: Int
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            academicCalendarDao.insertEvent(
+                AcademicCalendarEventEntity(
+                    title = title,
+                    type = type,
+                    startDate = startDate,
+                    endDate = endDate,
+                    locationOrVenue = locationOrVenue,
+                    description = description,
+                    daysRemaining = daysRemaining,
+                    isReminderSet = false
+                )
+            )
+        }
+    }
+
+    fun deleteAcademicEvent(event: AcademicCalendarEventEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            academicCalendarDao.deleteEvent(event)
+        }
+    }
+
     // Community post actions
     fun upvotePost(post: CommunityPostEntity) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -202,3 +267,4 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 }
+

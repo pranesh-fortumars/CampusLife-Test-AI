@@ -76,3 +76,18 @@ data class TaskEntity(
     val isCompleted: Boolean = false,
     val details: String = ""
 )
+
+@Entity(tableName = "academic_calendar_events")
+data class AcademicCalendarEventEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val title: String,
+    val type: String, // SEMESTER, EXAM, HOLIDAY, DEADLINE
+    val startDate: String,
+    val endDate: String = "",
+    val daysRemaining: Int = 0,
+    val locationOrVenue: String = "Campus-Wide",
+    val description: String = "",
+    val isReminderSet: Boolean = false
+)
+

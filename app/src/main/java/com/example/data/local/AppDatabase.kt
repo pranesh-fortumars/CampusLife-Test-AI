@@ -14,9 +14,10 @@ import kotlinx.coroutines.launch
         CourseEntity::class,
         StudyMaterialEntity::class,
         CommunityPostEntity::class,
-        TaskEntity::class
+        TaskEntity::class,
+        AcademicCalendarEventEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,6 +25,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun studyMaterialDao(): StudyMaterialDao
     abstract fun communityPostDao(): CommunityPostDao
     abstract fun taskDao(): TaskDao
+    abstract fun academicCalendarDao(): AcademicCalendarDao
+
 
     companion object {
         @Volatile
@@ -252,5 +255,92 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
         }
+
+        if (academicCalendarDao().getCount() == 0) {
+            academicCalendarDao().insertAllEvents(
+                listOf(
+                    AcademicCalendarEventEntity(
+                        title = "Midterm Examination Week",
+                        type = "EXAM",
+                        startDate = "Nov 18, 2026",
+                        endDate = "Nov 25, 2026",
+                        daysRemaining = 16,
+                        locationOrVenue = "Main Exam Halls A & B",
+                        description = "Formal mid-semester examinations across CS, Math, and Physics departments.",
+                        isReminderSet = true
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Thanksgiving Break & Campus Holiday",
+                        type = "HOLIDAY",
+                        startDate = "Nov 26, 2026",
+                        endDate = "Nov 29, 2026",
+                        daysRemaining = 24,
+                        locationOrVenue = "University-Wide",
+                        description = "No classes or labs. Residence dining hall remains open with holiday hours.",
+                        isReminderSet = true
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Last Day for Course Withdrawal (W Grade)",
+                        type = "DEADLINE",
+                        startDate = "Nov 10, 2026",
+                        daysRemaining = 8,
+                        locationOrVenue = "Academic Registrar Wing",
+                        description = "Final deadline for course dropping with no GPA penalty.",
+                        isReminderSet = false
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Laboratory Practical Exams & Vivas",
+                        type = "EXAM",
+                        startDate = "Dec 04, 2026",
+                        endDate = "Dec 08, 2026",
+                        daysRemaining = 32,
+                        locationOrVenue = "Turing Lab Room 202 & Hardware Lab",
+                        description = "Hands-on programming tests (Data Structures lab and OS kernel exercises).",
+                        isReminderSet = false
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Fall 2026 Final Examination Period",
+                        type = "EXAM",
+                        startDate = "Dec 11, 2026",
+                        endDate = "Dec 22, 2026",
+                        daysRemaining = 39,
+                        locationOrVenue = "Auditorium & Exam Complex",
+                        description = "Comprehensive end-semester finals. Quiet study hours enforced campus-wide.",
+                        isReminderSet = true
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Winter Recess & New Year Break",
+                        type = "HOLIDAY",
+                        startDate = "Dec 23, 2026",
+                        endDate = "Jan 10, 2027",
+                        daysRemaining = 51,
+                        locationOrVenue = "Campus Closed",
+                        description = "Winter recess between Fall and Spring terms.",
+                        isReminderSet = false
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Spring 2027 Semester Commencement",
+                        type = "SEMESTER",
+                        startDate = "Jan 12, 2027",
+                        endDate = "May 08, 2027",
+                        daysRemaining = 71,
+                        locationOrVenue = "Campus-Wide",
+                        description = "Spring semester instructional period begins. Check your schedule on portal.",
+                        isReminderSet = false
+                    ),
+                    AcademicCalendarEventEntity(
+                        title = "Martin Luther King Jr. Day Observance",
+                        type = "HOLIDAY",
+                        startDate = "Jan 18, 2027",
+                        endDate = "Jan 18, 2027",
+                        daysRemaining = 77,
+                        locationOrVenue = "Campus Closed",
+                        description = "University holiday in observance of MLK Day. Classes resume Tuesday.",
+                        isReminderSet = false
+                    )
+                )
+            )
+        }
     }
 }
+
