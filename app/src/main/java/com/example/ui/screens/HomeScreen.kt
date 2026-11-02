@@ -1,10 +1,11 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,698 +15,55 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.components.CourseAttendanceTrackerComponent
-import com.example.ui.components.MainAcademicDashboard
-import com.example.ui.components.UpcomingTasksDashboardComponent
+import com.example.data.local.CourseEntity
 import com.example.ui.theme.*
+import com.example.viewmodel.AppDestination
 import com.example.viewmodel.CampusLifeViewModel
-import com.example.viewmodel.SubScreen
-import java.util.Locale
+import com.example.viewmodel.SearchCategory
 
 @Composable
 fun HomeScreen(
     viewModel: CampusLifeViewModel,
-    onNavigateToTrack: () -> Unit,
-    onOpenCopilot: () -> Unit,
-    onOpenExecutiveDesk: () -> Unit
+    onNavigateToSearch: () -> Unit,
+    onNavigateToSchedule: () -> Unit,
+    onNavigateToCommunity: () -> Unit
 ) {
-    val profile by viewModel.profile.collectAsState()
-    val subjects by viewModel.subjects.collectAsState()
-    val academicTasks by viewModel.academicTasks.collectAsState()
-    val homeTasks by viewModel.homeTaskState.collectAsState()
-    val todayAttended by viewModel.todayAttendanceLogged.collectAsState()
+    val courses by viewModel.courses.collectAsState()
+    val tasks by viewModel.tasks.collectAsState()
 
-    val nextSubject = subjects.find { it.code == "CS-302" } ?: subjects.firstOrNull()
+    val pendingTasks = tasks.filter { !it.isCompleted }
+    val lowAttendanceCourses = courses.filter { it.attendancePercentage < 75.0 }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .testTag("home_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        // 1. Main Academic Dashboard (Greeting, Profile Snapshot & Deadlines Hub)
+        // Hero Header & Quick Search Bar
         item {
-            MainAcademicDashboard(
-                profile = profile,
-                subjects = subjects,
-                tasks = academicTasks,
-                onToggleTaskComplete = { viewModel.toggleAcademicTaskComplete(it) },
-                onAddTask = { title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note ->
-                    viewModel.addAcademicTask(title, subjectCode, subjectName, category, type, dueDate, dueTime, priority, weightage, note)
-                },
-                onDeleteTask = { viewModel.deleteAcademicTask(it) },
-                onNavigateToTrack = onNavigateToTrack
-            )
-        }
-
-        // 2. Main Dashboard Upcoming Tasks Component (Room Database)
-        item {
-            UpcomingTasksDashboardComponent(
-                viewModel = viewModel,
-                onNavigateToTrack = onNavigateToTrack
-            )
-        }
-
-        // 3. Today's Next Class Card (Spotlight Schedule & 1-Tap Attendance Logging)
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .testTag("next_class_card")
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(100),
-                            color = PrimaryContainer
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(Primary)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Starts in 22 mins",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = OnPrimaryContainer
-                                )
-                            }
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh
-                        ) {
-                            Text(
-                                text = "Lecture 2 of 4",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
                             )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Database Management Systems (DBMS)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        )
                     )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Schedule,
-                            contentDescription = null,
-                            tint = Primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "10:30 AM – 11:45 AM",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text("•", color = MaterialTheme.colorScheme.outlineVariant)
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = Primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "CS Lab 304, Block B",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.School,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Dr. Ananya Roy • Dept. of CSE",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    if (nextSubject != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        val isSafe = nextSubject.attendancePercentage >= nextSubject.targetPercentage
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSafe) TertiaryContainer else ErrorContainer,
-                            border = BorderStroke(1.dp, if (isSafe) Tertiary.copy(alpha = 0.25f) else Error.copy(alpha = 0.25f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "Attendance: ${String.format(Locale.US, "%.1f%%", nextSubject.attendancePercentage)} (${nextSubject.attendedClasses}/${nextSubject.totalClasses})",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSafe) OnTertiaryContainer else OnErrorContainer
-                                )
-                                Text(
-                                    if (isSafe) "${nextSubject.safeBunksLeft} safe bunks" else "Needs ${nextSubject.neededToReach75} to 75%",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isSafe) OnTertiaryContainer else OnErrorContainer
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { viewModel.markTodayAttended() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Tertiary,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .testTag("mark_attended_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ Present", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        OutlinedButton(
-                            onClick = { viewModel.markTodayMissed() },
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Error
-                            ),
-                            border = BorderStroke(1.dp, Error.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .testTag("mark_missed_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ Missed", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                viewModel.openSubScreen(SubScreen.COURSE_ATTENDANCE)
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            modifier = Modifier.testTag("open_daily_attendance_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FactCheck,
-                                contentDescription = "Daily Attendance Logger",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Manage Attendance", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        FilledTonalButton(
-                            onClick = {
-                                viewModel.setTrackSubTab("Timetable")
-                                onNavigateToTrack()
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer
-                            ),
-                            modifier = Modifier.testTag("open_timetable_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CalendarMonth,
-                                contentDescription = "Timetable",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. Course Attendance Tracker (Percentages & Progress Bars for each course)
-        item {
-            CourseAttendanceTrackerComponent(
-                subjects = subjects,
-                onQuickAttend = { courseCode ->
-                    viewModel.quickLogClass(courseCode, isAttended = true)
-                },
-                onQuickMiss = { courseCode ->
-                    viewModel.quickLogClass(courseCode, isAttended = false)
-                },
-                onCourseClick = { courseCode ->
-                    val sub = subjects.find { it.code == courseCode }
-                    if (sub != null) {
-                        viewModel.selectSubjectDetail(sub)
-                    } else {
-                        viewModel.setTrackSubTab("Academics")
-                        onNavigateToTrack()
-                    }
-                }
-            )
-        }
-
-        // 4. Smart Student Tools (2x2 Grid)
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Smart Campus Tools",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tool 1: Focus Timer
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.FOCUS_TIMER) },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Timer, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Focus Timer", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Pomodoro & Study", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Tool 2: Attendance Simulator
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                viewModel.setTrackSubTab("Academics")
-                                onNavigateToTrack()
-                            },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(TertiaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Calculate, contentDescription = null, tint = Tertiary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Attendance Sim", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Forecast & Bunks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tool 3: Revision Planner
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.REVISION_PLAN) },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SecondaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.AutoStories, contentDescription = null, tint = Secondary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Revision Plan", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Exam Mastery", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Tool 4: Executive Desk / Copilot
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onOpenExecutiveDesk() },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Badge, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("CR Desk", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Class Notices & Rep", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tool 5: Academic Calendar
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.ACADEMIC_CALENDAR) }
-                            .testTag("home_tool_academic_calendar"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Academic Calendar", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Exams & Deadlines", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Tool 6: GPA Calculator
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.GPA_CALCULATOR) }
-                            .testTag("home_tool_gpa_calculator"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(TertiaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Calculate, contentDescription = null, tint = Tertiary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("GPA Calculator", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("SGPA & CGPA Tracker", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tool 7: Course Schedule Manager
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.COURSE_SCHEDULE) }
-                            .testTag("home_tool_course_schedule"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Schedule, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Schedule Manager", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Rooms & Reminders", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Tool 8: Assignment Tracker
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.TASKS_LIST) }
-                            .testTag("home_tool_assignment_tracker"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SecondaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Assignment, contentDescription = null, tint = Secondary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Assignment Tracker", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Room DB Persistence", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tool 9: Student Projects
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.STUDENT_PROJECTS) }
-                            .testTag("home_tool_student_projects"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Student Projects", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Status & Deadlines (Room)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Tool 10: Attendance Visualizer Chart
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.COURSE_ATTENDANCE) }
-                            .testTag("home_tool_course_attendance_chart"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(TertiaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.BarChart, contentDescription = null, tint = Tertiary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Attendance Charts", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Bar Chart & Safe Bunks", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Tool 11: Career Deadlines & Drives
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.CAREER_EVENTS) }
-                            .testTag("home_tool_career_events"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Career Deadlines", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Alerts & Drives (Room)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-
-                    // Tool 12: Community Study Feed
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { viewModel.openSubScreen(SubScreen.COMMUNITY_FEED) }
-                            .testTag("home_tool_community_feed"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                        border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SecondaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Forum, contentDescription = null, tint = Secondary, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("Study Feed", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text("Questions & Tips (Room)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. Daily Student Routine Checklist
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                modifier = Modifier.fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(20.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    val completedCount = homeTasks.values.count { it }
-                    val totalTasks = 4
-                    val progress = completedCount.toFloat() / totalTasks.toFloat()
-
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -713,188 +71,337 @@ fun HomeScreen(
                     ) {
                         Column {
                             Text(
-                                text = "Today's Routine Checklist",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                "Welcome back, Devon!",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
                             Text(
-                                text = "$completedCount of $totalTasks completed",
+                                "Semester 4 • Computer Science & Eng.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color.White.copy(alpha = 0.85f)
                             )
                         }
-                        Text(
-                            text = "${(progress * 100).toInt()}%",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Primary
-                        )
+
+                        Surface(
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.School,
+                                    contentDescription = "Profile",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LinearProgressIndicator(
-                        progress = { progress },
+                    // Prominent Global Search Bar
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White,
+                        shadowElevation = 4.dp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp)),
-                        color = Primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val tasksList = listOf(
-                        "Attend DBMS Lab & Execute SQL Joins (10:30 AM)",
-                        "Submit OS Process Scheduling Code by 5:00 PM",
-                        "Review Computer Networks Unit 3 Notes",
-                        "GDSC Hackathon Team Sync at Canteen Huddle (4:30 PM)"
-                    )
-
-                    tasksList.forEachIndexed { index, taskText ->
-                        val isChecked = homeTasks[index] ?: false
+                            .height(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onNavigateToSearch() }
+                            .testTag("home_search_bar_trigger")
+                    ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { viewModel.toggleHomeTask(index) }
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Checkbox(
-                                checked = isChecked,
-                                onCheckedChange = { viewModel.toggleHomeTask(index) },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = Primary,
-                                    uncheckedColor = MaterialTheme.colorScheme.outline
-                                ),
-                                modifier = Modifier.size(24.dp)
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = IndigoPrimary,
+                                modifier = Modifier.size(22.dp)
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = taskText,
+                                "Find courses, notes, questions...",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (isChecked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                                textDecoration = if (isChecked) androidx.compose.ui.text.style.TextDecoration.LineThrough else androidx.compose.ui.text.style.TextDecoration.None
+                                color = SlateOnSurfaceVariant,
+                                modifier = Modifier.weight(1f)
                             )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = IndigoPrimaryContainer,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            ) {
+                                Text(
+                                    "Quick Search",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = IndigoOnPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Academic Tasks from Database Quick Access
+        // Campus Buzz Announcements Banner
         item {
             Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { viewModel.openSubScreen(SubScreen.TASKS_LIST) }
-                    .testTag("home_open_tasks_screen_card")
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    Surface(
+                        shape = CircleShape,
+                        color = WarningContainer,
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AssignmentTurnedIn,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Tasks & Assignments List",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "View & manage tasks from Room database",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Campaign, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(22.dp))
                         }
                     }
-                    FilledTonalButton(
-                        onClick = { viewModel.openSubScreen(SubScreen.TASKS_LIST) }
-                    ) {
-                        Text("View List", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Campus Buzz • Midterm Schedule Released", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(
+                            "Engineering block exams begin Nov 18. Library hours extended to 2:00 AM.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
 
-        // 5. Campus Quick Links & Portals
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-                border = BorderStroke(1.dp, OutlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Campus Quick Links",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
+        // Low Attendance Warning Alert if any
+        if (lowAttendanceCourses.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = ErrorContainer)
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val links = listOf(
-                            Triple("ERP Portal", Icons.Default.Language, "Active"),
-                            Triple("LMS Portal", Icons.Default.LaptopMac, "Active"),
-                            Triple("Results", Icons.Default.Grade, "Sem 5"),
-                            Triple("Library", Icons.Default.MenuBook, "0 Due"),
-                            Triple("Wi-Fi", Icons.Default.Wifi, "Connected")
-                        )
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(24.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Attendance Warning (< 75%)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = OnErrorContainer
+                            )
+                            val names = lowAttendanceCourses.joinToString { "${it.code} (${String.format("%.1f", it.attendancePercentage)}%)" }
+                            Text(
+                                "Attend upcoming classes in $names to avoid debarment.",
+                                fontSize = 11.sp,
+                                color = OnErrorContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
-                        links.forEach { (name, icon, status) ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { }
-                                    .padding(horizontal = 4.dp, vertical = 6.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(icon, contentDescription = name, tint = Primary, modifier = Modifier.size(20.dp))
+        // Quick Category Nav Row
+        item {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text("Search by Category", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CategoryTile(
+                        title = "Courses",
+                        icon = Icons.Default.MenuBook,
+                        color = IndigoPrimary,
+                        containerColor = IndigoPrimaryContainer,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            viewModel.selectCategory(SearchCategory.COURSES)
+                            onNavigateToSearch()
+                        }
+                    )
+                    CategoryTile(
+                        title = "Notes & Files",
+                        icon = Icons.Default.FolderOpen,
+                        color = EmeraldTertiary,
+                        containerColor = EmeraldTertiaryContainer,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            viewModel.selectCategory(SearchCategory.MATERIALS)
+                            onNavigateToSearch()
+                        }
+                    )
+                    CategoryTile(
+                        title = "Peer Feed",
+                        icon = Icons.Default.Forum,
+                        color = VioletSecondary,
+                        containerColor = VioletSecondaryContainer,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            viewModel.selectCategory(SearchCategory.POSTS)
+                            onNavigateToSearch()
+                        }
+                    )
+                }
+            }
+        }
+
+        // Today's Timetable Section
+        item {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Today's Classes & Rooms", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onNavigateToSchedule) {
+                        Text("View Timetable", fontSize = 12.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                courses.take(3).forEach { course ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(course.code, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                                    Text("•", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(course.room, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(name, style = MaterialTheme.typography.labelSmall, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                Text(status, style = MaterialTheme.typography.bodySmall, fontSize = 9.sp, color = Tertiary, fontWeight = FontWeight.Bold)
+                                Text(course.name, fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                                Text(course.timeSlot, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (course.attendancePercentage >= 75.0) EmeraldTertiaryContainer else ErrorContainer
+                            ) {
+                                Text(
+                                    text = "${String.format("%.0f", course.attendancePercentage)}%",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = if (course.attendancePercentage >= 75.0) EmeraldOnTertiaryContainer else OnErrorContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
                             }
                         }
                     }
                 }
             }
+        }
+
+        // Pending Deadlines Section
+        item {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Text("Upcoming Deadlines & Tasks", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                pendingTasks.take(3).forEach { task ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Checkbox(
+                                checked = task.isCompleted,
+                                onCheckedChange = { viewModel.toggleTask(task) }
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(task.title, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text("${task.courseCode} • Due ${task.dueDate}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryTile(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    containerColor: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .height(88.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(10.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = containerColor,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
         }
     }
 }

@@ -3,1510 +3,202 @@ package com.example.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.MockData
-import com.example.data.local.AppDatabase
-import com.example.data.local.CourseGradeEntity
-import com.example.data.repository.AttendanceRepository
-import com.example.data.repository.GradeRepository
-import com.example.data.repository.TaskRepository
-import com.example.model.*
-import com.example.worker.EventNotificationHelper
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import com.example.data.local.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 enum class AppDestination(val label: String) {
     HOME("Home"),
-    TRACK("Track"),
+    SEARCH("Search"),
+    SCHEDULE("Schedule"),
     COMMUNITY("Community"),
-    GROWTH("Growth"),
-    ME("Me")
+    ME("Profile")
 }
 
-enum class SubScreen {
-    NONE,
-    FOCUS_TIMER,
-    HACKATHON_PASS,
-    SUBJECT_DETAIL,
-    ID_VERIFICATION,
-    CAMPUS_COPILOT,
-    EXECUTIVE_DESK,
-    REVISION_PLAN,
-    DAILY_ATTENDANCE_LOGGER,
-    COURSE_ATTENDANCE,
-    TASKS_LIST,
-    ACADEMIC_CALENDAR,
-    GPA_CALCULATOR,
-    CAREER_KANBAN,
-    COURSE_SCHEDULE,
-    STUDENT_PROJECTS,
-    COMMUNITY_FEED,
-    CAREER_EVENTS
+enum class SearchCategory(val label: String) {
+    ALL("All"),
+    COURSES("Courses"),
+    MATERIALS("Study Notes"),
+    POSTS("Peer Posts"),
+    TASKS("Tasks")
 }
 
-class CampusLifeViewModel(
-    application: Application,
-    private val repository: AttendanceRepository,
-    private val taskRepository: TaskRepository,
-    private val gradeRepository: GradeRepository,
-    private val projectRepository: com.example.data.repository.AcademicProjectRepository =
-        com.example.data.repository.AcademicProjectRepository(AppDatabase.provideProjectDao(application)),
-    private val calendarRepository: com.example.data.repository.AcademicCalendarRepository =
-        com.example.data.repository.AcademicCalendarRepository(AppDatabase.provideAcademicCalendarDao(application)),
-    private val scheduleRepository: com.example.data.repository.CourseScheduleRepository =
-        com.example.data.repository.CourseScheduleRepository(AppDatabase.provideCourseScheduleDao(application)),
-    private val focusSessionRepository: com.example.data.repository.ProjectFocusSessionRepository =
-        com.example.data.repository.ProjectFocusSessionRepository(
-            AppDatabase.provideProjectFocusSessionDao(application),
-            AppDatabase.provideProjectDao(application)
-        ),
-    private val careerEventRepository: com.example.data.repository.CareerEventRepository =
-        com.example.data.repository.CareerEventRepository(AppDatabase.provideCareerEventDao(application)),
-    private val communityFeedRepository: com.example.data.repository.CommunityFeedRepository =
-        com.example.data.repository.CommunityFeedRepository(AppDatabase.provideCommunityPostDao(application))
-) : AndroidViewModel(application) {
+data class SearchSummary(
+    val totalCount: Int,
+    val coursesCount: Int,
+    val materialsCount: Int,
+    val postsCount: Int,
+    val tasksCount: Int
+)
 
-    constructor(
-        application: Application,
-        repository: AttendanceRepository,
-        taskRepository: TaskRepository
-    ) : this(
-        application,
-        repository,
-        taskRepository,
-        GradeRepository(AppDatabase.getDatabase(application).gradeDao())
-    )
+class CampusLifeViewModel(application: Application) : AndroidViewModel(application) {
 
-    constructor(
-        application: Application,
-        taskDao: com.example.data.local.TaskDao
-    ) : this(
-        application,
-        AttendanceRepository(AppDatabase.provideAttendanceDao(application)),
-        TaskRepository(taskDao),
-        GradeRepository(AppDatabase.provideGradeDao(application))
-    )
-
-    constructor(application: Application) : this(
-        application,
-        AttendanceRepository(AppDatabase.provideAttendanceDao(application)),
-        TaskRepository(AppDatabase.provideTaskDao(application)),
-        GradeRepository(AppDatabase.provideGradeDao(application))
-    )
-
-    companion object {
-        fun provideFactory(application: Application): androidx.lifecycle.ViewModelProvider.Factory =
-            object : androidx.lifecycle.ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                    val db = AppDatabase.getDatabase(application)
-                    return CampusLifeViewModel(
-                        application = application,
-                        repository = AttendanceRepository(db.attendanceDao()),
-                        taskRepository = TaskRepository(db.taskDao()),
-                        gradeRepository = GradeRepository(db.gradeDao())
-                    ) as T
-                }
-            }
-    }
-
-    private val _currentTab = MutableStateFlow(AppDestination.HOME)
-    val currentTab: StateFlow<AppDestination> = _currentTab.asStateFlow()
-
-    private val _subScreen = MutableStateFlow(SubScreen.NONE)
-    val subScreen: StateFlow<SubScreen> = _subScreen.asStateFlow()
-
-    private val _profile = MutableStateFlow(MockData.defaultProfile)
-    val profile: StateFlow<StudentProfile> = _profile.asStateFlow()
-
-    private val _subjects = MutableStateFlow(MockData.initialSubjects)
-    val subjects: StateFlow<List<Subject>> = _subjects.asStateFlow()
-
-    private val _attendanceHistory = MutableStateFlow<List<AttendanceRecord>>(emptyList())
-    val attendanceHistory: StateFlow<List<AttendanceRecord>> = _attendanceHistory.asStateFlow()
-
-    private val _selectedSubject = MutableStateFlow<Subject?>(null)
-    val selectedSubject: StateFlow<Subject?> = _selectedSubject.asStateFlow()
-
-    private val _academicTasks = MutableStateFlow<List<AcademicTask>>(emptyList())
-    val academicTasks: StateFlow<List<AcademicTask>> = _academicTasks.asStateFlow()
-
-    private val _academicProjects = MutableStateFlow<List<com.example.data.local.AcademicProjectEntity>>(emptyList())
-    val academicProjects: StateFlow<List<com.example.data.local.AcademicProjectEntity>> = _academicProjects.asStateFlow()
-
-    private val _projectFocusSessions = MutableStateFlow<List<com.example.data.local.ProjectFocusSessionEntity>>(emptyList())
-    val projectFocusSessions: StateFlow<List<com.example.data.local.ProjectFocusSessionEntity>> = _projectFocusSessions.asStateFlow()
-
-    private val _projectTimeSummaries = MutableStateFlow<List<com.example.data.local.ProjectTimeSpentSummary>>(emptyList())
-    val projectTimeSummaries: StateFlow<List<com.example.data.local.ProjectTimeSpentSummary>> = _projectTimeSummaries.asStateFlow()
-
-    private val _totalFocusMinutesOverall = MutableStateFlow(0)
-    val totalFocusMinutesOverall: StateFlow<Int> = _totalFocusMinutesOverall.asStateFlow()
-
-    private val _selectedProjectForTimer = MutableStateFlow<com.example.data.local.AcademicProjectEntity?>(null)
-    val selectedProjectForTimer: StateFlow<com.example.data.local.AcademicProjectEntity?> = _selectedProjectForTimer.asStateFlow()
-
-    private val _calendarEvents = MutableStateFlow<List<com.example.data.local.AcademicCalendarEventEntity>>(emptyList())
-    val calendarEvents: StateFlow<List<com.example.data.local.AcademicCalendarEventEntity>> = _calendarEvents.asStateFlow()
-
-    private val _courseSchedules = MutableStateFlow<List<ScheduleSlot>>(ScheduleMockData.defaultScheduleSlots)
-    val courseSchedules: StateFlow<List<ScheduleSlot>> = _courseSchedules.asStateFlow()
-
-    private val _assignments = MutableStateFlow(MockData.assignments)
-    val assignments: StateFlow<List<AssignmentItem>> = _assignments.asStateFlow()
-
-    private val _projects = MutableStateFlow(MockData.projects)
-    val projects: StateFlow<List<ProjectItem>> = _projects.asStateFlow()
-
-    private val _societies = MutableStateFlow(MockData.societies)
-    val societies: StateFlow<List<SocietyItem>> = _societies.asStateFlow()
-
-    private val _conversations = MutableStateFlow(MockData.conversations)
-    val conversations: StateFlow<List<ChatConversation>> = _conversations.asStateFlow()
-
-    // Community Events Aggregator State
-    private val _campusEvents = MutableStateFlow(CampusEventMockData.sampleEvents)
-    val campusEvents: StateFlow<List<CampusEvent>> = _campusEvents.asStateFlow()
-
-    // Career & Job Applications Kanban State
-    private val _careerApplications = MutableStateFlow<List<CareerApplication>>(CareerMockData.defaultApplications)
-    val careerApplications: StateFlow<List<CareerApplication>> = _careerApplications.asStateFlow()
-
-    // Upcoming Career Events & Internship Deadlines (Room DB)
-    private val _careerEvents = MutableStateFlow<List<com.example.data.local.CareerEventEntity>>(emptyList())
-    val careerEvents: StateFlow<List<com.example.data.local.CareerEventEntity>> = _careerEvents.asStateFlow()
-
-    // Community Feed Study Questions & Tips (Room DB)
-    private val _communityPosts = MutableStateFlow<List<com.example.data.local.CommunityPostEntity>>(emptyList())
-    val communityPosts: StateFlow<List<com.example.data.local.CommunityPostEntity>> = _communityPosts.asStateFlow()
-
-    // Simulator state
-    private val _simulatorCount = MutableStateFlow(3)
-    val simulatorCount: StateFlow<Int> = _simulatorCount.asStateFlow()
-
-    private val _simulatorSubjectCode = MutableStateFlow("CS-304")
-    val simulatorSubjectCode: StateFlow<String> = _simulatorSubjectCode.asStateFlow()
-
-    // Home Checklist tasks status
-    private val _homeTaskState = MutableStateFlow(mapOf(0 to false, 1 to false, 2 to false))
-    val homeTaskState: StateFlow<Map<Int, Boolean>> = _homeTaskState.asStateFlow()
-
-    // Attendance Logged state
-    private val _todayAttendanceLogged = MutableStateFlow(false)
-    val todayAttendanceLogged: StateFlow<Boolean> = _todayAttendanceLogged.asStateFlow()
-
-    // Track subtabs
-    private val _trackSubTab = MutableStateFlow("Academics") // "Academics", "Timetable", "Assignments", "Exams"
-    val trackSubTab: StateFlow<String> = _trackSubTab.asStateFlow()
-
-    // Feedback message (e.g. for snackbars)
-    private val _userFeedbackMessage = MutableStateFlow<String?>(null)
-    val userFeedbackMessage: StateFlow<String?> = _userFeedbackMessage.asStateFlow()
-
-    // Copilot messages
-    private val _copilotMessages = MutableStateFlow(
-        listOf(
-            CopilotMessage("m-1", true, "What is my plan for this afternoon, and can I afford to skip the 2:45 PM Agile lab?", "12:38 PM"),
-            CopilotMessage("m-2", false, "Here is your afternoon layout:", "12:38 PM", hasLayoutCard = true)
-        )
-    )
-    val copilotMessages: StateFlow<List<CopilotMessage>> = _copilotMessages.asStateFlow()
-
-    // Focus Timer state
-    private val _focusSeconds = MutableStateFlow(38 * 60 + 45)
-    val focusSeconds: StateFlow<Int> = _focusSeconds.asStateFlow()
-    private val _isFocusRunning = MutableStateFlow(true)
-    val isFocusRunning: StateFlow<Boolean> = _isFocusRunning.asStateFlow()
-
-    // Target CGPA simulator
-    private val _simulatedSem6Sgpa = MutableStateFlow(9.20f)
-    val simulatedSem6Sgpa: StateFlow<Float> = _simulatedSem6Sgpa.asStateFlow()
+    private val db = AppDatabase.getInstance(application)
+    private val courseDao = db.courseDao()
+    private val materialDao = db.studyMaterialDao()
+    private val postDao = db.communityPostDao()
+    private val taskDao = db.taskDao()
 
     init {
-        viewModelScope.launch {
-            try {
-                repository.seedInitialDataIfEmpty()
-            } catch (e: Exception) {
-                // In testing environments or when DB is unavailable, keep in-memory mock data
-            }
-
-            launch {
-                try {
-                    repository.subjects.collect { updatedList ->
-                        if (updatedList.isNotEmpty()) {
-                            _subjects.value = updatedList
-                            recalculateOverallAttendance(updatedList)
-
-                            // Keep selected subject in sync
-                            val currentSelected = _selectedSubject.value
-                            if (currentSelected != null) {
-                                _selectedSubject.value = updatedList.find { it.code == currentSelected.code } ?: currentSelected
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Ignore DB collect errors in mock fallback
-                }
-            }
-
-            launch {
-                try {
-                    repository.allRecords.collect { records ->
-                        _attendanceHistory.value = records
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    taskRepository.seedInitialTasksIfEmpty()
-                    com.example.worker.TaskNotificationScheduler.schedulePeriodicTaskReminder(application)
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    taskRepository.allTasks.collect { tasks ->
-                        _academicTasks.value = tasks
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    gradeRepository.seedInitialGradesIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    gradeRepository.allGradeEntities.collect { entities ->
-                        if (entities.isNotEmpty()) {
-                            val grouped = entities.groupBy { it.semesterNumber }
-                            val updatedSemesters = _semesterGrades.value.map { sem ->
-                                val coursesInSem = grouped[sem.semesterNumber]?.map { it.toDomain() }
-                                if (coursesInSem != null && coursesInSem.isNotEmpty()) {
-                                    sem.copy(courses = coursesInSem)
-                                } else sem
-                            }
-                            _semesterGrades.value = updatedSemesters
-                            recalculateCgpa()
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    projectRepository.seedInitialProjectsIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    projectRepository.allProjects.collect { projects ->
-                        _academicProjects.value = projects
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    calendarRepository.seedCalendarIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    calendarRepository.allEvents.collect { events ->
-                        _calendarEvents.value = events
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    scheduleRepository.seedInitialSchedulesIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    scheduleRepository.allSchedules.collect { schedules ->
-                        if (schedules.isNotEmpty()) {
-                            _courseSchedules.value = schedules
-                        }
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    focusSessionRepository.seedInitialSessionsIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    focusSessionRepository.allSessions.collect { sessions ->
-                        _projectFocusSessions.value = sessions
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    focusSessionRepository.projectTimeSummary.collect { summaries ->
-                        _projectTimeSummaries.value = summaries
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    focusSessionRepository.totalMinutesOverall.collect { total ->
-                        _totalFocusMinutesOverall.value = total
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    careerEventRepository.seedInitialCareerEventsIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    careerEventRepository.allEvents.collect { events ->
-                        _careerEvents.value = events
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
-
-            launch {
-                try {
-                    communityFeedRepository.seedInitialCommunityPostsIfEmpty()
-                } catch (e: Exception) {
-                    // Ignore
-                }
-                try {
-                    communityFeedRepository.allPosts.collect { posts ->
-                        _communityPosts.value = posts
-                    }
-                } catch (e: Exception) {
-                    // Ignore
-                }
-            }
+        viewModelScope.launch(Dispatchers.IO) {
+            db.populateInitialData()
         }
     }
 
-    private fun recalculateOverallAttendance(list: List<Subject>) {
-        val totalAttended = list.sumOf { it.attendedClasses }
-        val totalClasses = list.sumOf { it.totalClasses }
-        val overall = if (totalClasses == 0) 100.0 else (totalAttended.toDouble() / totalClasses) * 100.0
-        val rounded = String.format(Locale.US, "%.1f", overall).toDoubleOrNull() ?: overall
+    // Navigation state
+    private val _currentDestination = MutableStateFlow(AppDestination.HOME)
+    val currentDestination: StateFlow<AppDestination> = _currentDestination.asStateFlow()
 
-        _profile.update { it.copy(overallAttendance = rounded) }
+    fun navigateTo(destination: AppDestination) {
+        _currentDestination.value = destination
     }
 
-    // Semester Grades & CGPA state
-    private val _semesterGrades = MutableStateFlow(MockData.initialSemesterGrades)
-    val semesterGrades: StateFlow<List<SemesterGrades>> = _semesterGrades.asStateFlow()
+    // Search query & category
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    fun updateSimulatedSem6Sgpa(value: Float) {
-        _simulatedSem6Sgpa.value = value
+    private val _selectedCategory = MutableStateFlow(SearchCategory.ALL)
+    val selectedCategory: StateFlow<SearchCategory> = _selectedCategory.asStateFlow()
+
+    private val _recentSearches = MutableStateFlow(
+        listOf("Data Structures", "Operating Systems", "Cheat Sheet", "Room 302", "Heap Sort")
+    )
+    val recentSearches: StateFlow<List<String>> = _recentSearches.asStateFlow()
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
     }
 
-    fun updateCourseGrade(semesterNumber: Int, courseCode: String, newGrade: String) {
-        val newPoint = GradeScale.getPoint(newGrade)
-        _semesterGrades.update { list ->
-            list.map { sem ->
-                if (sem.semesterNumber == semesterNumber) {
-                    val updatedCourses = sem.courses.map { c ->
-                        if (c.courseCode == courseCode) {
-                            c.copy(grade = newGrade.uppercase(), gradePoint = newPoint)
-                        } else c
-                    }
-                    sem.copy(courses = updatedCourses)
-                } else sem
-            }
-        }
-        recalculateCgpa()
-        viewModelScope.launch {
-            try {
-                gradeRepository.updateCourseGrade(semesterNumber, courseCode, newGrade)
-            } catch (e: Exception) {
-                // In-memory already updated
-            }
-        }
+    fun clearSearchQuery() {
+        _searchQuery.value = ""
     }
 
-    fun addCourseGrade(semesterNumber: Int, courseGrade: CourseGrade) {
-        _semesterGrades.update { list ->
-            list.map { sem ->
-                if (sem.semesterNumber == semesterNumber) {
-                    sem.copy(courses = sem.courses + courseGrade)
-                } else sem
-            }
-        }
-        recalculateCgpa()
-        viewModelScope.launch {
-            try {
-                gradeRepository.insertGrade(courseGrade, semesterNumber)
-            } catch (e: Exception) {
-                // In-memory already updated
-            }
+    fun selectCategory(category: SearchCategory) {
+        _selectedCategory.value = category
+    }
+
+    fun applyRecentSearch(term: String) {
+        _searchQuery.value = term
+        _currentDestination.value = AppDestination.SEARCH
+    }
+
+    fun addRecentSearch(term: String) {
+        val trimmed = term.trim()
+        if (trimmed.isNotBlank()) {
+            val updated = (_recentSearches.value.filter { it.lowercase() != trimmed.lowercase() }).toMutableList()
+            updated.add(0, trimmed)
+            _recentSearches.value = updated.take(8)
         }
     }
 
-    fun saveSemesterCourseGrades(semesterNumber: Int, courses: List<CourseGrade>) {
-        _semesterGrades.update { list ->
-            var semesterFound = false
-            val updated = list.map { sem ->
-                if (sem.semesterNumber == semesterNumber) {
-                    semesterFound = true
-                    sem.copy(courses = courses)
-                } else sem
-            }
-            if (!semesterFound) {
-                updated + SemesterGrades(
-                    semesterNumber = semesterNumber,
-                    semesterName = "Semester $semesterNumber",
-                    academicYear = "2026-27",
-                    courses = courses,
-                    isCurrentSemester = true
-                )
-            } else updated
+    fun clearRecentSearches() {
+        _recentSearches.value = emptyList()
+    }
+
+    // Reactive data flows
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val courses: StateFlow<List<CourseEntity>> = _searchQuery
+        .flatMapLatest { query ->
+            if (query.isBlank()) courseDao.getAllCourses()
+            else courseDao.searchCourses(query.trim())
         }
-        recalculateCgpa()
-        viewModelScope.launch {
-            try {
-                courses.forEach { course ->
-                    gradeRepository.insertGrade(course, semesterNumber)
-                }
-            } catch (e: Exception) {
-                // In-memory already updated
-            }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val materials: StateFlow<List<StudyMaterialEntity>> = _searchQuery
+        .flatMapLatest { query ->
+            if (query.isBlank()) materialDao.getAllMaterials()
+            else materialDao.searchMaterials(query.trim())
         }
-        _userFeedbackMessage.value = "Saved ${courses.size} courses to Semester $semesterNumber records!"
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun selectProjectForTimer(project: com.example.data.local.AcademicProjectEntity?) {
-        _selectedProjectForTimer.value = project
-    }
-
-    fun openFocusTimerForProject(project: com.example.data.local.AcademicProjectEntity) {
-        _selectedProjectForTimer.value = project
-        _subScreen.value = SubScreen.FOCUS_TIMER
-    }
-
-    fun logProjectFocusSession(
-        projectId: String,
-        projectTitle: String,
-        subjectCode: String = "",
-        durationMinutes: Int,
-        notes: String = "",
-        sessionType: String = "FOCUS"
-    ) {
-        viewModelScope.launch {
-            try {
-                focusSessionRepository.logProjectFocusSession(
-                    projectId = projectId,
-                    projectTitle = projectTitle,
-                    subjectCode = subjectCode,
-                    durationMinutes = durationMinutes,
-                    notes = notes,
-                    sessionType = sessionType
-                )
-                _userFeedbackMessage.value = "Logged ${durationMinutes}m focus session for '$projectTitle'! ⏱️"
-            } catch (e: Exception) {
-                val fallbackSession = com.example.data.local.ProjectFocusSessionEntity(
-                    projectId = projectId,
-                    projectTitle = projectTitle,
-                    subjectCode = subjectCode,
-                    durationMinutes = durationMinutes,
-                    durationSeconds = (durationMinutes * 60).toLong(),
-                    sessionNotes = notes,
-                    sessionType = sessionType
-                )
-                _projectFocusSessions.update { listOf(fallbackSession) + it }
-                _academicProjects.update { list ->
-                    list.map {
-                        if (it.id == projectId) it.copy(totalFocusMinutes = it.totalFocusMinutes + durationMinutes)
-                        else it
-                    }
-                }
-                _userFeedbackMessage.value = "Logged ${durationMinutes}m focus session for '$projectTitle'!"
-            }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val posts: StateFlow<List<CommunityPostEntity>> = _searchQuery
+        .flatMapLatest { query ->
+            if (query.isBlank()) postDao.getAllPosts()
+            else postDao.searchPosts(query.trim())
         }
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun deleteProjectFocusSession(sessionId: String) {
-        viewModelScope.launch {
-            try {
-                focusSessionRepository.deleteSession(sessionId)
-                _userFeedbackMessage.value = "Deleted focus session record"
-            } catch (e: Exception) {
-                _projectFocusSessions.update { list -> list.filter { it.id != sessionId } }
-            }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val tasks: StateFlow<List<TaskEntity>> = _searchQuery
+        .flatMapLatest { query ->
+            if (query.isBlank()) taskDao.getAllTasks()
+            else taskDao.searchTasks(query.trim())
         }
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun logFocusSession(taskId: String?, durationMinutes: Int) {
-        val selectedProj = _selectedProjectForTimer.value
-        if (selectedProj != null) {
-            logProjectFocusSession(
-                projectId = selectedProj.id,
-                projectTitle = selectedProj.title,
-                subjectCode = selectedProj.subjectCode,
-                durationMinutes = durationMinutes,
-                notes = "Focus sprint completed"
+    // Combined search summary count
+    val searchSummary: StateFlow<SearchSummary> = combine(courses, materials, posts, tasks) { c, m, p, t ->
+        SearchSummary(
+            totalCount = c.size + m.size + p.size + t.size,
+            coursesCount = c.size,
+            materialsCount = m.size,
+            postsCount = p.size,
+            tasksCount = t.size
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SearchSummary(0, 0, 0, 0, 0))
+
+    // Attendance logging actions
+    fun logAttendance(course: CourseEntity, isPresent: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val updated = course.copy(
+                attendedClasses = if (isPresent) course.attendedClasses + 1 else course.attendedClasses,
+                totalClasses = course.totalClasses + 1
             )
-            return
+            courseDao.updateCourse(updated)
         }
+    }
 
-        val task = if (taskId != null) _academicTasks.value.find { it.id == taskId } else null
-        val matchedProj = if (task != null) {
-            _academicProjects.value.find { it.subjectCode == task.subjectCode || it.title.contains(task.title, ignoreCase = true) }
-        } else null
+    // Task toggle action
+    fun toggleTask(task: TaskEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskDao.updateTask(task.copy(isCompleted = !task.isCompleted))
+        }
+    }
 
-        if (matchedProj != null) {
-            logProjectFocusSession(
-                projectId = matchedProj.id,
-                projectTitle = matchedProj.title,
-                subjectCode = matchedProj.subjectCode,
-                durationMinutes = durationMinutes,
-                notes = "Session for task: ${task?.title ?: ""}"
-            )
-        } else {
-            val defaultProj = _academicProjects.value.firstOrNull()
-            if (defaultProj != null) {
-                logProjectFocusSession(
-                    projectId = defaultProj.id,
-                    projectTitle = defaultProj.title,
-                    subjectCode = defaultProj.subjectCode,
-                    durationMinutes = durationMinutes,
-                    notes = task?.title ?: "Independent study sprint"
+    fun addTask(title: String, courseCode: String, dueDate: String, priority: String, details: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            taskDao.insertTask(
+                TaskEntity(
+                    title = title,
+                    courseCode = courseCode,
+                    dueDate = dueDate,
+                    priority = priority,
+                    details = details
                 )
-            } else {
-                _userFeedbackMessage.value = "Completed $durationMinutes min Pomodoro study sprint! 🎉"
-            }
+            )
         }
     }
 
-    /**
-     * Add a student-defined class schedule slot with room location, timing, and reminder
-     */
-    fun addCourseSchedule(slot: ScheduleSlot) {
-        viewModelScope.launch {
-            try {
-                scheduleRepository.insertSchedule(slot)
-                _userFeedbackMessage.value = "Added ${slot.courseCode} (${slot.room}) to Schedule!"
-                if (slot.reminderEnabled) {
-                    com.example.worker.ScheduleReminderHelper.createNotificationChannel(getApplication())
-                }
-            } catch (e: Exception) {
-                _courseSchedules.update { it + slot }
-            }
+    // Community post actions
+    fun upvotePost(post: CommunityPostEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            postDao.upvotePost(post.id)
         }
     }
 
-    /**
-     * Delete a class schedule slot
-     */
-    fun deleteCourseSchedule(slotId: String) {
-        viewModelScope.launch {
-            try {
-                scheduleRepository.deleteSchedule(slotId)
-                _userFeedbackMessage.value = "Removed class from schedule"
-            } catch (e: Exception) {
-                _courseSchedules.update { list -> list.filter { it.id != slotId } }
-            }
-        }
-    }
-
-    /**
-     * Toggle or update reminder notification preferences for a scheduled class
-     */
-    fun toggleScheduleReminder(slotId: String, enabled: Boolean, minutesBefore: Int = 15) {
-        viewModelScope.launch {
-            try {
-                scheduleRepository.updateReminder(slotId, enabled, minutesBefore)
-                val status = if (enabled) "Enabled ($minutesBefore min alert)" else "Disabled"
-                _userFeedbackMessage.value = "Schedule reminder $status"
-            } catch (e: Exception) {
-                _courseSchedules.update { list ->
-                    list.map { if (it.id == slotId) it.copy(reminderEnabled = enabled, reminderMinutesBefore = minutesBefore) else it }
-                }
-            }
-        }
-    }
-
-    /**
-     * Posts a test reminder notification for an upcoming lecture/lab to verify alerts
-     */
-    fun testClassScheduleReminder(slot: ScheduleSlot) {
-        val posted = com.example.worker.ScheduleReminderHelper.postClassReminderNotification(
-            context = getApplication(),
-            slot = slot,
-            minutesBefore = slot.reminderMinutesBefore
-        )
-        if (posted) {
-            _userFeedbackMessage.value = "Reminder notification sent for ${slot.courseCode} in ${slot.room}!"
-        } else {
-            _userFeedbackMessage.value = "Scheduled reminder: ${slot.courseCode} at ${slot.timeStart} (${slot.room})"
-        }
-    }
-
-    /**
-     * Mark or unmark attendance for today's session of this schedule slot
-     */
-    fun toggleScheduleAttendedToday(slotId: String) {
-        val slot = _courseSchedules.value.find { it.id == slotId } ?: return
-        val newAttended = !slot.isAttendedToday
-        viewModelScope.launch {
-            try {
-                scheduleRepository.updateAttendedToday(slotId, newAttended)
-                _userFeedbackMessage.value = if (newAttended) "Marked attended for today!" else "Unmarked today's attendance"
-            } catch (e: Exception) {
-                _courseSchedules.update { list ->
-                    list.map { if (it.id == slotId) it.copy(isAttendedToday = newAttended) else it }
-                }
-            }
-        }
-    }
-
-    fun recalculateCgpa() {
-        val summary = AcademicGpaSummary(_semesterGrades.value)
-        val rounded = String.format(Locale.US, "%.2f", summary.cumulativeGpa).toDoubleOrNull() ?: summary.cumulativeGpa
-        _profile.update { it.copy(cgpa = rounded) }
-    }
-
-    fun selectTab(tab: AppDestination) {
-        _currentTab.value = tab
-        _subScreen.value = SubScreen.NONE
-    }
-
-    fun openSubScreen(screen: SubScreen) {
-        _subScreen.value = screen
-    }
-
-    fun closeSubScreen() {
-        _subScreen.value = SubScreen.NONE
-    }
-
-    fun selectSubjectDetail(subject: Subject) {
-        _selectedSubject.value = subject
-        _subScreen.value = SubScreen.SUBJECT_DETAIL
-    }
-
-    fun setTrackSubTab(tab: String) {
-        _trackSubTab.value = tab
-    }
-
-    fun clearFeedbackMessage() {
-        _userFeedbackMessage.value = null
-    }
-
-    /**
-     * Log a class session as Attended, Missed, or Cancelled
-     */
-    fun logAttendance(
-        subjectCode: String,
-        type: AttendanceType,
-        note: String = "",
-        customDate: String? = null,
-        customTime: String? = null
-    ) {
-        viewModelScope.launch {
-            try {
-                repository.logAttendance(subjectCode, type, note, customDate, customTime)
-                val statusText = when (type) {
-                    AttendanceType.ATTENDED -> "Attended (+1)"
-                    AttendanceType.MISSED -> "Missed (+1 Missed)"
-                    AttendanceType.CANCELLED -> "Cancelled"
-                }
-                _userFeedbackMessage.value = "Logged class for $subjectCode: $statusText"
-            } catch (e: Exception) {
-                // Fallback to in-memory state update
-                updateInMemoryAttendance(subjectCode, type, note)
-            }
-        }
-    }
-
-    /**
-     * Quick 1-tap logging of Attended or Missed class
-     */
-    fun quickLogClass(subjectCode: String, isAttended: Boolean) {
-        val type = if (isAttended) AttendanceType.ATTENDED else AttendanceType.MISSED
-        logAttendance(subjectCode, type, note = "Quick log")
-    }
-
-    fun logClassAttended(subjectCode: String) {
-        quickLogClass(subjectCode, true)
-    }
-
-    fun logClassMissed(subjectCode: String) {
-        quickLogClass(subjectCode, false)
-    }
-
-    /**
-     * Undo last attendance log for subject
-     */
-    fun undoLastAttendance(subjectCode: String) {
-        viewModelScope.launch {
-            try {
-                repository.undoLastRecordForSubject(subjectCode)
-                _userFeedbackMessage.value = "Undid last log for $subjectCode"
-            } catch (e: Exception) {
-                _userFeedbackMessage.value = "Undone"
-            }
-        }
-    }
-
-    /**
-     * Direct manual calibration of attended and missed counts
-     */
-    fun updateSubjectCounts(subjectCode: String, attended: Int, missed: Int, targetPercentage: Double? = null) {
-        viewModelScope.launch {
-            try {
-                repository.updateCounts(subjectCode, attended, missed, targetPercentage)
-                _userFeedbackMessage.value = "Updated $subjectCode: $attended attended, $missed missed"
-            } catch (e: Exception) {
-                _subjects.update { list ->
-                    list.map {
-                        if (it.code == subjectCode) {
-                            it.copy(
-                                attendedClasses = attended.coerceAtLeast(0),
-                                totalClasses = (attended + missed).coerceAtLeast(0),
-                                targetPercentage = targetPercentage ?: it.targetPercentage
-                            )
-                        } else it
-                    }
-                }
-                recalculateOverallAttendance(_subjects.value)
-            }
-        }
-    }
-
-    /**
-     * Add a new custom subject to track
-     */
-    fun addNewSubject(
-        code: String,
-        name: String,
-        credits: Int,
-        faculty: String,
-        attended: Int,
-        missed: Int,
-        targetPercentage: Double = 75.0,
-        room: String = "LH-101",
-        nextClassTime: String = "Mon, 10:00 AM"
-    ) {
-        val newSub = Subject(
-            code = code.trim().uppercase(),
-            name = name.trim(),
-            credits = credits,
-            faculty = faculty.trim(),
-            attendedClasses = attended.coerceAtLeast(0),
-            totalClasses = (attended + missed).coerceAtLeast(0),
-            targetPercentage = targetPercentage,
-            room = room,
-            nextClassTime = nextClassTime
-        )
-
-        viewModelScope.launch {
-            try {
-                repository.addSubject(newSub)
-                _userFeedbackMessage.value = "Added subject ${newSub.code}: ${newSub.name}"
-            } catch (e: Exception) {
-                _subjects.update { it + newSub }
-                recalculateOverallAttendance(_subjects.value)
-            }
-        }
-    }
-
-    /**
-     * Delete an enrolled subject
-     */
-    fun deleteSubject(code: String) {
-        viewModelScope.launch {
-            try {
-                repository.deleteSubject(code)
-                _userFeedbackMessage.value = "Deleted subject $code"
-            } catch (e: Exception) {
-                _subjects.update { list -> list.filter { it.code != code } }
-                recalculateOverallAttendance(_subjects.value)
-            }
-        }
-    }
-
-    private fun updateInMemoryAttendance(subjectCode: String, type: AttendanceType, note: String) {
-        _subjects.update { current ->
-            current.map { subject ->
-                if (subject.code == subjectCode) {
-                    val newAttended = when (type) {
-                        AttendanceType.ATTENDED -> subject.attendedClasses + 1
-                        AttendanceType.MISSED -> subject.attendedClasses
-                        AttendanceType.CANCELLED -> subject.attendedClasses
-                    }
-                    val newTotal = when (type) {
-                        AttendanceType.ATTENDED -> subject.totalClasses + 1
-                        AttendanceType.MISSED -> subject.totalClasses + 1
-                        AttendanceType.CANCELLED -> subject.totalClasses
-                    }
-                    subject.copy(attendedClasses = newAttended, totalClasses = newTotal)
-                } else subject
-            }
-        }
-        recalculateOverallAttendance(_subjects.value)
-
-        val newRecord = AttendanceRecord(
-            subjectCode = subjectCode,
-            subjectName = _subjects.value.find { it.code == subjectCode }?.name ?: subjectCode,
-            date = "Today",
-            time = "Just now",
-            type = type,
-            note = note
-        )
-        _attendanceHistory.update { listOf(newRecord) + it }
-    }
-
-    fun incrementSimulator() {
-        if (_simulatorCount.value < 15) {
-            _simulatorCount.update { it + 1 }
-        }
-    }
-
-    fun decrementSimulator() {
-        if (_simulatorCount.value > 1) {
-            _simulatorCount.update { it - 1 }
-        }
-    }
-
-    fun resetSimulator() {
-        _simulatorCount.value = 3
-    }
-
-    fun setSimulatorSubject(code: String) {
-        _simulatorSubjectCode.value = code
-    }
-
-    fun toggleHomeTask(index: Int) {
-        _homeTaskState.update { current ->
-            current.toMutableMap().apply {
-                this[index] = !(this[index] ?: false)
-            }
-        }
-    }
-
-    fun markTodayAttended() {
-        _todayAttendanceLogged.value = true
-        quickLogClass("CS-302", isAttended = true)
-    }
-
-    fun markTodayMissed() {
-        _todayAttendanceLogged.value = true
-        quickLogClass("CS-302", isAttended = false)
-    }
-
-    fun toggleFocusTimer() {
-        _isFocusRunning.update { !it }
-    }
-
-    fun resetFocusTimer() {
-        _focusSeconds.value = 50 * 60
-        _isFocusRunning.value = false
-    }
-
-    fun sendCopilotQuery(prompt: String) {
-        if (prompt.isBlank()) return
-        val userMsg = CopilotMessage(id = "usr-${System.currentTimeMillis()}", isUser = true, text = prompt)
-        _copilotMessages.update { it + userMsg }
-
-        // Generate intelligent contextual response
-        val botMsg = CopilotMessage(
-            id = "bot-${System.currentTimeMillis()}",
-            isUser = false,
-            text = "Analyzing syllabus & attendance logs for '$prompt'...\n\nYour current overall attendance is ${_profile.value.overallAttendance}%. You have safe margins in Software Engineering (+12%) and DBMS (+11%). Tomorrow's Operating Systems lecture at 9:15 AM is critical to stay above the 75% statutory NAAC minimum."
-        )
-        _copilotMessages.update { it + botMsg }
-    }
-
-    fun toggleAssignmentComplete(id: String) {
-        _assignments.update { list ->
-            list.map { if (it.id == id) it.copy(isCompleted = !it.isCompleted) else it }
-        }
-    }
-
-    fun toggleAcademicTaskComplete(id: String) {
-        val currentTask = _academicTasks.value.find { it.id == id } ?: return
-        val newCompleted = !currentTask.isCompleted
-        viewModelScope.launch {
-            try {
-                taskRepository.setTaskCompleted(id, newCompleted)
-                _userFeedbackMessage.value = if (newCompleted) "Completed: ${currentTask.title}" else "Marked pending: ${currentTask.title}"
-            } catch (e: Exception) {
-                _academicTasks.update { list ->
-                    list.map { if (it.id == id) it.copy(isCompleted = newCompleted) else it }
-                }
-            }
-        }
-    }
-
-    fun addAcademicTask(
-        title: String,
-        subjectCode: String,
-        subjectName: String,
-        category: String = "Assignment",
-        type: String = "ASSIGNMENT",
-        dueDate: String = "Tomorrow",
-        dueTime: String = "11:59 PM",
-        priority: String = "HIGH",
-        weightage: String = "15% Weightage",
-        note: String = "",
-        dueTimestamp: Long? = null
-    ) {
-        val calculatedTimestamp = dueTimestamp ?: com.example.ui.components.TaskDateUtils.parseDateStringToEpochMillis(dueDate)
-        val newTask = AcademicTask(
-            title = title,
-            subjectCode = subjectCode,
-            subjectName = subjectName,
-            category = category,
-            type = type,
-            dueDate = dueDate,
-            dueTime = dueTime,
-            priority = priority,
-            weightage = weightage,
-            note = note,
-            dueTimestamp = calculatedTimestamp
-        )
-        viewModelScope.launch {
-            try {
-                taskRepository.insertTask(newTask)
-                _userFeedbackMessage.value = "Saved task '$title' (Due $dueDate) to Room DB"
-                if (priority == "URGENT" || dueDate.contains("Today", ignoreCase = true) || dueDate.contains("Tomorrow", ignoreCase = true)) {
-                    com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(getApplication())
-                }
-            } catch (e: Exception) {
-                _academicTasks.update { listOf(newTask) + it }
-            }
-        }
-    }
-
-    /**
-     * Reschedules an existing task's due date in Room database using the Material Design 3 DatePicker.
-     */
-    fun rescheduleTaskDueDate(taskId: String, newDueDate: String, newTimestamp: Long) {
-        viewModelScope.launch {
-            try {
-                taskRepository.updateTaskDueDate(taskId, newDueDate, newTimestamp)
-                _userFeedbackMessage.value = "Rescheduled task due date to $newDueDate in Room DB"
-            } catch (e: Exception) {
-                _userFeedbackMessage.value = "Updated task due date to $newDueDate"
-            }
-        }
-    }
-
-    fun triggerUpcomingTasksReminder() {
-        com.example.worker.TaskNotificationScheduler.triggerImmediateDueCheck(getApplication())
-        _userFeedbackMessage.value = "WorkManager checking upcoming deadlines..."
-    }
-
-    fun deleteAcademicTask(id: String) {
-        viewModelScope.launch {
-            try {
-                taskRepository.deleteTask(id)
-                _userFeedbackMessage.value = "Deleted deadline"
-            } catch (e: Exception) {
-                _academicTasks.update { list -> list.filter { it.id != id } }
-            }
-        }
-    }
-
-    fun toggleAcademicProjectComplete(id: String) {
-        viewModelScope.launch {
-            try {
-                projectRepository.toggleProjectCompletion(id)
-            } catch (e: Exception) {
-                _academicProjects.update { list ->
-                    list.map { if (it.id == id) it.toggleCompleted() else it }
-                }
-            }
-        }
-    }
-
-    fun updateAcademicProjectStatus(id: String, newStatus: String) {
-        val normalized = com.example.data.local.ProjectStatus.fromString(newStatus)
-        val isDone = normalized == com.example.data.local.ProjectStatus.DONE
-        viewModelScope.launch {
-            try {
-                projectRepository.updateProjectStatus(id, normalized.code, isDone)
-                _userFeedbackMessage.value = "Project moved to ${normalized.displayName}"
-            } catch (e: Exception) {
-                _academicProjects.update { list ->
-                    list.map { if (it.id == id) it.withStatus(normalized) else it }
-                }
-            }
-        }
-    }
-
-    fun updateAcademicProjectDeadline(id: String, deadlineDate: String, dueTimestamp: Long) {
-        viewModelScope.launch {
-            try {
-                projectRepository.updateProjectDeadline(id, deadlineDate, dueTimestamp)
-                _userFeedbackMessage.value = "Updated deadline to $deadlineDate"
-            } catch (e: Exception) {
-                _academicProjects.update { list ->
-                    list.map { if (it.id == id) it.withDeadline(deadlineDate, dueTimestamp) else it }
-                }
-            }
-        }
-    }
-
-    fun deleteAcademicProject(id: String) {
-        viewModelScope.launch {
-            try {
-                projectRepository.deleteProjectById(id)
-                _userFeedbackMessage.value = "Deleted project"
-            } catch (e: Exception) {
-                _academicProjects.update { list -> list.filter { it.id != id } }
-            }
-        }
-    }
-
-    fun addAcademicProject(
-        title: String,
-        subjectCode: String,
-        subjectName: String,
-        description: String,
-        techStack: String = "Kotlin, Jetpack Compose, Room",
-        deadlineDate: String = "Nov 15, 2026",
-        totalMilestones: Int = 4,
-        weightage: String = "25% Capstone Project",
-        githubUrl: String = "",
-        teamMembers: String = "",
-        dueTimestamp: Long = System.currentTimeMillis() + (14 * 86400000L),
-        status: String = "IN_PROGRESS"
-    ) {
-        val normalized = com.example.data.local.ProjectStatus.fromString(status)
-        val isDone = normalized == com.example.data.local.ProjectStatus.DONE
-        val newProj = com.example.data.local.AcademicProjectEntity(
-            title = title,
-            subjectCode = subjectCode,
-            subjectName = subjectName,
-            description = description,
-            techStack = techStack,
-            deadlineDate = deadlineDate,
-            dueTimestamp = dueTimestamp,
-            totalMilestones = totalMilestones,
-            milestonesCompleted = if (isDone) totalMilestones else 0,
-            status = normalized.code,
-            weightage = weightage,
-            githubUrl = githubUrl,
-            teamMembers = teamMembers,
-            isCompleted = isDone
-        )
-        viewModelScope.launch {
-            try {
-                projectRepository.insertProject(newProj)
-                _userFeedbackMessage.value = "Added project: $title"
-            } catch (e: Exception) {
-                _academicProjects.update { it + newProj }
-            }
-        }
-    }
-
-    // Community Events & Seminars Operations
-    fun updateEventRsvp(
-        eventId: String,
-        newStatus: RsvpStatus,
-        context: android.content.Context? = null
-    ) {
-        var updatedEvent: CampusEvent? = null
-        _campusEvents.update { events ->
-            events.map { event ->
-                if (event.id == eventId) {
-                    val wasGoing = event.rsvpStatus == RsvpStatus.GOING
-                    val isGoing = newStatus == RsvpStatus.GOING
-                    val attendeeDelta = when {
-                        !wasGoing && isGoing -> 1
-                        wasGoing && !isGoing -> -1
-                        else -> 0
-                    }
-                    val newCount = (event.attendeeCount + attendeeDelta).coerceAtLeast(0)
-                    val reminderState = if (isGoing) true else event.isReminderSet
-                    val modified = event.copy(
-                        rsvpStatus = newStatus,
-                        attendeeCount = newCount,
-                        isReminderSet = reminderState
-                    )
-                    updatedEvent = modified
-                    modified
-                } else {
-                    event
-                }
-            }
-        }
-
-        val statusText = when (newStatus) {
-            RsvpStatus.GOING -> "RSVP Confirmed: You are attending!"
-            RsvpStatus.INTERESTED -> "Marked as Interested"
-            RsvpStatus.DECLINED -> "RSVP Declined"
-            RsvpStatus.NONE -> "RSVP Cleared"
-        }
-        _userFeedbackMessage.value = statusText
-
-        if (context != null && updatedEvent != null && (newStatus == RsvpStatus.GOING || newStatus == RsvpStatus.INTERESTED)) {
-            EventNotificationHelper.postEventRsvpNotification(context, updatedEvent!!, newStatus)
-        }
-    }
-
-    fun toggleEventReminder(
-        eventId: String,
-        context: android.content.Context? = null
-    ) {
-        var reminderState = false
-        var targetEvent: CampusEvent? = null
-        _campusEvents.update { events ->
-            events.map { event ->
-                if (event.id == eventId) {
-                    val toggled = !event.isReminderSet
-                    reminderState = toggled
-                    val modified = event.copy(isReminderSet = toggled)
-                    targetEvent = modified
-                    modified
-                } else {
-                    event
-                }
-            }
-        }
-        _userFeedbackMessage.value = if (reminderState) "🔔 Reminder notification set (1h before)" else "🔕 Reminder cancelled"
-
-        if (context != null && reminderState && targetEvent != null) {
-            EventNotificationHelper.postUpcomingEventAlert(context, targetEvent!!)
-        }
-    }
-
-    fun addCampusEvent(newEvent: CampusEvent) {
-        _campusEvents.update { listOf(newEvent) + it }
-        _userFeedbackMessage.value = "Published event: ${newEvent.title}"
-    }
-
-    fun testTriggerEventNotification(context: android.content.Context, event: CampusEvent) {
-        val success = EventNotificationHelper.postUpcomingEventAlert(context, event)
-        _userFeedbackMessage.value = if (success) "Sent notification for ${event.title}" else "Notification posted (check status bar)"
-    }
-
-    // Academic Calendar Operations
-    fun toggleCalendarEventCompleted(id: String) {
-        val event = _calendarEvents.value.find { it.id == id } ?: return
-        val nextCompleted = !event.isCompleted
-        viewModelScope.launch {
-            try {
-                calendarRepository.toggleCompleted(id, nextCompleted)
-                _userFeedbackMessage.value = if (nextCompleted) "Completed: ${event.title}" else "Marked pending: ${event.title}"
-            } catch (e: Exception) {
-                _calendarEvents.update { list ->
-                    list.map { if (it.id == id) it.copy(isCompleted = nextCompleted) else it }
-                }
-            }
-        }
-    }
-
-    fun deleteCalendarEvent(id: String) {
-        val event = _calendarEvents.value.find { it.id == id }
-        viewModelScope.launch {
-            try {
-                calendarRepository.deleteEventById(id)
-                _userFeedbackMessage.value = "Removed calendar deadline: ${event?.title ?: "Event"}"
-            } catch (e: Exception) {
-                _calendarEvents.update { list -> list.filter { it.id != id } }
-            }
-        }
-    }
-
-    fun addCalendarEvent(
-        title: String,
-        courseCode: String,
-        courseName: String,
-        eventType: String,
-        date: String,
-        time: String,
-        timestamp: Long,
-        locationOrRoom: String,
-        weightage: String,
-        description: String = ""
-    ) {
-        val newEvent = com.example.data.local.AcademicCalendarEventEntity(
-            title = title,
-            courseCode = courseCode,
-            courseName = courseName,
-            eventType = eventType,
-            date = date,
-            time = time,
-            timestamp = timestamp,
-            locationOrRoom = locationOrRoom,
-            weightage = weightage,
-            description = description
-        )
-        viewModelScope.launch {
-            try {
-                calendarRepository.insertEvent(newEvent)
-                _userFeedbackMessage.value = "Added to Academic Calendar: $title ($date)"
-            } catch (e: Exception) {
-                _calendarEvents.update { it + newEvent }
-            }
-        }
-    }
-
-    fun rescheduleCalendarEvent(id: String, newDate: String, newTimestamp: Long) {
-        viewModelScope.launch {
-            try {
-                calendarRepository.updateEventDate(id, newDate, newTimestamp)
-                _userFeedbackMessage.value = "Rescheduled event to $newDate"
-            } catch (e: Exception) {
-                _calendarEvents.update { list ->
-                    list.map { if (it.id == id) it.copy(date = newDate, timestamp = newTimestamp) else it }
-                }
-            }
-        }
-    }
-
-    fun deleteCourseGrade(semesterNumber: Int, courseId: String) {
-        _semesterGrades.update { list ->
-            list.map { sem ->
-                if (sem.semesterNumber == semesterNumber) {
-                    sem.copy(courses = sem.courses.filter { it.id != courseId })
-                } else sem
-            }
-        }
-        recalculateCgpa()
-        viewModelScope.launch {
-            try {
-                gradeRepository.deleteGrade(courseId)
-                _userFeedbackMessage.value = "Deleted course grade"
-            } catch (e: Exception) {
-                // In-memory already deleted
-            }
-        }
-    }
-
-    // Career Kanban Board Operations
-    fun moveCareerApplicationStatus(applicationId: String, newStatus: ApplicationStatus) {
-        val app = _careerApplications.value.find { it.id == applicationId } ?: return
-        val oldStatus = app.status
-        _careerApplications.update { list ->
-            list.map { item ->
-                if (item.id == applicationId) {
-                    item.copy(
-                        status = newStatus,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                } else item
-            }
-        }
-        _userFeedbackMessage.value = "Moved ${app.companyName} (${app.roleTitle}): ${oldStatus.displayName} → ${newStatus.displayName} 🎉"
-    }
-
-    fun addCareerApplication(newApplication: CareerApplication) {
-        _careerApplications.update { listOf(newApplication) + it }
-        _userFeedbackMessage.value = "Added ${newApplication.companyName} to ${newApplication.status.displayName} board!"
-    }
-
-    fun deleteCareerApplication(applicationId: String) {
-        val app = _careerApplications.value.find { it.id == applicationId }
-        _careerApplications.update { list -> list.filter { it.id != applicationId } }
-        _userFeedbackMessage.value = "Removed ${app?.companyName ?: "application"} from board"
-    }
-
-    fun updateCareerApplication(updated: CareerApplication) {
-        _careerApplications.update { list ->
-            list.map { if (it.id == updated.id) updated else it }
-        }
-        _userFeedbackMessage.value = "Updated ${updated.companyName} details"
-    }
-
-    // Room Persistent Career Events & Internship Deadlines
-    fun addCareerEvent(
-        title: String,
-        company: String,
-        role: String,
-        eventType: String = "INTERNSHIP_DEADLINE",
-        deadlineDate: String = "Nov 15, 2026",
-        dueTimestamp: Long = System.currentTimeMillis() + (14 * 86400000L),
-        locationOrUrl: String = "",
-        stipendOrPackage: String = "",
-        eligibility: String = "",
-        description: String = "",
-        reminderEnabled: Boolean = true,
-        context: android.content.Context? = null
-    ) {
-        val newEvent = com.example.data.local.CareerEventEntity(
-            title = title,
-            company = company,
-            role = role,
-            eventType = eventType,
-            deadlineDate = deadlineDate,
-            dueTimestamp = dueTimestamp,
-            locationOrUrl = locationOrUrl,
-            stipendOrPackage = stipendOrPackage,
-            eligibility = eligibility,
-            description = description,
-            reminderEnabled = reminderEnabled
-        )
-        viewModelScope.launch {
-            try {
-                careerEventRepository.insertEvent(newEvent)
-                _userFeedbackMessage.value = "Saved deadline: $company ($role)"
-                if (reminderEnabled) {
-                    val appContext = context ?: getApplication()
-                    com.example.worker.CareerNotificationHelper.triggerCareerDeadlineNotification(appContext, newEvent)
-                }
-            } catch (e: Exception) {
-                _careerEvents.update { it + newEvent }
-                _userFeedbackMessage.value = "Saved deadline: $company ($role)"
-            }
-        }
-    }
-
-    fun toggleCareerReminder(eventId: String, context: android.content.Context? = null) {
-        val event = _careerEvents.value.find { it.id == eventId } ?: return
-        val newState = !event.reminderEnabled
-        viewModelScope.launch {
-            try {
-                careerEventRepository.toggleReminder(eventId, newState)
-                if (newState) {
-                    val appContext = context ?: getApplication()
-                    com.example.worker.CareerNotificationHelper.triggerCareerDeadlineNotification(appContext, event)
-                    _userFeedbackMessage.value = "🔔 Notification alert set for ${event.company}!"
-                } else {
-                    _userFeedbackMessage.value = "Disabled reminder for ${event.company}"
-                }
-            } catch (e: Exception) {
-                _careerEvents.update { list ->
-                    list.map { if (it.id == eventId) it.copy(reminderEnabled = newState) else it }
-                }
-            }
-        }
-    }
-
-    fun triggerCareerDeadlineNotification(event: com.example.data.local.CareerEventEntity, context: android.content.Context? = null) {
-        val appContext = context ?: getApplication()
-        val success = com.example.worker.CareerNotificationHelper.triggerCareerDeadlineNotification(appContext, event)
-        if (success) {
-            _userFeedbackMessage.value = "Triggered alert for ${event.company} (${event.deadlineDate}) 🔔"
-        } else {
-            _userFeedbackMessage.value = "Notification sent for ${event.company}"
-        }
-    }
-
-    fun updateCareerEventStatus(eventId: String, status: String) {
-        viewModelScope.launch {
-            try {
-                careerEventRepository.updateStatus(eventId, status)
-                _userFeedbackMessage.value = "Updated event status to $status"
-            } catch (e: Exception) {
-                _careerEvents.update { list ->
-                    list.map { if (it.id == eventId) it.copy(status = status) else it }
-                }
-            }
-        }
-    }
-
-    fun deleteCareerEvent(eventId: String) {
-        viewModelScope.launch {
-            try {
-                careerEventRepository.deleteEvent(eventId)
-                _userFeedbackMessage.value = "Removed career event"
-            } catch (e: Exception) {
-                _careerEvents.update { list -> list.filter { it.id != eventId } }
-            }
-        }
-    }
-
-    // Community Feed Study Questions & Tips operations
-    fun addCommunityPost(
-        authorName: String,
-        authorRole: String,
-        postType: String,
-        title: String,
-        content: String,
-        subjectCode: String = "",
-        subjectName: String = "",
-        tags: String = "#Study"
-    ) {
-        viewModelScope.launch {
-            try {
-                communityFeedRepository.createPost(
-                    authorName = authorName,
-                    authorRole = authorRole,
-                    postType = postType,
+    fun createPost(title: String, content: String, courseCode: String, tag: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            postDao.insertPost(
+                CommunityPostEntity(
+                    author = "You (Student)",
+                    courseCode = courseCode,
                     title = title,
                     content = content,
-                    subjectCode = subjectCode,
-                    subjectName = subjectName,
-                    tags = tags
+                    tag = tag,
+                    timeAgo = "Just now"
                 )
-                val typeLabel = if (postType == "QUESTION") "Question" else "Study Tip"
-                _userFeedbackMessage.value = "Posted study $typeLabel to community feed! 🚀"
-            } catch (e: Exception) {
-                val fallbackPost = com.example.data.local.CommunityPostEntity(
-                    authorName = authorName,
-                    authorRole = authorRole,
-                    postType = postType,
-                    title = title,
-                    content = content,
-                    subjectCode = subjectCode,
-                    subjectName = subjectName,
-                    tags = tags
-                )
-                _communityPosts.update { listOf(fallbackPost) + it }
-                _userFeedbackMessage.value = "Posted to community feed!"
-            }
+            )
         }
     }
 
-    fun upvoteCommunityPost(postId: String) {
-        viewModelScope.launch {
-            try {
-                communityFeedRepository.upvotePost(postId)
-                _userFeedbackMessage.value = "Upvoted study post! 👍"
-            } catch (e: Exception) {
-                _communityPosts.update { list ->
-                    list.map { if (it.id == postId) it.copy(upvotes = it.upvotes + 1) else it }
-                }
-            }
-        }
-    }
-
-    fun deleteCommunityPost(postId: String) {
-        viewModelScope.launch {
-            try {
-                communityFeedRepository.deletePost(postId)
-                _userFeedbackMessage.value = "Deleted post"
-            } catch (e: Exception) {
-                _communityPosts.update { list -> list.filter { it.id != postId } }
-            }
+    // Study material actions
+    fun toggleMaterialDownloaded(material: StudyMaterialEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            materialDao.updateMaterial(material.copy(isDownloaded = !material.isDownloaded))
         }
     }
 }
-
-

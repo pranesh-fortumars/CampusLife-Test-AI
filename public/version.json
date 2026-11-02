@@ -1,10 +1,10 @@
 {
   "versionCode": 2,
-  "versionName": "1.1",
+  "versionName": "1.2",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Latest CampusLife Android release with OTA updates, Class Schedules, Deadlines, Community Feed, and Attendance % logging.",
-  "publishedDate": "2026-11-01",
+  "releaseNotes": "Added Universal Search across Courses, Study Notes & Cheat Sheets, Peer Discussion Feed, and Tasks, with real-time query filtering, category badges, and Safe Bunk tracking.",
+  "publishedDate": "2026-11-02",
   "minSupportedVersion": 1
 }

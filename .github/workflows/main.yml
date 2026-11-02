@@ -53,7 +53,7 @@ jobs:
           "apkUrl": "/CampusLife.apk",
           "downloadUrl": "/CampusLife.apk",
           "appName": "CampusLife",
-          "releaseNotes": "Automated build #$RUN_NUM ($COMMIT_SHA) with updated schedules, attendance tracking, and OTA updates.",
+          "releaseNotes": "Automated build #$RUN_NUM ($COMMIT_SHA) with Universal Search across Courses, Study Notes, Peer Posts, and Timetable.",
           "publishedDate": "$(date -u +%Y-%m-%d)",
           "minSupportedVersion": 1
         }
