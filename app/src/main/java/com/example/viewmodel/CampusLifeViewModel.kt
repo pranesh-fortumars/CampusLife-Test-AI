@@ -44,6 +44,8 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     private val taskDao = db.taskDao()
     private val academicCalendarDao = db.academicCalendarDao()
     private val semesterDao = db.semesterDao()
+    private val studySessionDao = db.studySessionDao()
+
 
 
 
@@ -290,6 +292,46 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             semesterDao.updateSemester(semester)
         }
     }
+
+    // Study Sessions & Pomodoro tracking
+    val studyStatsPerSubject: StateFlow<List<SubjectStudyStats>> = studySessionDao.getStudyStatsPerSubject()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalFocusMinutes: StateFlow<Int> = studySessionDao.getTotalFocusMinutes()
+        .map { it ?: 0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val allStudySessions: StateFlow<List<StudySessionEntity>> = studySessionDao.getAllSessions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun recordStudySession(
+        courseCode: String,
+        subjectName: String,
+        durationMinutes: Int,
+        mode: String,
+        notes: String = ""
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            studySessionDao.insertSession(
+                StudySessionEntity(
+                    courseCode = courseCode,
+                    subjectName = subjectName,
+                    durationMinutes = durationMinutes,
+                    timestampMs = System.currentTimeMillis(),
+                    dateDisplay = "Today",
+                    mode = mode,
+                    notes = notes
+                )
+            )
+        }
+    }
+
+    fun deleteStudySession(session: StudySessionEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            studySessionDao.deleteSession(session)
+        }
+    }
 }
+
 
 

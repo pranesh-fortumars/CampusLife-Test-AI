@@ -178,4 +178,32 @@ interface SemesterDao {
     suspend fun getCount(): Int
 }
 
+@Dao
+interface StudySessionDao {
+    @Query("SELECT * FROM study_sessions ORDER BY timestampMs DESC")
+    fun getAllSessions(): Flow<List<StudySessionEntity>>
+
+    @Query("SELECT courseCode, SUM(durationMinutes) as totalMinutes, COUNT(*) as sessionCount FROM study_sessions GROUP BY courseCode ORDER BY totalMinutes DESC")
+    fun getStudyStatsPerSubject(): Flow<List<SubjectStudyStats>>
+
+    @Query("SELECT SUM(durationMinutes) FROM study_sessions WHERE mode = 'FOCUS'")
+    fun getTotalFocusMinutes(): Flow<Int?>
+
+    @Query("SELECT SUM(durationMinutes) FROM study_sessions WHERE courseCode = :courseCode")
+    fun getStudyMinutesForCourse(courseCode: String): Flow<Int?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSession(session: StudySessionEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllSessions(sessions: List<StudySessionEntity>)
+
+    @Delete
+    suspend fun deleteSession(session: StudySessionEntity)
+
+    @Query("SELECT COUNT(*) FROM study_sessions")
+    suspend fun getCount(): Int
+}
+
+
 

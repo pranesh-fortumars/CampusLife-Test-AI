@@ -65,23 +65,45 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("Timetable & Bunks", fontWeight = FontWeight.SemiBold) },
+                            text = { Text("Timetable", fontWeight = FontWeight.SemiBold) },
                             icon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(18.dp)) },
                             modifier = Modifier.testTag("tab_timetable")
                         )
                         Tab(
                             selected = selectedTab == 1,
                             onClick = { selectedTab = 1 },
-                            text = { Text("Calendar & Exams", fontWeight = FontWeight.SemiBold) },
+                            text = { Text("Exams & Cal", fontWeight = FontWeight.SemiBold) },
                             icon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(18.dp)) },
                             modifier = Modifier.testTag("tab_academic_calendar")
+                        )
+                        Tab(
+                            selected = selectedTab == 2,
+                            onClick = { selectedTab = 2 },
+                            text = { Text("Study Timer", fontWeight = FontWeight.SemiBold) },
+                            icon = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.testTag("tab_study_timer")
                         )
                     }
                 }
             }
         }
     ) { padding ->
-        if (selectedTab == 1) {
+        if (selectedTab == 2) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background)
+                    .testTag("study_timer_tab_view"),
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                item {
+                    com.example.ui.components.PomodoroStudyTimerComponent(
+                        viewModel = viewModel
+                    )
+                }
+            }
+        } else if (selectedTab == 1) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -91,7 +113,6 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                 contentPadding = PaddingValues(16.dp)
             ) {
                 item {
-
                     com.example.ui.components.ExamCountdownComponent(
                         viewModel = viewModel
                     )
@@ -110,6 +131,7 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                 }
             }
         } else {
+
 
             LazyColumn(
                 modifier = Modifier

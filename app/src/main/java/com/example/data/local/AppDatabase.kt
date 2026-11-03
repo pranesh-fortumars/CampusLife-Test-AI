@@ -16,9 +16,10 @@ import kotlinx.coroutines.launch
         CommunityPostEntity::class,
         TaskEntity::class,
         AcademicCalendarEventEntity::class,
-        SemesterEntity::class
+        SemesterEntity::class,
+        StudySessionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,6 +29,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun academicCalendarDao(): AcademicCalendarDao
     abstract fun semesterDao(): SemesterDao
+    abstract fun studySessionDao(): StudySessionDao
+
 
 
 
@@ -409,7 +412,79 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
         }
+
+        if (studySessionDao().getCount() == 0) {
+            val now = System.currentTimeMillis()
+            studySessionDao().insertAllSessions(
+                listOf(
+                    StudySessionEntity(
+                        courseCode = "CS201",
+                        subjectName = "Data Structures & Algorithms",
+                        durationMinutes = 50,
+                        timestampMs = now - (2 * 3600 * 1000),
+                        dateDisplay = "Today",
+                        mode = "FOCUS",
+                        notes = "Binary Search Tree rotations & balance factors"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "CS201",
+                        subjectName = "Data Structures & Algorithms",
+                        durationMinutes = 25,
+                        timestampMs = now - (24 * 3600 * 1000),
+                        dateDisplay = "Yesterday",
+                        mode = "FOCUS",
+                        notes = "Heap sort priority queue implementations"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "MATH204",
+                        subjectName = "Discrete Mathematics",
+                        durationMinutes = 50,
+                        timestampMs = now - (36 * 3600 * 1000),
+                        dateDisplay = "Yesterday",
+                        mode = "FOCUS",
+                        notes = "Combinatorics & recurrence relations proofs"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "MATH204",
+                        subjectName = "Discrete Mathematics",
+                        durationMinutes = 25,
+                        timestampMs = now - (48 * 3600 * 1000),
+                        dateDisplay = "2 days ago",
+                        mode = "FOCUS",
+                        notes = "Euler and Hamiltonian graphs practice"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "CS310",
+                        subjectName = "Operating Systems",
+                        durationMinutes = 50,
+                        timestampMs = now - (52 * 3600 * 1000),
+                        dateDisplay = "2 days ago",
+                        mode = "FOCUS",
+                        notes = "Semaphores & Dining Philosophers problem"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "PHY102",
+                        subjectName = "Applied Electromagnetism",
+                        durationMinutes = 50,
+                        timestampMs = now - (72 * 3600 * 1000),
+                        dateDisplay = "3 days ago",
+                        mode = "FOCUS",
+                        notes = "Poynting vector & Maxwell wave equations"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "ENG215",
+                        subjectName = "Technical Writing",
+                        durationMinutes = 25,
+                        timestampMs = now - (96 * 3600 * 1000),
+                        dateDisplay = "4 days ago",
+                        mode = "FOCUS",
+                        notes = "IEEE reference formatting and abstract refinement"
+                    )
+                )
+            )
+        }
     }
 }
+
 
 

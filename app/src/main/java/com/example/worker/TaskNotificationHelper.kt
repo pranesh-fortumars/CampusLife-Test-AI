@@ -129,4 +129,112 @@ object TaskNotificationHelper {
 
         NotificationManagerCompat.from(context).notify(SUMMARY_NOTIFICATION_ID, notification)
     }
+
+    const val FOCUS_CHANNEL_ID = "pomodoro_focus_channel"
+    private const val FOCUS_NOTIFICATION_ID = 8888
+
+    fun createFocusNotificationChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(
+                FOCUS_CHANNEL_ID,
+                "Pomodoro Study Timer",
+                importance
+            ).apply {
+                description = "Alerts for completed study blocks and break periods"
+                enableLights(true)
+                enableVibration(true)
+                setShowBadge(true)
+            }
+            val notificationManager: NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    fun showFocusSessionFinishedNotification(
+        context: Context,
+        courseCode: String,
+        subjectName: String,
+        durationMinutes: Int
+    ) {
+        createFocusNotificationChannel(context)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            FOCUS_NOTIFICATION_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, FOCUS_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_deadline)
+            .setContentTitle("🎉 Focus Session Complete! ($courseCode)")
+            .setContentText("Awesome job! Logged $durationMinutes mins for $subjectName.")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("Great work! You just completed a $durationMinutes-minute deep focus session on $subjectName ($courseCode).\nTotal study hours have been saved to your academic records. Take a 5-minute break!")
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(0xFF10B981.toInt()) // Emerald
+            .build()
+
+        NotificationManagerCompat.from(context).notify(FOCUS_NOTIFICATION_ID, notification)
+    }
+
+    fun showBreakFinishedNotification(context: Context) {
+        createFocusNotificationChannel(context)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            FOCUS_NOTIFICATION_ID + 1,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, FOCUS_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_deadline)
+            .setContentTitle("⚡ Break Time Over!")
+            .setContentText("Ready for your next study block? Pick your subject and focus.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(0xFF4F46E5.toInt())
+            .build()
+
+        NotificationManagerCompat.from(context).notify(FOCUS_NOTIFICATION_ID + 1, notification)
+    }
 }
+

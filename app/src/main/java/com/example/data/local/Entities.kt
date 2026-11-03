@@ -133,4 +133,27 @@ data class SemesterEntity(
     }
 }
 
+@Entity(tableName = "study_sessions")
+data class StudySessionEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val courseCode: String,
+    val subjectName: String,
+    val durationMinutes: Int,
+    val timestampMs: Long = System.currentTimeMillis(),
+    val dateDisplay: String,
+    val mode: String = "FOCUS", // FOCUS, SHORT_BREAK, LONG_BREAK
+    val notes: String = ""
+)
+
+data class SubjectStudyStats(
+    val courseCode: String,
+    val totalMinutes: Int,
+    val sessionCount: Int
+) {
+    val totalHours: Double
+        get() = totalMinutes / 60.0
+}
+
+
 

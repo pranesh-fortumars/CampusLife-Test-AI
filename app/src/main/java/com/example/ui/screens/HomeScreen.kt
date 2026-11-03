@@ -324,9 +324,17 @@ fun HomeScreen(
             }
         }
 
+        // Pomodoro Study Timer & Subject Hours Tracker
+        item {
+            com.example.ui.components.PomodoroStudyTimerComponent(
+                viewModel = viewModel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
 
         // Today's Timetable Section
         item {
+
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
