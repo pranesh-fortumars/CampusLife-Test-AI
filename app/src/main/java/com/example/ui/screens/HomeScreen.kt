@@ -149,8 +149,26 @@ fun HomeScreen(
             }
         }
 
+        // Current Academic Semester Progress Bar
+        item {
+            com.example.ui.components.SemesterProgressComponent(
+                viewModel = viewModel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+
+        // Next Scheduled Exam Countdown Timer
+        item {
+            com.example.ui.components.ExamCountdownComponent(
+                viewModel = viewModel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                onViewAllExams = onNavigateToSchedule
+            )
+        }
+
         // Campus Buzz Announcements Banner
         item {
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

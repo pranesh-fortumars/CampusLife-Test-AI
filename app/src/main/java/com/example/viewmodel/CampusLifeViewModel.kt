@@ -43,6 +43,8 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     private val postDao = db.communityPostDao()
     private val taskDao = db.taskDao()
     private val academicCalendarDao = db.academicCalendarDao()
+    private val semesterDao = db.semesterDao()
+
 
 
     init {
@@ -266,5 +268,28 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             materialDao.updateMaterial(material.copy(isDownloaded = !material.isDownloaded))
         }
     }
+
+    // Academic Semester & Next Exam flows
+    val currentSemester: StateFlow<SemesterEntity?> = semesterDao.getCurrentSemester()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val allSemesters: StateFlow<List<SemesterEntity>> = semesterDao.getAllSemesters()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val nextScheduledExam: StateFlow<AcademicCalendarEventEntity?> = academicCalendarDao.getNextExam()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun switchCurrentSemester(semesterId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            semesterDao.setCurrentSemester(semesterId)
+        }
+    }
+
+    fun updateSemester(semester: SemesterEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            semesterDao.updateSemester(semester)
+        }
+    }
 }
+
 

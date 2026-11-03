@@ -15,9 +15,10 @@ import kotlinx.coroutines.launch
         StudyMaterialEntity::class,
         CommunityPostEntity::class,
         TaskEntity::class,
-        AcademicCalendarEventEntity::class
+        AcademicCalendarEventEntity::class,
+        SemesterEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -26,6 +27,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun communityPostDao(): CommunityPostDao
     abstract fun taskDao(): TaskDao
     abstract fun academicCalendarDao(): AcademicCalendarDao
+    abstract fun semesterDao(): SemesterDao
+
 
 
     companion object {
@@ -257,6 +260,7 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         if (academicCalendarDao().getCount() == 0) {
+            val now = System.currentTimeMillis()
             academicCalendarDao().insertAllEvents(
                 listOf(
                     AcademicCalendarEventEntity(
@@ -264,7 +268,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "EXAM",
                         startDate = "Nov 18, 2026",
                         endDate = "Nov 25, 2026",
-                        daysRemaining = 16,
+                        daysRemaining = 15,
+                        targetTimestampMs = now + (15L * 24 * 3600 * 1000) + (4 * 3600 * 1000) + (18 * 60 * 1000),
                         locationOrVenue = "Main Exam Halls A & B",
                         description = "Formal mid-semester examinations across CS, Math, and Physics departments.",
                         isReminderSet = true
@@ -274,7 +279,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "HOLIDAY",
                         startDate = "Nov 26, 2026",
                         endDate = "Nov 29, 2026",
-                        daysRemaining = 24,
+                        daysRemaining = 23,
+                        targetTimestampMs = now + (23L * 24 * 3600 * 1000),
                         locationOrVenue = "University-Wide",
                         description = "No classes or labs. Residence dining hall remains open with holiday hours.",
                         isReminderSet = true
@@ -283,7 +289,8 @@ abstract class AppDatabase : RoomDatabase() {
                         title = "Last Day for Course Withdrawal (W Grade)",
                         type = "DEADLINE",
                         startDate = "Nov 10, 2026",
-                        daysRemaining = 8,
+                        daysRemaining = 7,
+                        targetTimestampMs = now + (7L * 24 * 3600 * 1000),
                         locationOrVenue = "Academic Registrar Wing",
                         description = "Final deadline for course dropping with no GPA penalty.",
                         isReminderSet = false
@@ -293,7 +300,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "EXAM",
                         startDate = "Dec 04, 2026",
                         endDate = "Dec 08, 2026",
-                        daysRemaining = 32,
+                        daysRemaining = 31,
+                        targetTimestampMs = now + (31L * 24 * 3600 * 1000),
                         locationOrVenue = "Turing Lab Room 202 & Hardware Lab",
                         description = "Hands-on programming tests (Data Structures lab and OS kernel exercises).",
                         isReminderSet = false
@@ -303,7 +311,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "EXAM",
                         startDate = "Dec 11, 2026",
                         endDate = "Dec 22, 2026",
-                        daysRemaining = 39,
+                        daysRemaining = 38,
+                        targetTimestampMs = now + (38L * 24 * 3600 * 1000),
                         locationOrVenue = "Auditorium & Exam Complex",
                         description = "Comprehensive end-semester finals. Quiet study hours enforced campus-wide.",
                         isReminderSet = true
@@ -313,7 +322,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "HOLIDAY",
                         startDate = "Dec 23, 2026",
                         endDate = "Jan 10, 2027",
-                        daysRemaining = 51,
+                        daysRemaining = 50,
+                        targetTimestampMs = now + (50L * 24 * 3600 * 1000),
                         locationOrVenue = "Campus Closed",
                         description = "Winter recess between Fall and Spring terms.",
                         isReminderSet = false
@@ -323,7 +333,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "SEMESTER",
                         startDate = "Jan 12, 2027",
                         endDate = "May 08, 2027",
-                        daysRemaining = 71,
+                        daysRemaining = 70,
+                        targetTimestampMs = now + (70L * 24 * 3600 * 1000),
                         locationOrVenue = "Campus-Wide",
                         description = "Spring semester instructional period begins. Check your schedule on portal.",
                         isReminderSet = false
@@ -333,7 +344,8 @@ abstract class AppDatabase : RoomDatabase() {
                         type = "HOLIDAY",
                         startDate = "Jan 18, 2027",
                         endDate = "Jan 18, 2027",
-                        daysRemaining = 77,
+                        daysRemaining = 76,
+                        targetTimestampMs = now + (76L * 24 * 3600 * 1000),
                         locationOrVenue = "Campus Closed",
                         description = "University holiday in observance of MLK Day. Classes resume Tuesday.",
                         isReminderSet = false
@@ -341,6 +353,63 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
         }
+
+        if (semesterDao().getCount() == 0) {
+            val now = System.currentTimeMillis()
+            // Fall 2026: Started ~71 days ago, ends in ~45 days (Aug 24 - Dec 18, 2026)
+            val fallStart = now - (71L * 24 * 3600 * 1000)
+            val fallEnd = now + (45L * 24 * 3600 * 1000)
+
+            // Spring 2027: Starts in ~70 days, ends in ~186 days (Jan 12 - May 08, 2027)
+            val springStart = now + (70L * 24 * 3600 * 1000)
+            val springEnd = springStart + (116L * 24 * 3600 * 1000)
+
+            // Spring 2026: Completed
+            val pastSpringStart = now - (295L * 24 * 3600 * 1000)
+            val pastSpringEnd = now - (178L * 24 * 3600 * 1000)
+
+            semesterDao().insertAllSemesters(
+                listOf(
+                    SemesterEntity(
+                        name = "Fall 2026 Semester",
+                        code = "FA26",
+                        academicYear = "2026-2027",
+                        startDate = "Aug 24, 2026",
+                        endDate = "Dec 18, 2026",
+                        startTimestampMs = fallStart,
+                        endTimestampMs = fallEnd,
+                        isCurrent = true,
+                        totalWeeks = 17,
+                        targetGpa = 3.85
+                    ),
+                    SemesterEntity(
+                        name = "Spring 2027 Semester",
+                        code = "SP27",
+                        academicYear = "2026-2027",
+                        startDate = "Jan 12, 2027",
+                        endDate = "May 08, 2027",
+                        startTimestampMs = springStart,
+                        endTimestampMs = springEnd,
+                        isCurrent = false,
+                        totalWeeks = 17,
+                        targetGpa = 3.90
+                    ),
+                    SemesterEntity(
+                        name = "Spring 2026 Semester (Past)",
+                        code = "SP26",
+                        academicYear = "2025-2026",
+                        startDate = "Jan 13, 2026",
+                        endDate = "May 09, 2026",
+                        startTimestampMs = pastSpringStart,
+                        endTimestampMs = pastSpringEnd,
+                        isCurrent = false,
+                        totalWeeks = 17,
+                        targetGpa = 3.75
+                    )
+                )
+            )
+        }
     }
 }
+
 

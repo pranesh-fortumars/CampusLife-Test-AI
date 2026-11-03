@@ -128,7 +128,50 @@ interface AcademicCalendarDao {
     @Query("UPDATE academic_calendar_events SET isReminderSet = :isReminderSet WHERE id = :id")
     suspend fun updateReminder(id: Long, isReminderSet: Boolean)
 
+    @Query("SELECT * FROM academic_calendar_events WHERE type = 'EXAM' AND daysRemaining >= 0 ORDER BY daysRemaining ASC, targetTimestampMs ASC LIMIT 1")
+    fun getNextExam(): Flow<AcademicCalendarEventEntity?>
+
+    @Query("SELECT * FROM academic_calendar_events WHERE type = 'EXAM' ORDER BY daysRemaining ASC, id ASC")
+    fun getAllExams(): Flow<List<AcademicCalendarEventEntity>>
+
     @Query("SELECT COUNT(*) FROM academic_calendar_events")
     suspend fun getCount(): Int
 }
+
+@Dao
+interface SemesterDao {
+    @Query("SELECT * FROM academic_semesters ORDER BY startTimestampMs DESC")
+    fun getAllSemesters(): Flow<List<SemesterEntity>>
+
+    @Query("SELECT * FROM academic_semesters WHERE isCurrent = 1 LIMIT 1")
+    fun getCurrentSemester(): Flow<SemesterEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSemester(semester: SemesterEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllSemesters(semesters: List<SemesterEntity>)
+
+    @Update
+    suspend fun updateSemester(semester: SemesterEntity)
+
+    @Delete
+    suspend fun deleteSemester(semester: SemesterEntity)
+
+    @Query("UPDATE academic_semesters SET isCurrent = 0")
+    suspend fun clearCurrentSemester()
+
+    @Query("UPDATE academic_semesters SET isCurrent = 1 WHERE id = :semesterId")
+    suspend fun markSemesterAsCurrent(semesterId: Long)
+
+    @Transaction
+    suspend fun setCurrentSemester(semesterId: Long) {
+        clearCurrentSemester()
+        markSemesterAsCurrent(semesterId)
+    }
+
+    @Query("SELECT COUNT(*) FROM academic_semesters")
+    suspend fun getCount(): Int
+}
+
 

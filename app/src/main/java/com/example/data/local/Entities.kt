@@ -86,8 +86,51 @@ data class AcademicCalendarEventEntity(
     val startDate: String,
     val endDate: String = "",
     val daysRemaining: Int = 0,
+    val targetTimestampMs: Long = 0L,
     val locationOrVenue: String = "Campus-Wide",
     val description: String = "",
     val isReminderSet: Boolean = false
 )
+
+@Entity(tableName = "academic_semesters")
+data class SemesterEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val name: String, // e.g. "Fall 2026 Semester"
+    val code: String, // e.g. "FA26"
+    val academicYear: String = "2026-2027",
+    val startDate: String, // e.g. "Aug 24, 2026"
+    val endDate: String, // e.g. "Dec 18, 2026"
+    val startTimestampMs: Long,
+    val endTimestampMs: Long,
+    val isCurrent: Boolean = false,
+    val totalWeeks: Int = 17,
+    val targetGpa: Double = 3.8
+) {
+    fun calculateProgress(nowMs: Long = System.currentTimeMillis()): Float {
+        if (endTimestampMs <= startTimestampMs) return 1f
+        if (nowMs <= startTimestampMs) return 0f
+        if (nowMs >= endTimestampMs) return 1f
+        return ((nowMs - startTimestampMs).toFloat() / (endTimestampMs - startTimestampMs).toFloat()).coerceIn(0f, 1f)
+    }
+
+    fun daysElapsed(nowMs: Long = System.currentTimeMillis()): Int {
+        if (nowMs <= startTimestampMs) return 0
+        val diff = (nowMs.coerceAtMost(endTimestampMs) - startTimestampMs)
+        return (diff / (1000 * 60 * 60 * 24)).toInt()
+    }
+
+    fun daysRemaining(nowMs: Long = System.currentTimeMillis()): Int {
+        if (nowMs >= endTimestampMs) return 0
+        val diff = (endTimestampMs - nowMs.coerceAtLeast(startTimestampMs))
+        return (diff / (1000 * 60 * 60 * 24)).toInt()
+    }
+
+    fun currentWeek(nowMs: Long = System.currentTimeMillis()): Int {
+        val days = daysElapsed(nowMs)
+        val week = (days / 7) + 1
+        return week.coerceIn(1, totalWeeks)
+    }
+}
+
 

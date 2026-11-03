@@ -91,12 +91,26 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                 contentPadding = PaddingValues(16.dp)
             ) {
                 item {
+
+                    com.example.ui.components.ExamCountdownComponent(
+                        viewModel = viewModel
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+                item {
+                    com.example.ui.components.SemesterProgressComponent(
+                        viewModel = viewModel
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+                item {
                     com.example.ui.components.AcademicCalendarComponent(
                         viewModel = viewModel
                     )
                 }
             }
         } else {
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
