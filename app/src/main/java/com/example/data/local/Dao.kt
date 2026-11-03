@@ -100,7 +100,11 @@ interface TaskDao {
 
     @Query("SELECT COUNT(*) FROM tasks")
     suspend fun getCount(): Int
+
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 ORDER BY id ASC")
+    suspend fun getPendingTasksList(): List<TaskEntity>
 }
+
 
 @Dao
 interface AcademicCalendarDao {

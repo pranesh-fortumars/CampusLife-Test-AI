@@ -1,6 +1,5 @@
 package com.example.worker
 
-import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -12,27 +11,22 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.MainActivity
+import com.example.R
 import com.example.data.local.TaskEntity
 
-/**
- * Helper class for creating notification channels and building/posting
- * rich local notifications for upcoming academic task deadlines.
- */
 object TaskNotificationHelper {
 
-    const val CHANNEL_ID = "upcoming_tasks_channel"
-    const val NOTIFICATION_ID = 1001
+    const val CHANNEL_ID = "assignment_deadlines_channel"
+    private const val CHANNEL_NAME = "Assignment Deadlines & Tasks"
+    private const val CHANNEL_DESCRIPTION = "Alerts and reminders for upcoming course assignments and homework deadlines"
+    private const val SUMMARY_NOTIFICATION_ID = 9001
 
-    /**
-     * Ensures the Notification Channel is created on Android 8.0+ (API 26+).
-     */
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Upcoming Task Deadlines"
-            val descriptionText = "Alerts and reminders for assignments, exams, and project submissions."
             val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
+            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
+                description = CHANNEL_DESCRIPTION
+                enableLights(true)
                 enableVibration(true)
                 setShowBadge(true)
             }
@@ -42,86 +36,97 @@ object TaskNotificationHelper {
         }
     }
 
-    /**
-     * Checks if the app has permission to post notifications (Android 13+).
-     */
-    fun hasNotificationPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
-
-    /**
-     * Posts a notification summarizing upcoming academic tasks.
-     * Returns true if notification was posted, false if permission missing or list empty.
-     */
-    fun postUpcomingTasksNotification(
-        context: Context,
-        upcomingTasks: List<TaskEntity>
-    ): Boolean {
-        if (upcomingTasks.isEmpty()) return false
-        if (!hasNotificationPermission(context)) return false
-
+    fun showDeadlineAlert(context: Context, task: TaskEntity) {
         createNotificationChannel(context)
 
-        // PendingIntent to launch MainActivity when tapping notification
+        // Permission check for Android 13+ (API 33+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
+        }
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("EXTRA_NAVIGATE_TO", "TASKS")
+            putExtra("EXTRA_TASK_ID", task.id)
         }
+
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            task.id.toInt(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val taskCount = upcomingTasks.size
-        val firstTask = upcomingTasks.first()
-
-        val title = if (taskCount == 1) {
-            "Due Soon: ${firstTask.title}"
-        } else {
-            "$taskCount Academic Tasks Due Soon!"
-        }
-
-        val contentText = if (taskCount == 1) {
-            "${firstTask.subjectCode} • Due ${firstTask.dueDate} at ${firstTask.dueTime} (${firstTask.priority} priority)"
-        } else {
-            "Earliest: ${firstTask.subjectCode} - ${firstTask.title} (${firstTask.dueDate} ${firstTask.dueTime})"
-        }
-
-        val bigText = buildString {
-            append(contentText)
-            if (taskCount > 1) {
-                append("\n\nUpcoming Deadlines:")
-                upcomingTasks.take(5).forEach { task ->
-                    append("\n• ${task.subjectCode}: ${task.title} (Due ${task.dueDate} ${task.dueTime})")
-                }
-            }
+        val priorityLabel = when (task.priority) {
+            "HIGH" -> "🚨 Urgent"
+            "MEDIUM" -> "⚠️ Pending"
+            else -> "📌 Reminder"
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(title)
-            .setContentText(contentText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
+            .setSmallIcon(R.drawable.ic_notification_deadline)
+            .setContentTitle("$priorityLabel: ${task.title}")
+            .setContentText("${task.courseCode} • Due ${task.dueDate}")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("${task.courseCode}: ${task.title}\nDue: ${task.dueDate}\nPriority: ${task.priority}\n\n${task.details.ifBlank { "Don't forget to submit your work before the deadline!" }}")
+            )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(0xFF4F46E5.toInt()) // Indigo theme color
             .build()
 
-        return try {
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
-            true
-        } catch (e: SecurityException) {
-            false
+        NotificationManagerCompat.from(context).notify(task.id.toInt(), notification)
+    }
+
+    fun showUpcomingSummaryAlert(context: Context, pendingCount: Int, primaryTask: TaskEntity) {
+        createNotificationChannel(context)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
         }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("EXTRA_NAVIGATE_TO", "TASKS")
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            SUMMARY_NOTIFICATION_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_deadline)
+            .setContentTitle("⏰ You have $pendingCount pending assignments")
+            .setContentText("Next up: ${primaryTask.title} (${primaryTask.courseCode})")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("You have $pendingCount uncompleted assignments saved in your academic schedule.\nNext deadline: ${primaryTask.title} (${primaryTask.courseCode}) due ${primaryTask.dueDate}.\nTap to view tasks and submit on time.")
+            )
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setColor(0xFF4F46E5.toInt())
+            .build()
+
+        NotificationManagerCompat.from(context).notify(SUMMARY_NOTIFICATION_ID, notification)
     }
 }

@@ -1,10 +1,10 @@
 {
-  "versionCode": 4,
-  "versionName": "1.4",
+  "versionCode": 5,
+  "versionName": "1.5",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Added Academic Semester Room persistence with animated completion progress bar, week-by-week tracking, and a live digital countdown timer component for the next scheduled exam.",
+  "releaseNotes": "Added local notification system using WorkManager to alert students of upcoming assignment deadlines saved in the Room database with high-priority notifications and instant test alerts.",
   "publishedDate": "2026-11-03",
   "minSupportedVersion": 1
 }

@@ -417,10 +417,18 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                // WorkManager Local Notification Engine Status & Test Card
+                Spacer(modifier = Modifier.height(6.dp))
+                com.example.ui.components.DeadlineNotificationCard(
+                    viewModel = viewModel,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
 }
+
 
 @Composable
 fun CategoryTile(

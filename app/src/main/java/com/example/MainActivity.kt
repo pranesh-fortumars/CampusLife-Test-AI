@@ -1,10 +1,14 @@
 package com.example
 
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -12,22 +16,58 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.screens.*
 import com.example.ui.theme.CampusLifeTheme
 import com.example.viewmodel.AppDestination
 import com.example.viewmodel.CampusLifeViewModel
+import com.example.worker.DeadlineWorkScheduler
+import com.example.worker.TaskNotificationHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Initialize WorkManager notification channel and periodic deadline check
+        TaskNotificationHelper.createNotificationChannel(this)
+        DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(this)
+
+        val navigateToTasks = intent?.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
+
         setContent {
             CampusLifeTheme {
+                val context = LocalContext.current
                 val viewModel: CampusLifeViewModel = viewModel()
                 val currentDestination by viewModel.currentDestination.collectAsState()
+
+                // Request POST_NOTIFICATIONS runtime permission on Android 13+
+                val permissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (isGranted) {
+                        DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(context)
+                    }
+                }
+
+                LaunchedEffect(Unit) {
+                    if (navigateToTasks) {
+                        viewModel.navigateTo(AppDestination.SEARCH)
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                }
 
                 // System BackHandler: if on non-Home tab, back returns to Home
                 BackHandler(enabled = currentDestination != AppDestination.HOME) {
