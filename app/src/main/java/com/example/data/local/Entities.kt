@@ -155,5 +155,17 @@ data class SubjectStudyStats(
         get() = totalMinutes / 60.0
 }
 
+data class DayStudyTrend(
+    val dayKey: String, // "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+    val dayLabel: String, // "Monday", etc.
+    val totalMinutes: Int,
+    val sessionCount: Int,
+    val primarySubject: String
+) {
+    val totalHours: Double
+        get() = totalMinutes / 60.0
+}
+
+
 
 

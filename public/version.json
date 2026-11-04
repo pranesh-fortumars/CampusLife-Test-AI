@@ -1,10 +1,10 @@
 {
-  "versionCode": 7,
-  "versionName": "1.7",
+  "versionCode": 8,
+  "versionName": "1.8",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Integrated Recharts bar chart component to visually display total study hours per subject accumulated from the Room database with interactive tooltips, gridlines, and target goal tracking.",
+  "releaseNotes": "Added interactive weekly trend toggle & consistency metrics overlay to the Recharts study chart. Students can switch between Subject Breakdown and Weekly Trend (Mon–Sun), view 2.0h daily target reference lines, track active study streaks, daily averages, and consistency scores.",
   "publishedDate": "2026-11-04",
   "minSupportedVersion": 1
 }

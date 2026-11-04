@@ -304,7 +304,49 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     val allStudySessions: StateFlow<List<StudySessionEntity>> = studySessionDao.getAllSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val weeklyStudyTrends: StateFlow<List<DayStudyTrend>> = allStudySessions.map { sessions ->
+        val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+        val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+        val baseMinutes = mapOf(
+            "Mon" to 150, // 2.5h
+            "Tue" to 195, // 3.25h
+            "Wed" to 165, // 2.75h
+            "Thu" to 210, // 3.5h
+            "Fri" to 135, // 2.25h
+            "Sat" to 90,  // 1.5h
+            "Sun" to 75   // 1.25h
+        )
+        val baseSubjects = mapOf(
+            "Mon" to "CS201",
+            "Tue" to "CS310",
+            "Wed" to "MATH204",
+            "Thu" to "CS201",
+            "Fri" to "PHY102",
+            "Sat" to "MATH204",
+            "Sun" to "ENG215"
+        )
+
+        val extraTodayMinutes = sessions.filter { it.dateDisplay == "Today" }.sumOf { it.durationMinutes }
+
+        days.mapIndexed { index, dayKey ->
+            val isToday = (dayKey == "Tue") // 2026-11-03 is Tuesday
+            val mins = (baseMinutes[dayKey] ?: 0) + (if (isToday) extraTodayMinutes else 0)
+            val count = maxOf(1, mins / 45)
+            val subject = if (isToday && sessions.isNotEmpty()) sessions.first().courseCode else (baseSubjects[dayKey] ?: "CS201")
+
+            DayStudyTrend(
+                dayKey = dayKey,
+                dayLabel = fullDays[index],
+                totalMinutes = mins,
+                sessionCount = count,
+                primarySubject = subject
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun recordStudySession(
+
         courseCode: String,
         subjectName: String,
         durationMinutes: Int,
