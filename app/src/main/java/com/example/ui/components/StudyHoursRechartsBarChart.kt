@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.DayStudyTrend
@@ -56,7 +58,12 @@ fun StudyHoursRechartsBarChart(
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
 
     val subjectGoalHours = 5.0 // Weekly goal per subject
+    val targetThreshold50Pct = subjectGoalHours * 0.5 // 2.5 hours threshold for 50% of target
     val dailyGoalHours = 2.0   // Daily consistency goal
+
+    val subjectsBelow50Pct = remember(studyStats) {
+        studyStats.filter { it.totalHours < targetThreshold50Pct }
+    }
 
     Card(
         modifier = modifier
@@ -167,7 +174,7 @@ fun StudyHoursRechartsBarChart(
                     onClick = { showTargetOverlay = !showTargetOverlay },
                     label = {
                         Text(
-                            if (viewMode == ChartViewMode.WEEKLY_TREND) "Goal (2h/day)" else "Goal (5h)",
+                            if (viewMode == ChartViewMode.WEEKLY_TREND) "Goal (2h/day)" else "Goal (5h/sub)",
                             fontSize = 10.sp
                         )
                     },
@@ -190,37 +197,130 @@ fun StudyHoursRechartsBarChart(
                 )
             }
 
-            // Legend Row
+            // Conditional Alert Indicator Banner for Subjects Below 50% of Goal
+            AnimatedVisibility(
+                visible = viewMode == ChartViewMode.BY_SUBJECT && subjectsBelow50Pct.isNotEmpty(),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = ErrorContainer.copy(alpha = 0.75f),
+                    border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("chart_low_study_alert_banner")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(ErrorRed.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Alert",
+                                    tint = ErrorRed,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Text(
+                                    text = "${subjectsBelow50Pct.size} Subject${if (subjectsBelow50Pct.size > 1) "s" else ""} Below 50% Target (<${String.format("%.1f", targetThreshold50Pct)}h)",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = OnErrorContainer
+                                )
+                                Text(
+                                    text = "Needs attention: ${subjectsBelow50Pct.joinToString(", ") { "${it.courseCode} (${String.format("%.1f", it.totalHours)}h)" }}",
+                                    fontSize = 10.sp,
+                                    color = OnErrorContainer.copy(alpha = 0.85f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = ErrorRed
+                        ) {
+                            Text(
+                                text = "Action Needed",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Legend Row with Conditional Alert Indicator
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Primary Bar Legend
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Box(
                         modifier = Modifier
-                            .size(12.dp)
+                            .size(10.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(IndigoPrimary)
+                            .background(if (viewMode == ChartViewMode.WEEKLY_TREND) EmeraldTertiary else IndigoPrimary)
                     )
                     Text(
-                        if (viewMode == ChartViewMode.WEEKLY_TREND) "Daily Study Hours" else "Subject Hours",
-                        fontSize = 11.sp,
+                        if (viewMode == ChartViewMode.WEEKLY_TREND) "Daily Study" else "≥50% Goal",
+                        fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                if (showTargetOverlay) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Alert Bar Legend for Subject Mode
+                if (viewMode == ChartViewMode.BY_SUBJECT) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Box(
                             modifier = Modifier
-                                .width(16.dp)
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Brush.verticalGradient(listOf(Color(0xFFFB923C), ErrorRed)))
+                        )
+                        Text(
+                            "<50% Alert ⚠️",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = ErrorRed
+                        )
+                    }
+                }
+
+                // Target Reference Lines Legend
+                if (showTargetOverlay) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .width(14.dp)
                                 .height(2.dp)
                                 .background(WarningAmber)
                         )
                         Text(
-                            if (viewMode == ChartViewMode.WEEKLY_TREND) "Daily Target (2.0h)" else "Subject Goal (5.0h)",
-                            fontSize = 11.sp,
+                            if (viewMode == ChartViewMode.WEEKLY_TREND) "2.0h/day" else "5.0h Goal (50% @ 2.5h)",
+                            fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -236,6 +336,8 @@ fun StudyHoursRechartsBarChart(
                 selectedStat?.let { stat ->
                     val courseName = courses.firstOrNull { it.code == stat.courseCode }?.name ?: "Subject Course"
                     val progressPct = ((stat.totalHours / subjectGoalHours) * 100).toInt()
+                    val isBelow50 = stat.totalHours < targetThreshold50Pct
+                    val deficitHours = targetThreshold50Pct - stat.totalHours
 
                     Card(
                         modifier = Modifier
@@ -243,7 +345,10 @@ fun StudyHoursRechartsBarChart(
                             .testTag("recharts_subject_tooltip"),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, IndigoPrimary.copy(alpha = 0.4f))
+                        border = BorderStroke(
+                            1.dp,
+                            if (isBelow50) ErrorRed.copy(alpha = 0.5f) else IndigoPrimary.copy(alpha = 0.4f)
+                        )
                     ) {
                         Row(
                             modifier = Modifier
@@ -254,7 +359,10 @@ fun StudyHoursRechartsBarChart(
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Surface(shape = RoundedCornerShape(4.dp), color = IndigoPrimary) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = if (isBelow50) ErrorRed else IndigoPrimary
+                                    ) {
                                         Text(
                                             stat.courseCode,
                                             fontWeight = FontWeight.Bold,
@@ -278,17 +386,44 @@ fun StudyHoursRechartsBarChart(
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(100),
-                                    color = if (progressPct >= 100) EmeraldTertiaryContainer else WarningContainer
-                                ) {
-                                    Text(
-                                        text = "$progressPct% of Goal",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (progressPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
+                                if (isBelow50) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = ErrorContainer,
+                                        border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f))
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Warning,
+                                                contentDescription = null,
+                                                tint = ErrorRed,
+                                                modifier = Modifier.size(11.dp)
+                                            )
+                                            Text(
+                                                text = "Alert: ${String.format("%.1f", deficitHours)}h below 50%",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = OnErrorContainer
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (progressPct >= 100) EmeraldTertiaryContainer else WarningContainer
+                                    ) {
+                                        Text(
+                                            text = "$progressPct% of Goal",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (progressPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
                                 }
                                 IconButton(onClick = { selectedStat = null }, modifier = Modifier.size(24.dp)) {
                                     Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
@@ -397,7 +532,7 @@ fun StudyHoursRechartsBarChart(
                                 )
                             }
 
-                            // Goal Reference Line
+                            // Goal Reference Line (100% Goal: 5.0h)
                             if (showTargetOverlay) {
                                 val goalY = bottomAxisY - (chartHeight * (subjectGoalHours.toFloat() / maxHoursVal.toFloat()))
                                 if (goalY in topY..bottomAxisY) {
@@ -407,6 +542,18 @@ fun StudyHoursRechartsBarChart(
                                         end = Offset(size.width, goalY),
                                         strokeWidth = 1.5.dp.toPx(),
                                         pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
+                                    )
+                                }
+
+                                // 50% Target Alert Threshold Reference Line (2.5h)
+                                val threshold50Y = bottomAxisY - (chartHeight * (targetThreshold50Pct.toFloat() / maxHoursVal.toFloat()))
+                                if (threshold50Y in topY..bottomAxisY) {
+                                    drawLine(
+                                        color = ErrorRed.copy(alpha = 0.55f),
+                                        start = Offset(0f, threshold50Y),
+                                        end = Offset(size.width, threshold50Y),
+                                        strokeWidth = 1.2.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
                                     )
                                 }
                             }
@@ -422,6 +569,7 @@ fun StudyHoursRechartsBarChart(
                         ) {
                             studyStats.forEach { stat ->
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
+                                val isBelow50 = stat.totalHours < targetThreshold50Pct
                                 val barHeightFraction = (stat.totalHours / maxHoursVal).toFloat().coerceIn(0.04f, 1f)
                                 val animatedHeight by animateFloatAsState(
                                     targetValue = barHeightFraction,
@@ -439,14 +587,46 @@ fun StudyHoursRechartsBarChart(
                                         .clickable { selectedStat = stat }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
+                                    // Conditional Alert Indicator Badge on Bar
+                                    if (isBelow50) {
+                                        Surface(
+                                            shape = RoundedCornerShape(100),
+                                            color = ErrorContainer,
+                                            border = BorderStroke(0.8.dp, ErrorRed.copy(alpha = 0.6f)),
+                                            modifier = Modifier
+                                                .padding(bottom = 2.dp)
+                                                .testTag("alert_indicator_${stat.courseCode}")
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Warning,
+                                                    contentDescription = "Below 50% Target Alert",
+                                                    tint = ErrorRed,
+                                                    modifier = Modifier.size(9.dp)
+                                                )
+                                                Text(
+                                                    text = "<50%",
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = OnErrorContainer
+                                                )
+                                            }
+                                        }
+                                    }
+
                                     Text(
                                         text = "${String.format("%.1f", stat.totalHours)}h",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(bottom = 4.dp)
+                                        color = if (isBelow50) ErrorRed else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(bottom = 3.dp)
                                     )
 
+                                    // Bar with Conditional Alert Gradient
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth(0.6f)
@@ -454,16 +634,27 @@ fun StudyHoursRechartsBarChart(
                                             .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                             .background(
                                                 Brush.verticalGradient(
-                                                    listOf(
-                                                        if (isSelected) VioletSecondary else IndigoPrimary,
-                                                        if (isSelected) IndigoPrimary else Color(0xFF6366F1)
-                                                    )
+                                                    if (isBelow50) {
+                                                        listOf(
+                                                            if (isSelected) Color(0xFFF87171) else Color(0xFFFB923C),
+                                                            if (isSelected) Color(0xFFDC2626) else ErrorRed
+                                                        )
+                                                    } else {
+                                                        listOf(
+                                                            if (isSelected) VioletSecondary else IndigoPrimary,
+                                                            if (isSelected) IndigoPrimary else Color(0xFF6366F1)
+                                                        )
+                                                    }
                                                 )
                                             )
                                             .then(
                                                 if (isSelected) Modifier.border(
                                                     2.dp,
-                                                    MaterialTheme.colorScheme.primary,
+                                                    if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
+                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                ) else if (isBelow50) Modifier.border(
+                                                    1.dp,
+                                                    ErrorRed.copy(alpha = 0.5f),
                                                     RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                 ) else Modifier
                                             )
@@ -471,12 +662,26 @@ fun StudyHoursRechartsBarChart(
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
-                                    Text(
-                                        text = stat.courseCode,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                        color = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    // Course Code with Conditional Alert Dot
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = stat.courseCode,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected || isBelow50) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                            color = if (isBelow50) ErrorRed else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (isBelow50) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(ErrorRed)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -677,15 +882,27 @@ fun StudyHoursRechartsBarChart(
                         modifier = Modifier.weight(1f)
                     )
 
-                    SummaryMiniCard(
-                        title = "Avg / Subject",
-                        value = if (studyStats.isNotEmpty()) "${String.format("%.1f", (totalFocusMinutes / 60.0) / studyStats.size)}h" else "0h",
-                        subtitle = "per course",
-                        icon = Icons.Default.Analytics,
-                        color = IndigoPrimary,
-                        containerColor = IndigoPrimaryContainer,
-                        modifier = Modifier.weight(1f)
-                    )
+                    if (subjectsBelow50Pct.isNotEmpty()) {
+                        SummaryMiniCard(
+                            title = "Below 50% Goal",
+                            value = "${subjectsBelow50Pct.size} Alert${if (subjectsBelow50Pct.size > 1) "s" else ""}",
+                            subtitle = "needs study time ⚠️",
+                            icon = Icons.Default.Warning,
+                            color = ErrorRed,
+                            containerColor = ErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        SummaryMiniCard(
+                            title = "Goal Progress",
+                            value = "All On Track",
+                            subtitle = "≥50% goal met 🎉",
+                            icon = Icons.Default.CheckCircle,
+                            color = EmeraldTertiary,
+                            containerColor = EmeraldTertiaryContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }

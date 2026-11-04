@@ -1,10 +1,10 @@
 {
-  "versionCode": 8,
-  "versionName": "1.8",
+  "versionCode": 9,
+  "versionName": "1.9",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Added interactive weekly trend toggle & consistency metrics overlay to the Recharts study chart. Students can switch between Subject Breakdown and Weekly Trend (Mon–Sun), view 2.0h daily target reference lines, track active study streaks, daily averages, and consistency scores.",
+  "releaseNotes": "Implemented conditional alert indicators within the Recharts subject chart. Subjects below 50% of the target goal (2.5h) are highlighted with warning badge pills, amber/coral gradient bars, alert dot labels, a 50% target threshold dashed line, and an actionable attention banner.",
   "publishedDate": "2026-11-04",
   "minSupportedVersion": 1
 }
