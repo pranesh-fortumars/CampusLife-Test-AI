@@ -25,6 +25,8 @@ import com.example.ui.theme.CampusLifeTheme
 import com.example.viewmodel.AppDestination
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.worker.DeadlineWorkScheduler
+import com.example.worker.ProjectAssignment24hNotificationHelper
+import com.example.worker.ProjectAssignmentDeadlineService
 import com.example.worker.TaskNotificationHelper
 
 class MainActivity : ComponentActivity() {
@@ -32,9 +34,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize WorkManager notification channel and periodic deadline check
+        // Initialize WorkManager notification channels and periodic deadline checks
         TaskNotificationHelper.createNotificationChannel(this)
+        ProjectAssignment24hNotificationHelper.createNotificationChannel(this)
         DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(this)
+        DeadlineWorkScheduler.schedule24HourPeriodicChecks(this)
+
+        // Prime the 24-hour background deadline service scan from Room database
+        ProjectAssignmentDeadlineService.startDeadlineScan(this)
 
         val navigateToTasks = intent?.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
 
@@ -50,6 +57,8 @@ class MainActivity : ComponentActivity() {
                 ) { isGranted ->
                     if (isGranted) {
                         DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(context)
+                        DeadlineWorkScheduler.schedule24HourPeriodicChecks(context)
+                        ProjectAssignmentDeadlineService.startDeadlineScan(context)
                     }
                 }
 

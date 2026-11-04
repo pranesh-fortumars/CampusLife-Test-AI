@@ -36,19 +36,26 @@ object TaskNotificationHelper {
         }
     }
 
+    fun hasNotificationPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
     fun showDeadlineAlert(context: Context, task: TaskEntity) {
         createNotificationChannel(context)
 
         // Permission check for Android 13+ (API 33+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    context,
-                    android.Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                return
-            }
+        if (!hasNotificationPermission(context)) {
+            return
         }
+
+        val notifId = (task.id.hashCode() and 0x7FFFFFFF)
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -58,7 +65,7 @@ object TaskNotificationHelper {
 
         val pendingIntent = PendingIntent.getActivity(
             context,
-            task.id.toInt(),
+            notifId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -72,10 +79,10 @@ object TaskNotificationHelper {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_deadline)
             .setContentTitle("$priorityLabel: ${task.title}")
-            .setContentText("${task.courseCode} • Due ${task.dueDate}")
+            .setContentText("${task.subjectCode.ifBlank { task.courseCode }} • Due ${task.dueDate}")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("${task.courseCode}: ${task.title}\nDue: ${task.dueDate}\nPriority: ${task.priority}\n\n${task.details.ifBlank { "Don't forget to submit your work before the deadline!" }}")
+                    .bigText("${task.subjectCode.ifBlank { task.courseCode }}: ${task.title}\nDue: ${task.dueDate}\nPriority: ${task.priority}\n\n${task.details.ifBlank { task.note.ifBlank { "Don't forget to submit your work before the deadline!" } }}")
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -84,7 +91,23 @@ object TaskNotificationHelper {
             .setColor(0xFF4F46E5.toInt()) // Indigo theme color
             .build()
 
-        NotificationManagerCompat.from(context).notify(task.id.toInt(), notification)
+        NotificationManagerCompat.from(context).notify(notifId, notification)
+    }
+
+    fun postUpcomingTasksNotification(
+        context: Context,
+        upcomingTasks: List<TaskEntity>
+    ): Boolean {
+        if (upcomingTasks.isEmpty()) return false
+        createNotificationChannel(context)
+        if (!hasNotificationPermission(context)) return false
+
+        val primaryTask = upcomingTasks.first()
+        showDeadlineAlert(context, primaryTask)
+        if (upcomingTasks.size > 1) {
+            showUpcomingSummaryAlert(context, upcomingTasks.size, primaryTask)
+        }
+        return true
     }
 
     fun showUpcomingSummaryAlert(context: Context, pendingCount: Int, primaryTask: TaskEntity) {

@@ -27,6 +27,12 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND dueTimestamp <= :maxTimestamp ORDER BY dueTimestamp ASC")
     suspend fun getUpcomingDueTasksList(maxTimestamp: Long): List<TaskEntity>
 
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND (category = 'Project' OR category = 'Assignment' OR type = 'PROJECT' OR type = 'ASSIGNMENT') AND dueTimestamp BETWEEN :minTimestamp AND :maxTimestamp ORDER BY dueTimestamp ASC")
+    suspend fun getProjectsAndAssignmentsDueBetween(minTimestamp: Long, maxTimestamp: Long): List<TaskEntity>
+
+    @Query("SELECT * FROM tasks WHERE isCompleted = 0 AND (category = 'Project' OR category = 'Assignment' OR type = 'PROJECT' OR type = 'ASSIGNMENT') ORDER BY dueTimestamp ASC")
+    suspend fun getPendingProjectsAndAssignments(): List<TaskEntity>
+
     @Query("SELECT * FROM tasks WHERE category IN ('Assignment', 'Exam') ORDER BY isCompleted ASC, dueTimestamp ASC")
     fun getAssignmentsAndExams(): Flow<List<TaskEntity>>
 

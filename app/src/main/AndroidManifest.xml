@@ -37,6 +37,19 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <service
+            android:name=".worker.ProjectAssignmentDeadlineService"
+            android:exported="false" />
+
+        <receiver
+            android:name=".worker.DeadlineAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="com.example.ACTION_CHECK_24H_DEADLINES" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

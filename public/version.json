@@ -1,10 +1,10 @@
 {
-  "versionCode": 9,
-  "versionName": "1.9",
+  "versionCode": 10,
+  "versionName": "2.0",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Implemented conditional alert indicators within the Recharts subject chart. Subjects below 50% of the target goal (2.5h) are highlighted with warning badge pills, amber/coral gradient bars, alert dot labels, a 50% target threshold dashed line, and an actionable attention banner.",
+  "releaseNotes": "Implemented a dedicated background service that notifies students via high-priority local notifications 24 hours before project or assignment deadlines sourced directly from the local Room database, with WorkManager periodic triggers, exact scheduling, and interactive alert management.",
   "publishedDate": "2026-11-04",
   "minSupportedVersion": 1
 }

@@ -249,8 +249,15 @@ class TaskViewModel(
         _userMessage.value = "WorkManager checking upcoming deadlines..."
     }
 
+    fun trigger24HourDeadlineCheck(context: Context) {
+        com.example.worker.ProjectAssignmentDeadlineService.startDeadlineScan(context, forceNotify = true)
+        com.example.worker.DeadlineWorkScheduler.triggerImmediate24HourCheck(context, forceNotify = true)
+        _userMessage.value = "24h Deadline Service active: Checking Room database & notifying upcoming submissions! ⏳"
+    }
+
     fun schedulePeriodicReminders(context: Context, intervalHours: Long = 4) {
         com.example.worker.TaskNotificationScheduler.schedulePeriodicTaskReminder(context, intervalHours)
+        com.example.worker.DeadlineWorkScheduler.schedule24HourPeriodicChecks(context)
     }
 
     companion object {

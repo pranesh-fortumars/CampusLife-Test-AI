@@ -181,4 +181,36 @@ class ExampleRobolectricTest {
     // Even if permission is denied in test sandbox, the function returns a clean boolean without crash
     org.junit.Assert.assertNotNull(notificationSent)
   }
+
+  @Test
+  fun `test ProjectAssignment24hNotificationHelper queries Room and handles 24h deadlines`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val db = com.example.data.local.AppDatabase.getDatabase(context)
+    val taskDao = db.taskDao()
+
+    com.example.worker.ProjectAssignment24hNotificationHelper.createNotificationChannel(context)
+
+    val now = System.currentTimeMillis()
+    val dueIn20Hours = now + (20 * 3600 * 1000L)
+
+    val projectTask = com.example.data.local.TaskEntity(
+      id = "proj-24h-test",
+      title = "Robotics Final Project Submission",
+      subjectCode = "CS-312",
+      subjectName = "Embedded Systems & Robotics",
+      category = "Project",
+      type = "PROJECT",
+      dueDate = "Tomorrow",
+      priority = "URGENT",
+      dueTimestamp = dueIn20Hours,
+      isCompleted = false
+    )
+    taskDao.insertTask(projectTask)
+
+    val count = com.example.worker.ProjectAssignment24hNotificationHelper.checkAndNotifyUpcomingDeadlines(
+      context,
+      forceNotify = true
+    )
+    org.junit.Assert.assertTrue(count >= 1)
+  }
 }
