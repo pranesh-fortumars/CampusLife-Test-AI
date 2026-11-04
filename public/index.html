@@ -154,8 +154,90 @@
                 </div>
 
             </div>
+
+            <!-- Recharts Bar Chart Live Visualization Preview -->
+            <div class="mt-12 bg-slate-800/60 border border-slate-700/80 rounded-3xl p-6 md:p-8">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="w-3 h-3 rounded-full bg-indigo-500 animate-pulse"></span>
+                            <h4 class="font-bold text-lg text-white">Total Study Hours per Subject (Recharts Visualization)</h4>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">Live analytics accumulated from Room database Pomodoro study sessions</p>
+                    </div>
+                    <div class="flex items-center space-x-4 text-xs">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="w-3 h-3 rounded bg-indigo-500 inline-block"></span>
+                            <span class="text-slate-300">Study Hours</span>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            <span class="w-3 h-0.5 bg-amber-400 inline-block"></span>
+                            <span class="text-slate-300">Target Goal (5.0h)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recharts Style SVG Bar Chart -->
+                <div class="w-full overflow-x-auto">
+                    <svg viewBox="0 0 650 220" class="w-full h-56 min-w-[500px]">
+                        <!-- Grid Lines -->
+                        <line x1="40" y1="30" x2="620" y2="30" stroke="#334155" stroke-dasharray="3 3" />
+                        <line x1="40" y1="75" x2="620" y2="75" stroke="#334155" stroke-dasharray="3 3" />
+                        <line x1="40" y1="120" x2="620" y2="120" stroke="#334155" stroke-dasharray="3 3" />
+                        <line x1="40" y1="165" x2="620" y2="165" stroke="#334155" />
+                        
+                        <!-- Y Axis labels -->
+                        <text x="30" y="34" fill="#94a3b8" font-size="10" text-anchor="end">8h</text>
+                        <text x="30" y="79" fill="#94a3b8" font-size="10" text-anchor="end">5h (Goal)</text>
+                        <text x="30" y="124" fill="#94a3b8" font-size="10" text-anchor="end">2.5h</text>
+                        <text x="30" y="169" fill="#94a3b8" font-size="10" text-anchor="end">0h</text>
+
+                        <!-- Goal Line at 5.0h -->
+                        <line x1="40" y1="75" x2="620" y2="75" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4 4" />
+
+                        <!-- Bars -->
+                        <!-- CS201 (5.5h) -->
+                        <rect x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
+                        <text x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h</text>
+                        <text x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
+                        <text x="102" y="200" fill="#64748b" font-size="9" text-anchor="middle">Algorithms</text>
+
+                        <!-- MATH204 (4.0h) -->
+                        <rect x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
+                        <text x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h</text>
+                        <text x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
+                        <text x="212" y="200" fill="#64748b" font-size="9" text-anchor="middle">Discrete Math</text>
+
+                        <!-- CS310 (3.5h) -->
+                        <rect x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
+                        <text x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h</text>
+                        <text x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
+                        <text x="322" y="200" fill="#64748b" font-size="9" text-anchor="middle">Operating Sys</text>
+
+                        <!-- PHY102 (2.5h) -->
+                        <rect x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
+                        <text x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h</text>
+                        <text x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
+                        <text x="432" y="200" fill="#64748b" font-size="9" text-anchor="middle">Physics</text>
+
+                        <!-- ENG215 (1.5h) -->
+                        <rect x="515" y="138" width="55" height="27" rx="6" fill="url(#barGrad)" />
+                        <text x="542" y="129" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">1.5h</text>
+                        <text x="542" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">ENG215</text>
+                        <text x="542" y="200" fill="#64748b" font-size="9" text-anchor="middle">Tech Writing</text>
+
+                        <defs>
+                            <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#818cf8" />
+                                <stop offset="100%" stop-color="#4f46e5" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
         </section>
     </main>
+
 
     <!-- Footer -->
     <footer class="border-t border-slate-800 bg-slate-900/60 py-6 text-center text-xs text-slate-500">

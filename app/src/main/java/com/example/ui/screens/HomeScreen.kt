@@ -332,8 +332,17 @@ fun HomeScreen(
             )
         }
 
+        // Recharts-Style Bar Chart Component for Subject Study Hours
+        item {
+            com.example.ui.components.StudyHoursRechartsBarChart(
+                viewModel = viewModel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+
         // Today's Timetable Section
         item {
+
 
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Row(

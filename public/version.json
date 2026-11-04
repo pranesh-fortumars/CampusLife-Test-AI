@@ -1,10 +1,10 @@
 {
-  "versionCode": 6,
-  "versionName": "1.6",
+  "versionCode": 7,
+  "versionName": "1.7",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Added Pomodoro study timer component with notification support for focus sessions and Room database persistence tracking total study hours per subject.",
-  "publishedDate": "2026-11-03",
+  "releaseNotes": "Integrated Recharts bar chart component to visually display total study hours per subject accumulated from the Room database with interactive tooltips, gridlines, and target goal tracking.",
+  "publishedDate": "2026-11-04",
   "minSupportedVersion": 1
 }
