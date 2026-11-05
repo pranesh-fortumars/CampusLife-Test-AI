@@ -30,11 +30,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.SubjectStudyStats
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
+import java.util.Locale
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 enum class ChartViewMode(val label: String) {
     BY_SUBJECT("By Subject"),
@@ -50,16 +54,17 @@ fun StudyHoursRechartsBarChart(
     val weeklyTrends by viewModel.weeklyStudyTrends.collectAsState()
     val totalFocusMinutes by viewModel.totalFocusMinutes.collectAsState()
     val courses by viewModel.courses.collectAsState()
+    val dailyGoalHours by viewModel.dailyStudyGoalHours.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
+    var showGoalSettingsModal by remember { mutableStateOf(false) }
 
     var selectedStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
 
     val subjectGoalHours = 5.0 // Weekly goal per subject
     val targetThreshold50Pct = subjectGoalHours * 0.5 // 2.5 hours threshold for 50% of target
-    val dailyGoalHours = 2.0   // Daily consistency goal
 
     val subjectsBelow50Pct = remember(studyStats) {
         studyStats.filter { it.totalHours < targetThreshold50Pct }
@@ -168,33 +173,53 @@ fun StudyHoursRechartsBarChart(
                     }
                 }
 
-                // Overlay Goal Target Toggle
-                FilterChip(
-                    selected = showTargetOverlay,
-                    onClick = { showTargetOverlay = !showTargetOverlay },
-                    label = {
-                        Text(
-                            if (viewMode == ChartViewMode.WEEKLY_TREND) "Goal (2h/day)" else "Goal (5h/sub)",
-                            fontSize = 10.sp
-                        )
-                    },
-                    leadingIcon = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Overlay Goal Target Toggle
+                    FilterChip(
+                        selected = showTargetOverlay,
+                        onClick = { showTargetOverlay = !showTargetOverlay },
+                        label = {
+                            Text(
+                                if (viewMode == ChartViewMode.WEEKLY_TREND) "Goal (${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h)" else "Goal (5h/sub)",
+                                fontSize = 10.sp
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (showTargetOverlay) Icons.Default.Check else Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        },
+                        shape = RoundedCornerShape(100),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WarningContainer,
+                            selectedLabelColor = OnWarningContainer,
+                            selectedLeadingIconColor = OnWarningContainer
+                        ),
+                        modifier = Modifier
+                            .heightIn(min = 32.dp)
+                            .testTag("toggle_target_overlay")
+                    )
+
+                    // Button to open Customize Daily Goal Modal
+                    FilledTonalIconButton(
+                        onClick = { showGoalSettingsModal = true },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("btn_open_goal_settings_modal")
+                    ) {
                         Icon(
-                            if (showTargetOverlay) Icons.Default.Check else Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp)
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Customize daily study goal",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(15.dp)
                         )
-                    },
-                    shape = RoundedCornerShape(100),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = WarningContainer,
-                        selectedLabelColor = OnWarningContainer,
-                        selectedLeadingIconColor = OnWarningContainer
-                    ),
-                    modifier = Modifier
-                        .heightIn(min = 32.dp)
-                        .testTag("toggle_target_overlay")
-                )
+                    }
+                }
             }
 
             // Conditional Alert Indicator Banner for Subjects Below 50% of Goal
@@ -319,7 +344,7 @@ fun StudyHoursRechartsBarChart(
                                 .background(WarningAmber)
                         )
                         Text(
-                            if (viewMode == ChartViewMode.WEEKLY_TREND) "2.0h/day" else "5.0h Goal (50% @ 2.5h)",
+                            if (viewMode == ChartViewMode.WEEKLY_TREND) "${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h/day Goal" else "5.0h Goal (50% @ 2.5h)",
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -479,7 +504,7 @@ fun StudyHoursRechartsBarChart(
                                     color = if (goalPct >= 100) EmeraldTertiaryContainer else WarningContainer
                                 ) {
                                     Text(
-                                        text = if (goalPct >= 100) "Goal Reached ($goalPct%)" else "$goalPct% of 2h goal",
+                                        text = if (goalPct >= 100) "Goal Reached ($goalPct%)" else "$goalPct% of ${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h goal",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (goalPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
@@ -689,7 +714,7 @@ fun StudyHoursRechartsBarChart(
                 }
             } else {
                 // Weekly Trend View: 7 Days (Mon - Sun)
-                val maxDailyHours = max(4.0, (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8)
+                val maxDailyHours = max(max(4.0, dailyGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8)
 
                 Box(
                     modifier = Modifier
@@ -838,7 +863,7 @@ fun StudyHoursRechartsBarChart(
                     SummaryMiniCard(
                         title = "Consistency",
                         value = "$consistencyPct%",
-                        subtitle = "met 2h/day goal",
+                        subtitle = "met ${String.format(Locale.US, "%.1f", dailyGoalHours)}h/day goal",
                         icon = Icons.Default.CheckCircle,
                         color = EmeraldTertiary,
                         containerColor = EmeraldTertiaryContainer,
@@ -907,6 +932,17 @@ fun StudyHoursRechartsBarChart(
             }
         }
     }
+
+    if (showGoalSettingsModal) {
+        CustomizeDailyGoalDialog(
+            currentGoalHours = dailyGoalHours,
+            onDismiss = { showGoalSettingsModal = false },
+            onSaveGoal = { newGoal ->
+                viewModel.updateDailyStudyGoalHours(newGoal)
+                showGoalSettingsModal = false
+            }
+        )
+    }
 }
 
 @Composable
@@ -937,3 +973,368 @@ fun SummaryMiniCard(
         }
     }
 }
+
+@Composable
+fun CustomizeDailyGoalDialog(
+    currentGoalHours: Double,
+    onDismiss: () -> Unit,
+    onSaveGoal: (Double) -> Unit
+) {
+    var goalHoursInput by remember { mutableStateOf(String.format(Locale.US, "%.1f", currentGoalHours)) }
+    var sliderValue by remember { mutableFloatStateOf(currentGoalHours.coerceIn(0.5, 8.0).toFloat()) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Quick presets
+    val presets = listOf(1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0)
+
+    fun applyGoal(value: Double) {
+        val clamped = (value * 10).roundToInt() / 10.0
+        goalHoursInput = String.format(Locale.US, "%.1f", clamped)
+        sliderValue = clamped.coerceIn(0.5, 8.0).toFloat()
+        errorMessage = null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("customize_daily_goal_dialog"),
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(IndigoPrimaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = IndigoPrimary,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Daily Study Goal",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Set your daily target study hours. Chart threshold lines and consistency metrics will adapt instantly.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Current Goal Display Card & Motivation Banner
+                val currentParsed = goalHoursInput.toDoubleOrNull() ?: currentGoalHours
+                val weeklyTotal = currentParsed * 7.0
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Weekly Commitment",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${String.format(Locale.US, "%.1f", weeklyTotal)} hrs / week",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = IndigoPrimary
+                            )
+                        }
+
+                        // Badge based on intensity
+                        val (badgeText, badgeColor, badgeBg) = when {
+                            currentParsed < 1.5 -> Triple("Light", Color(0xFF6B7280), Color(0xFFF3F4F6))
+                            currentParsed <= 2.5 -> Triple("Balanced", EmeraldTertiary, EmeraldTertiaryContainer)
+                            currentParsed <= 4.0 -> Triple("Focused", IndigoPrimary, IndigoPrimaryContainer)
+                            else -> Triple("Intense", WarningAmber, WarningContainer)
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = badgeBg,
+                            modifier = Modifier.padding(2.dp)
+                        ) {
+                            Text(
+                                text = badgeText,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = badgeColor,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Stepper + Direct Input Field
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Target Hours Per Day",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Minus Button
+                        FilledTonalIconButton(
+                            onClick = {
+                                val current = goalHoursInput.toDoubleOrNull() ?: currentGoalHours
+                                if (current > 0.5) {
+                                    applyGoal(current - 0.5)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("btn_stepper_minus")
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "Decrease goal by 0.5 hours")
+                        }
+
+                        // Text Field for direct input
+                        OutlinedTextField(
+                            value = goalHoursInput,
+                            onValueChange = { input ->
+                                goalHoursInput = input
+                                val parsed = input.toDoubleOrNull()
+                                if (parsed == null) {
+                                    errorMessage = "Please enter a valid number"
+                                } else if (parsed < 0.5 || parsed > 12.0) {
+                                    errorMessage = "Goal must be between 0.5h and 12.0h"
+                                } else {
+                                    errorMessage = null
+                                    sliderValue = parsed.coerceIn(0.5, 8.0).toFloat()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("input_daily_goal_hours"),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            trailingIcon = {
+                                Text(
+                                    text = "hours",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                            },
+                            isError = errorMessage != null,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        // Plus Button
+                        FilledTonalIconButton(
+                            onClick = {
+                                val current = goalHoursInput.toDoubleOrNull() ?: currentGoalHours
+                                if (current < 12.0) {
+                                    applyGoal(current + 0.5)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("btn_stepper_plus")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Increase goal by 0.5 hours")
+                        }
+                    }
+
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage ?: "",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+
+                // Interactive Slider
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Slider Adjust (0.5h – 8.0h)",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", sliderValue)}h",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = IndigoPrimary
+                        )
+                    }
+
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { newValue ->
+                            val stepped = ((newValue * 2f).roundToInt() / 2.0f)
+                            sliderValue = stepped
+                            goalHoursInput = String.format(Locale.US, "%.1f", stepped)
+                            errorMessage = null
+                        },
+                        valueRange = 0.5f..8.0f,
+                        steps = 14,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("slider_daily_goal"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = IndigoPrimary,
+                            activeTrackColor = IndigoPrimary,
+                            inactiveTrackColor = IndigoPrimary.copy(alpha = 0.2f)
+                        )
+                    )
+                }
+
+                // Quick Preset Chips
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Quick Presets",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        presets.take(4).forEach { preset ->
+                            val isSelected = (goalHoursInput.toDoubleOrNull() ?: 0.0) == preset
+                            SuggestionChip(
+                                onClick = { applyGoal(preset) },
+                                label = {
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", preset)}h",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (isSelected) IndigoPrimaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    labelColor = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                ),
+                                border = if (isSelected) BorderStroke(1.dp, IndigoPrimary) else null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("chip_preset_${String.format(Locale.US, "%.1f", preset).replace('.', '_')}")
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        presets.drop(4).forEach { preset ->
+                            val isSelected = (goalHoursInput.toDoubleOrNull() ?: 0.0) == preset
+                            SuggestionChip(
+                                onClick = { applyGoal(preset) },
+                                label = {
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", preset)}h",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (isSelected) IndigoPrimaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    labelColor = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                ),
+                                border = if (isSelected) BorderStroke(1.dp, IndigoPrimary) else null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("chip_preset_${String.format(Locale.US, "%.1f", preset).replace('.', '_')}")
+                            )
+                        }
+                        // Default 2.0h Reset chip
+                        SuggestionChip(
+                            onClick = { applyGoal(2.0) },
+                            label = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(10.dp))
+                                    Text("Reset (2h)", fontSize = 10.sp)
+                                }
+                            },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = WarningContainer.copy(alpha = 0.5f),
+                                labelColor = OnWarningContainer
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_reset_daily_goal")
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = goalHoursInput.toDoubleOrNull()
+                    if (parsed != null && parsed in 0.5..12.0) {
+                        onSaveGoal(parsed)
+                    } else {
+                        errorMessage = "Enter a value between 0.5 and 12.0"
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                modifier = Modifier.testTag("btn_save_daily_goal")
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Save Goal", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("btn_cancel_daily_goal")
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+

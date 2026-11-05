@@ -373,6 +373,22 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             studySessionDao.deleteSession(session)
         }
     }
+
+    // Daily study hour goal customization for analytics & chart thresholds
+    private val analyticsPrefs = getApplication<Application>().getSharedPreferences("campus_life_analytics_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _dailyStudyGoalHours = MutableStateFlow(
+        analyticsPrefs.getFloat("daily_study_goal_hours", 2.0f).toDouble()
+    )
+    val dailyStudyGoalHours: StateFlow<Double> = _dailyStudyGoalHours.asStateFlow()
+
+    fun updateDailyStudyGoalHours(hours: Double) {
+        val clamped = (Math.round(hours * 10.0) / 10.0).coerceIn(0.5, 12.0)
+        _dailyStudyGoalHours.value = clamped
+        viewModelScope.launch(Dispatchers.IO) {
+            analyticsPrefs.edit().putFloat("daily_study_goal_hours", clamped.toFloat()).apply()
+        }
+    }
 }
 
 

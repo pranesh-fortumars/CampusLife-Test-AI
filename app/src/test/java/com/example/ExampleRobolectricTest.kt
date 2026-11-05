@@ -213,4 +213,30 @@ class ExampleRobolectricTest {
     )
     org.junit.Assert.assertTrue(count >= 1)
   }
+
+  @Test
+  fun `test CampusLifeViewModel updates and persists dailyStudyGoalHours`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val vm = com.example.viewmodel.CampusLifeViewModel(context as android.app.Application)
+
+    // Initial default is 2.0h
+    org.junit.Assert.assertEquals(2.0, vm.dailyStudyGoalHours.value, 0.001)
+
+    // Update to 3.5h
+    vm.updateDailyStudyGoalHours(3.5)
+    org.junit.Assert.assertEquals(3.5, vm.dailyStudyGoalHours.value, 0.001)
+
+    // Verify persisted in SharedPreferences
+    val prefs = context.getSharedPreferences("campus_life_analytics_prefs", Context.MODE_PRIVATE)
+    val saved = prefs.getFloat("key_daily_study_goal_hours", -1f)
+    org.junit.Assert.assertEquals(3.5f, saved, 0.001f)
+
+    // Test bounds clamping (e.g. 15h should clamp to 12.0h)
+    vm.updateDailyStudyGoalHours(15.0)
+    org.junit.Assert.assertEquals(12.0, vm.dailyStudyGoalHours.value, 0.001)
+
+    // Reset back to 2.0h
+    vm.updateDailyStudyGoalHours(2.0)
+    org.junit.Assert.assertEquals(2.0, vm.dailyStudyGoalHours.value, 0.001)
+  }
 }

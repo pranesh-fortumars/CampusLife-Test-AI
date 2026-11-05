@@ -1,10 +1,10 @@
 {
-  "versionCode": 10,
-  "versionName": "2.0",
+  "versionCode": 11,
+  "versionName": "2.1",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Implemented a dedicated background service that notifies students via high-priority local notifications 24 hours before project or assignment deadlines sourced directly from the local Room database, with WorkManager periodic triggers, exact scheduling, and interactive alert management.",
-  "publishedDate": "2026-11-04",
+  "releaseNotes": "Added customizable daily study hour goal settings modal in the analytics section with interactive stepper, direct decimal input, preset chips, and visual slider, dynamically updating chart target threshold lines, day bar completion gradients, and weekly consistency metrics.",
+  "publishedDate": "2026-11-05",
   "minSupportedVersion": 1
 }

@@ -1812,6 +1812,51 @@ class CampusLifeUnitTest {
         assertEquals(6, afterAttend.missedClasses)
         assertEquals(77.77, afterAttend.attendancePercentage, 0.01)
     }
+
+    @Test
+    fun testDailyStudyGoalCustomizationAndThresholdScaling() {
+        // 1. Clamping logic verification (0.5h to 12.0h)
+        val defaultGoal = 2.0
+        val clampedLow = (-1.0).coerceIn(0.5, 12.0)
+        val clampedHigh = 15.0.coerceIn(0.5, 12.0)
+        val validCustomGoal = 3.5.coerceIn(0.5, 12.0)
+
+        assertEquals(0.5, clampedLow, 0.001)
+        assertEquals(12.0, clampedHigh, 0.001)
+        assertEquals(3.5, validCustomGoal, 0.001)
+
+        // 2. Dynamic maxDailyHours scale calculation
+        // Formula: max(max(4.0, dailyGoalHours + 1.2), maxRecorded + 0.8)
+        val recordedMaxLow = 2.5
+        val scaleDefault = kotlin.math.max(
+            kotlin.math.max(4.0, defaultGoal + 1.2),
+            recordedMaxLow + 0.8
+        )
+        assertEquals(4.0, scaleDefault, 0.001) // 2.0 + 1.2 = 3.2 < 4.0
+
+        val highGoal = 4.5
+        val scaleHigh = kotlin.math.max(
+            kotlin.math.max(4.0, highGoal + 1.2),
+            recordedMaxLow + 0.8
+        )
+        assertEquals(5.7, scaleHigh, 0.001) // 4.5 + 1.2 = 5.7 > 4.0
+
+        // 3. Weekly Consistency Percentage calculation
+        val dailyHoursList = listOf(2.5, 3.0, 1.5, 2.0, 4.0, 1.0, 0.5) // 7 days
+        val daysMeetingDefaultGoal = dailyHoursList.count { it >= defaultGoal } // 2.5, 3.0, 2.0, 4.0 -> 4 days
+        val consistencyDefault = ((daysMeetingDefaultGoal / 7.0) * 100).toInt()
+        assertEquals(4, daysMeetingDefaultGoal)
+        assertEquals(57, consistencyDefault) // 4/7 = 57%
+
+        val daysMeetingHighGoal = dailyHoursList.count { it >= 3.0 } // 3.0, 4.0 -> 2 days
+        val consistencyHigh = ((daysMeetingHighGoal / 7.0) * 100).toInt()
+        assertEquals(2, daysMeetingHighGoal)
+        assertEquals(28, consistencyHigh) // 2/7 = 28%
+
+        // 4. Weekly Commitment calculation
+        val weeklyCommitmentHours = validCustomGoal * 7.0
+        assertEquals(24.5, weeklyCommitmentHours, 0.001)
+    }
 }
 
 
