@@ -315,3 +315,4 @@ fun ScheduleCourseCard(
         }
     }
 }
+}
