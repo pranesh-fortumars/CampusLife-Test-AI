@@ -389,6 +389,73 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             analyticsPrefs.edit().putFloat("daily_study_goal_hours", clamped.toFloat()).apply()
         }
     }
+
+    // Custom weekly study goals for individual subjects
+    val defaultSubjectWeeklyGoals = mapOf(
+        "CS201" to 5.0,
+        "MATH204" to 5.0,
+        "CS310" to 5.0,
+        "PHY102" to 4.0,
+        "ENG215" to 3.0
+    )
+
+    private val _subjectWeeklyStudyGoals = MutableStateFlow<Map<String, Double>>(
+        loadPersistedSubjectGoals()
+    )
+    val subjectWeeklyStudyGoals: StateFlow<Map<String, Double>> = _subjectWeeklyStudyGoals.asStateFlow()
+
+    fun getSubjectWeeklyGoal(courseCode: String): Double {
+        return _subjectWeeklyStudyGoals.value[courseCode] ?: defaultSubjectWeeklyGoals[courseCode] ?: 5.0
+    }
+
+    fun updateSubjectWeeklyStudyGoal(courseCode: String, goalHours: Double) {
+        val clamped = (Math.round(goalHours * 10.0) / 10.0).coerceIn(0.5, 25.0)
+        val currentMap = _subjectWeeklyStudyGoals.value.toMutableMap()
+        currentMap[courseCode] = clamped
+        _subjectWeeklyStudyGoals.value = currentMap
+        persistSubjectGoals(currentMap)
+    }
+
+    fun resetSubjectWeeklyStudyGoals() {
+        val defaults = defaultSubjectWeeklyGoals.toMutableMap()
+        _subjectWeeklyStudyGoals.value = defaults
+        persistSubjectGoals(defaults)
+    }
+
+    private fun loadPersistedSubjectGoals(): Map<String, Double> {
+        val jsonString = analyticsPrefs.getString("subject_weekly_goals_json", null)
+        if (!jsonString.isNullOrEmpty()) {
+            try {
+                val json = org.json.JSONObject(jsonString)
+                val map = mutableMapOf<String, Double>()
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    map[key] = json.optDouble(key, 5.0)
+                }
+                val result = defaultSubjectWeeklyGoals.toMutableMap()
+                result.putAll(map)
+                return result
+            } catch (e: Exception) {
+                // fallback to defaults
+            }
+        }
+        return defaultSubjectWeeklyGoals
+    }
+
+    private fun persistSubjectGoals(goals: Map<String, Double>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val json = org.json.JSONObject()
+                goals.forEach { (code, goal) ->
+                    json.put(code, goal)
+                }
+                analyticsPrefs.edit().putString("subject_weekly_goals_json", json.toString()).apply()
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
 }
 
 

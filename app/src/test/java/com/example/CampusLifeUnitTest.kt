@@ -1857,6 +1857,58 @@ class CampusLifeUnitTest {
         val weeklyCommitmentHours = validCustomGoal * 7.0
         assertEquals(24.5, weeklyCommitmentHours, 0.001)
     }
+
+    @Test
+    fun testCustomSubjectWeeklyGoalsAndProgressTracking() {
+        val customGoals = mapOf(
+            "CS201" to 6.0,
+            "MATH204" to 4.0,
+            "CS310" to 7.0,
+            "PHY102" to 3.5,
+            "ENG215" to 2.5
+        )
+
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats(courseCode = "CS201", subjectName = "Data Structures", totalMinutes = 390, sessionCount = 6), // 6.5h -> 108% (Met)
+            com.example.data.local.SubjectStudyStats(courseCode = "MATH204", subjectName = "Discrete Math", totalMinutes = 150, sessionCount = 3), // 2.5h -> 62.5% (On track, >=50%)
+            com.example.data.local.SubjectStudyStats(courseCode = "CS310", subjectName = "Operating Systems", totalMinutes = 180, sessionCount = 3), // 3.0h / 7.0h -> 42.8% (<50% Alert)
+            com.example.data.local.SubjectStudyStats(courseCode = "PHY102", subjectName = "Physics", totalMinutes = 210, sessionCount = 4), // 3.5h -> 100% (Met)
+            com.example.data.local.SubjectStudyStats(courseCode = "ENG215", subjectName = "Technical Writing", totalMinutes = 60, sessionCount = 1) // 1.0h / 2.5h -> 40% (<50% Alert)
+        )
+
+        // 1. Verify progress percentages against custom subject targets
+        val cs201Stat = stats.first { it.courseCode == "CS201" }
+        val cs201Goal = customGoals["CS201"]!!
+        val cs201ProgressPct = ((cs201Stat.totalHours / cs201Goal) * 100).toInt()
+        assertEquals(108, cs201ProgressPct)
+        assertTrue(cs201Stat.totalHours >= cs201Goal) // Goal met
+
+        val cs310Stat = stats.first { it.courseCode == "CS310" }
+        val cs310Goal = customGoals["CS310"]!!
+        val cs310ProgressPct = ((cs310Stat.totalHours / cs310Goal) * 100).toInt()
+        assertEquals(42, cs310ProgressPct)
+        assertTrue(cs310Stat.totalHours < (cs310Goal * 0.5)) // Below 50% target threshold alert
+
+        // 2. Identify subjects below 50% based on individual goals
+        val below50Subjects = stats.filter { stat ->
+            val goal = customGoals[stat.courseCode] ?: 5.0
+            stat.totalHours < (goal * 0.5)
+        }
+        assertEquals(2, below50Subjects.size)
+        assertTrue(below50Subjects.any { it.courseCode == "CS310" })
+        assertTrue(below50Subjects.any { it.courseCode == "ENG215" })
+        assertFalse(below50Subjects.any { it.courseCode == "MATH204" }) // 2.5h >= 2.0h (50% of 4.0h)
+
+        // 3. Count of targets met
+        val targetsMet = stats.count { it.totalHours >= (customGoals[it.courseCode] ?: 5.0) }
+        assertEquals(2, targetsMet) // CS201 and PHY102
+
+        // 4. Dynamic subject viewport maximum scale
+        val maxTarget = stats.maxOfOrNull { customGoals[it.courseCode] ?: 5.0 } ?: 5.0
+        val maxLogged = stats.maxOfOrNull { it.totalHours } ?: 6.0
+        val maxHoursVal = kotlin.math.max(kotlin.math.max(8.0, maxTarget + 1.5), maxLogged + 1.5)
+        assertEquals(8.5, maxHoursVal, 0.001) // 7.0 + 1.5 = 8.5
+    }
 }
 
 

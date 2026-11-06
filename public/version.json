@@ -1,10 +1,10 @@
 {
-  "versionCode": 11,
-  "versionName": "2.1",
+  "versionCode": 12,
+  "versionName": "2.2",
   "apkUrl": "/CampusLife.apk",
   "downloadUrl": "/CampusLife.apk",
   "appName": "CampusLife",
-  "releaseNotes": "Added customizable daily study hour goal settings modal in the analytics section with interactive stepper, direct decimal input, preset chips, and visual slider, dynamically updating chart target threshold lines, day bar completion gradients, and weekly consistency metrics.",
+  "releaseNotes": "Added custom weekly study goals for individual subjects with interactive subject goal modal, real-time progress tracking, contextual chart threshold lines, celebratory completion badges, and Pomodoro timer progress bars.",
   "publishedDate": "2026-11-05",
   "minSupportedVersion": 1
 }

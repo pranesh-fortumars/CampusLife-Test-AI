@@ -28,7 +28,7 @@
             </div>
             <div class="flex items-center space-x-3">
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    ● v1.2 Live (Universal Search & OTA)
+                    ● v2.2 Live (Custom Subject Goals & Recharts)
                 </span>
             </div>
         </div>
@@ -208,24 +208,31 @@
                     <div class="mb-4 bg-red-950/50 border border-red-800/60 rounded-xl p-3 flex items-center justify-between text-xs">
                         <div class="flex items-center space-x-2.5">
                             <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                            <span class="font-bold text-red-200">1 Subject Below 50% Target (&lt;2.5h):</span>
-                            <span class="text-slate-300">ENG215 Technical Writing has only 1.5h logged (Needs +1.0h to reach 50% goal)</span>
+                            <span class="font-bold text-red-200">1 Subject Below 50% Custom Goal:</span>
+                            <span class="text-slate-300">ENG215 Technical Writing has only 1.5h logged towards its 3.5h custom weekly goal (43% &lt; 50% target)</span>
                         </div>
                         <span class="px-2 py-0.5 rounded-full bg-red-600 text-[10px] font-bold text-white uppercase tracking-wider">Alert</span>
                     </div>
 
-                    <div class="flex items-center justify-end space-x-4 text-xs mb-3">
-                        <div class="flex items-center space-x-1.5">
-                            <span class="w-3 h-3 rounded bg-indigo-500 inline-block"></span>
-                            <span class="text-slate-300">≥50% Goal</span>
+                    <!-- Custom Goals Info Bar -->
+                    <div class="flex flex-wrap items-center justify-between text-xs mb-3 gap-2">
+                        <div class="flex items-center space-x-2 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-xl">
+                            <span class="text-indigo-300 font-bold">🎯 Custom Subject Goals:</span>
+                            <span class="text-slate-300">CS201 (6h) • MATH204 (5h) • CS310 (4.5h) • PHY102 (4h) • ENG215 (3.5h)</span>
                         </div>
-                        <div class="flex items-center space-x-1.5">
-                            <span class="w-3 h-3 rounded bg-red-500 inline-block"></span>
-                            <span class="text-red-400 font-semibold">&lt;50% Alert ⚠️</span>
-                        </div>
-                        <div class="flex items-center space-x-1.5">
-                            <span class="w-3 h-0.5 bg-amber-400 inline-block"></span>
-                            <span class="text-slate-300">5.0h Goal (50% @ 2.5h)</span>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="w-3 h-3 rounded bg-indigo-500 inline-block"></span>
+                                <span class="text-slate-300">Logged Hours</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="w-3 h-3 rounded bg-emerald-500 inline-block"></span>
+                                <span class="text-emerald-400 font-semibold">100% Met ✓</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="w-3 h-3 rounded bg-red-500 inline-block"></span>
+                                <span class="text-red-400 font-semibold">&lt;50% Alert ⚠️</span>
+                            </div>
                         </div>
                     </div>
                     <svg viewBox="0 0 650 220" class="w-full h-56 min-w-[500px]">
@@ -237,44 +244,42 @@
                         
                         <!-- Y Axis labels -->
                         <text x="30" y="34" fill="#94a3b8" font-size="10" text-anchor="end">8h</text>
-                        <text x="30" y="79" fill="#fbbf24" font-size="10" font-weight="bold" text-anchor="end">5h (Goal)</text>
-                        <text x="30" y="124" fill="#f87171" font-size="9" font-weight="bold" text-anchor="end">2.5h (50%)</text>
+                        <text x="30" y="79" fill="#94a3b8" font-size="10" text-anchor="end">5h</text>
+                        <text x="30" y="124" fill="#94a3b8" font-size="9" text-anchor="end">2.5h</text>
                         <text x="30" y="169" fill="#94a3b8" font-size="10" text-anchor="end">0h</text>
 
-                        <!-- Goal Line at 5.0h -->
-                        <line x1="40" y1="75" x2="620" y2="75" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4 4" />
-                        
-                        <!-- 50% Alert Threshold Line at 2.5h -->
-                        <line x1="40" y1="120" x2="620" y2="120" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4 4" stroke-opacity="0.7" />
-
-                        <!-- Bars -->
+                        <!-- Bars with individual target ratios -->
+                        <!-- CS201: 5.5h of 6.0h goal (92%) -->
                         <rect x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
-                        <text x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h</text>
+                        <text x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
                         <text x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
-                        <text x="102" y="200" fill="#64748b" font-size="9" text-anchor="middle">Algorithms</text>
+                        <text x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
 
+                        <!-- MATH204: 4.0h of 5.0h goal (80%) -->
                         <rect x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
-                        <text x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h</text>
+                        <text x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
                         <text x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
-                        <text x="212" y="200" fill="#64748b" font-size="9" text-anchor="middle">Discrete Math</text>
+                        <text x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
 
+                        <!-- CS310: 3.5h of 4.5h goal (78%) -->
                         <rect x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
-                        <text x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h</text>
+                        <text x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
                         <text x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
-                        <text x="322" y="200" fill="#64748b" font-size="9" text-anchor="middle">Operating Sys</text>
+                        <text x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
 
+                        <!-- PHY102: 2.5h of 4.0h goal (63%) -->
                         <rect x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
-                        <text x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h</text>
+                        <text x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
                         <text x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
-                        <text x="432" y="200" fill="#64748b" font-size="9" text-anchor="middle">Physics</text>
+                        <text x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
 
-                        <!-- ENG215 (1.5h - Below 50% Goal Alert) -->
+                        <!-- ENG215: 1.5h of 3.5h goal (43% - Below 50% Alert) -->
                         <rect x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
                         <text x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
                         <rect x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
-                        <text x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h</text>
+                        <text x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
                         <text x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
-                        <text x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">Tech Writing</text>
+                        <text x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
 
                         <defs>
                             <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">

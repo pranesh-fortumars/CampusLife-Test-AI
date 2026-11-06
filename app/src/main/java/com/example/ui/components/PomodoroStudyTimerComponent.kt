@@ -55,9 +55,12 @@ fun PomodoroStudyTimerComponent(
     val courses by viewModel.courses.collectAsState()
     val studyStats by viewModel.studyStatsPerSubject.collectAsState()
     val totalFocusMinutes by viewModel.totalFocusMinutes.collectAsState()
+    val subjectWeeklyGoals by viewModel.subjectWeeklyStudyGoals.collectAsState()
 
     var selectedMode by remember { mutableStateOf(TimerMode.FOCUS_25) }
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
+    var showSubjectGoalsModal by remember { mutableStateOf(false) }
+    var selectedGoalCourseCode by remember { mutableStateOf<String?>(null) }
 
     // Default to first course if none selected
     LaunchedEffect(courses) {
@@ -423,24 +426,46 @@ fun PomodoroStudyTimerComponent(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Tracked deep focus minutes per subject",
+                            text = "Tracked deep focus minutes vs weekly targets",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    val totalHours = totalFocusMinutes / 60.0
-                    Surface(
-                        shape = RoundedCornerShape(100),
-                        color = EmeraldTertiaryContainer
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "${String.format("%.1f", totalHours)} hrs total",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = EmeraldOnTertiaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
+                        val totalHours = totalFocusMinutes / 60.0
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = EmeraldTertiaryContainer
+                        ) {
+                            Text(
+                                text = "${String.format(java.util.Locale.US, "%.1f", totalHours)} hrs total",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = EmeraldOnTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                selectedGoalCourseCode = selectedCourse?.code
+                                showSubjectGoalsModal = true
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("btn_timer_open_subject_goals")
+                        ) {
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = "Customize Subject Goals",
+                                tint = IndigoPrimary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                     }
                 }
 
@@ -451,16 +476,23 @@ fun PomodoroStudyTimerComponent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    val maxMinutes = (studyStats.maxOfOrNull { it.totalMinutes } ?: 60).coerceAtLeast(60)
-
                     studyStats.forEach { stat ->
                         val hours = stat.totalMinutes / 60.0
-                        val barFraction = (stat.totalMinutes.toFloat() / maxMinutes.toFloat()).coerceIn(0.1f, 1f)
+                        val customGoal = subjectWeeklyGoals[stat.courseCode] ?: viewModel.defaultSubjectWeeklyGoals[stat.courseCode] ?: 5.0
+                        val progressFraction = (hours / customGoal).toFloat().coerceIn(0.04f, 1f)
+                        val progressPct = ((hours / customGoal) * 100).toInt()
+                        val isMet = hours >= customGoal
+                        val isBelow50 = hours < (customGoal * 0.5)
 
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 2.dp),
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    selectedGoalCourseCode = stat.courseCode
+                                    showSubjectGoalsModal = true
+                                }
+                                .padding(vertical = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Row(
@@ -471,13 +503,13 @@ fun PomodoroStudyTimerComponent(
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
-                                        color = IndigoPrimaryContainer
+                                        color = if (isMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
                                     ) {
                                         Text(
                                             text = stat.courseCode,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = IndigoOnPrimaryContainer,
+                                            color = Color.White,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
@@ -486,17 +518,29 @@ fun PomodoroStudyTimerComponent(
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (isMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
+                                    ) {
+                                        Text(
+                                            text = if (isMet) "Goal Met ✓" else if (isBelow50) "<50% ⚠️" else "$progressPct%",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
 
                                 Text(
-                                    text = "${String.format("%.1f", hours)} hrs (${stat.totalMinutes}m)",
-                                    fontSize = 12.sp,
+                                    text = "${String.format(java.util.Locale.US, "%.1f", hours)} / ${String.format(java.util.Locale.US, "%.1f", customGoal)} hrs",
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = if (isMet) EmeraldTertiary else if (isBelow50) ErrorRed else MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
-                            // Horizontal Bar Representation
+                            // Horizontal Bar Representation reflecting custom goal progress
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -506,10 +550,14 @@ fun PomodoroStudyTimerComponent(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .fillMaxWidth(barFraction)
+                                        .fillMaxWidth(progressFraction)
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(100))
-                                        .background(IndigoPrimary)
+                                        .background(
+                                            if (isMet) EmeraldTertiary
+                                            else if (isBelow50) ErrorRed
+                                            else IndigoPrimary
+                                        )
                                 )
                             }
                         }
@@ -517,5 +565,24 @@ fun PomodoroStudyTimerComponent(
                 }
             }
         }
+    }
+
+    if (showSubjectGoalsModal) {
+        CustomizeSubjectGoalsDialog(
+            courses = courses,
+            studyStats = studyStats,
+            currentGoals = subjectWeeklyGoals,
+            preselectedCourseCode = selectedGoalCourseCode,
+            onDismiss = {
+                showSubjectGoalsModal = false
+                selectedGoalCourseCode = null
+            },
+            onSaveGoal = { courseCode, newGoal ->
+                viewModel.updateSubjectWeeklyStudyGoal(courseCode, newGoal)
+            },
+            onResetDefaults = {
+                viewModel.resetSubjectWeeklyStudyGoals()
+            }
+        )
     }
 }

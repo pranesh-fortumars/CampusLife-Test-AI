@@ -239,4 +239,34 @@ class ExampleRobolectricTest {
     vm.updateDailyStudyGoalHours(2.0)
     org.junit.Assert.assertEquals(2.0, vm.dailyStudyGoalHours.value, 0.001)
   }
+
+  @Test
+  fun `test CampusLifeViewModel updates and persists custom subject weekly study goals`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val vm = com.example.viewmodel.CampusLifeViewModel(context as android.app.Application)
+
+    // Initial default for CS201 is 5.0h
+    org.junit.Assert.assertEquals(5.0, vm.getSubjectWeeklyGoal("CS201"), 0.001)
+
+    // Update CS201 goal to 7.5h
+    vm.updateSubjectWeeklyStudyGoal("CS201", 7.5)
+    org.junit.Assert.assertEquals(7.5, vm.getSubjectWeeklyGoal("CS201"), 0.001)
+    org.junit.Assert.assertEquals(7.5, vm.subjectWeeklyStudyGoals.value["CS201"] ?: 0.0, 0.001)
+
+    // Update ENG215 goal to 3.5h
+    vm.updateSubjectWeeklyStudyGoal("ENG215", 3.5)
+    org.junit.Assert.assertEquals(3.5, vm.getSubjectWeeklyGoal("ENG215"), 0.001)
+
+    // Verify persisted in SharedPreferences json
+    val prefs = context.getSharedPreferences("campus_life_analytics_prefs", Context.MODE_PRIVATE)
+    val jsonStr = prefs.getString("subject_weekly_goals_json", null)
+    org.junit.Assert.assertNotNull(jsonStr)
+    val json = org.json.JSONObject(jsonStr!!)
+    org.junit.Assert.assertEquals(7.5, json.getDouble("CS201"), 0.001)
+    org.junit.Assert.assertEquals(3.5, json.getDouble("ENG215"), 0.001)
+
+    // Test reset
+    vm.resetSubjectWeeklyStudyGoals()
+    org.junit.Assert.assertEquals(5.0, vm.getSubjectWeeklyGoal("CS201"), 0.001)
+  }
 }

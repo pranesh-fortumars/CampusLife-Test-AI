@@ -10,7 +10,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.SubjectStudyStats
 import com.example.ui.theme.*
@@ -55,19 +58,26 @@ fun StudyHoursRechartsBarChart(
     val totalFocusMinutes by viewModel.totalFocusMinutes.collectAsState()
     val courses by viewModel.courses.collectAsState()
     val dailyGoalHours by viewModel.dailyStudyGoalHours.collectAsState()
+    val subjectWeeklyGoals by viewModel.subjectWeeklyStudyGoals.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
+    var showSubjectGoalsModal by remember { mutableStateOf(false) }
+    var preselectedSubjectForGoalModal by remember { mutableStateOf<String?>(null) }
 
     var selectedStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
 
-    val subjectGoalHours = 5.0 // Weekly goal per subject
-    val targetThreshold50Pct = subjectGoalHours * 0.5 // 2.5 hours threshold for 50% of target
+    fun getGoalForCourse(courseCode: String): Double {
+        return subjectWeeklyGoals[courseCode] ?: viewModel.defaultSubjectWeeklyGoals[courseCode] ?: 5.0
+    }
 
-    val subjectsBelow50Pct = remember(studyStats) {
-        studyStats.filter { it.totalHours < targetThreshold50Pct }
+    val subjectsBelow50Pct = remember(studyStats, subjectWeeklyGoals) {
+        studyStats.filter { stat ->
+            val goal = getGoalForCourse(stat.courseCode)
+            stat.totalHours < (goal * 0.5)
+        }
     }
 
     Card(
@@ -183,7 +193,13 @@ fun StudyHoursRechartsBarChart(
                         onClick = { showTargetOverlay = !showTargetOverlay },
                         label = {
                             Text(
-                                if (viewMode == ChartViewMode.WEEKLY_TREND) "Goal (${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h)" else "Goal (5h/sub)",
+                                if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                                    "Goal (${String.format(Locale.US, "%.1f", dailyGoalHours)}h)"
+                                } else if (selectedStat != null) {
+                                    "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(selectedStat!!.courseCode))}h: ${selectedStat!!.courseCode})"
+                                } else {
+                                    "Subject Goals"
+                                },
                                 fontSize = 10.sp
                             )
                         },
@@ -205,19 +221,52 @@ fun StudyHoursRechartsBarChart(
                             .testTag("toggle_target_overlay")
                     )
 
-                    // Button to open Customize Daily Goal Modal
+                    // Button to open Goal Customization Modal (Daily Goal for Weekly View, Subject Goals for By Subject View)
                     FilledTonalIconButton(
-                        onClick = { showGoalSettingsModal = true },
+                        onClick = {
+                            if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                                showGoalSettingsModal = true
+                            } else {
+                                preselectedSubjectForGoalModal = selectedStat?.courseCode
+                                showSubjectGoalsModal = true
+                            }
+                        },
                         modifier = Modifier
                             .size(32.dp)
                             .testTag("btn_open_goal_settings_modal")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tune,
-                            contentDescription = "Customize daily study goal",
+                            contentDescription = if (viewMode == ChartViewMode.WEEKLY_TREND) "Customize daily study goal" else "Customize subject study goals",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(15.dp)
                         )
+                    }
+
+                    if (viewMode == ChartViewMode.BY_SUBJECT) {
+                        FilledTonalButton(
+                            onClick = {
+                                preselectedSubjectForGoalModal = selectedStat?.courseCode
+                                showSubjectGoalsModal = true
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(100),
+                            modifier = Modifier
+                                .heightIn(min = 32.dp)
+                                .testTag("btn_open_subject_goals_modal")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.TrackChanges,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Set Goals",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -264,13 +313,16 @@ fun StudyHoursRechartsBarChart(
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                                 Text(
-                                    text = "${subjectsBelow50Pct.size} Subject${if (subjectsBelow50Pct.size > 1) "s" else ""} Below 50% Target (<${String.format("%.1f", targetThreshold50Pct)}h)",
+                                    text = "${subjectsBelow50Pct.size} Subject${if (subjectsBelow50Pct.size > 1) "s" else ""} Below 50% Target",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = OnErrorContainer
                                 )
                                 Text(
-                                    text = "Needs attention: ${subjectsBelow50Pct.joinToString(", ") { "${it.courseCode} (${String.format("%.1f", it.totalHours)}h)" }}",
+                                    text = "Needs attention: ${subjectsBelow50Pct.joinToString(", ") { 
+                                        val g = getGoalForCourse(it.courseCode)
+                                        "${it.courseCode} (${String.format(Locale.US, "%.1f", it.totalHours)}h / ${String.format(Locale.US, "%.1f", g)}h goal)"
+                                    }}",
                                     fontSize = 10.sp,
                                     color = OnErrorContainer.copy(alpha = 0.85f),
                                     maxLines = 1,
@@ -281,10 +333,14 @@ fun StudyHoursRechartsBarChart(
 
                         Surface(
                             shape = RoundedCornerShape(100),
-                            color = ErrorRed
+                            color = ErrorRed,
+                            modifier = Modifier.clickable {
+                                preselectedSubjectForGoalModal = subjectsBelow50Pct.firstOrNull()?.courseCode
+                                showSubjectGoalsModal = true
+                            }
                         ) {
                             Text(
-                                text = "Action Needed",
+                                text = "Adjust Goals",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White,
@@ -344,7 +400,14 @@ fun StudyHoursRechartsBarChart(
                                 .background(WarningAmber)
                         )
                         Text(
-                            if (viewMode == ChartViewMode.WEEKLY_TREND) "${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h/day Goal" else "5.0h Goal (50% @ 2.5h)",
+                            if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                                "${String.format(Locale.US, "%.1f", dailyGoalHours)}h/day Goal"
+                            } else if (selectedStat != null) {
+                                val g = getGoalForCourse(selectedStat!!.courseCode)
+                                "${selectedStat!!.courseCode} Goal: ${String.format(Locale.US, "%.1f", g)}h (50% @ ${String.format(Locale.US, "%.1f", g * 0.5)}h)"
+                            } else {
+                                "Custom Subject Goals (50% threshold)"
+                            },
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -360,9 +423,12 @@ fun StudyHoursRechartsBarChart(
             ) {
                 selectedStat?.let { stat ->
                     val courseName = courses.firstOrNull { it.code == stat.courseCode }?.name ?: "Subject Course"
-                    val progressPct = ((stat.totalHours / subjectGoalHours) * 100).toInt()
+                    val customGoal = getGoalForCourse(stat.courseCode)
+                    val targetThreshold50Pct = customGoal * 0.5
+                    val progressPct = ((stat.totalHours / customGoal) * 100).toInt()
                     val isBelow50 = stat.totalHours < targetThreshold50Pct
-                    val deficitHours = targetThreshold50Pct - stat.totalHours
+                    val isGoalMet = stat.totalHours >= customGoal
+                    val deficitHours = (targetThreshold50Pct - stat.totalHours).coerceAtLeast(0.0)
 
                     Card(
                         modifier = Modifier
@@ -372,86 +438,129 @@ fun StudyHoursRechartsBarChart(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                         border = BorderStroke(
                             1.dp,
-                            if (isBelow50) ErrorRed.copy(alpha = 0.5f) else IndigoPrimary.copy(alpha = 0.4f)
+                            if (isGoalMet) EmeraldTertiary.copy(alpha = 0.7f)
+                            else if (isBelow50) ErrorRed.copy(alpha = 0.5f)
+                            else IndigoPrimary.copy(alpha = 0.4f)
                         )
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = if (isBelow50) ErrorRed else IndigoPrimary
-                                    ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
+                                        ) {
+                                            Text(
+                                                stat.courseCode,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 10.sp,
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
                                         Text(
-                                            stat.courseCode,
+                                            courseName,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                     Text(
-                                        courseName,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        "${String.format(Locale.US, "%.1f", stat.totalHours)}h logged • ${stat.sessionCount} focus sessions",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                Text(
-                                    "${String.format("%.1f", stat.totalHours)} Hours • ${stat.sessionCount} Focus Sessions",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
 
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (isBelow50) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Surface(
                                         shape = RoundedCornerShape(100),
-                                        color = ErrorContainer,
-                                        border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f))
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Warning,
-                                                contentDescription = null,
-                                                tint = ErrorRed,
-                                                modifier = Modifier.size(11.dp)
-                                            )
-                                            Text(
-                                                text = "Alert: ${String.format("%.1f", deficitHours)}h below 50%",
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = OnErrorContainer
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Surface(
-                                        shape = RoundedCornerShape(100),
-                                        color = if (progressPct >= 100) EmeraldTertiaryContainer else WarningContainer
+                                        color = if (isGoalMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
                                     ) {
                                         Text(
-                                            text = "$progressPct% of Goal",
+                                            text = if (isGoalMet) "Goal Met 🎉" else if (isBelow50) "<50% Behind ⚠️" else "$progressPct% of Goal",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (progressPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
+                                            color = if (isGoalMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                         )
                                     }
+
+                                    // Button to customize goal for this specific subject
+                                    IconButton(
+                                        onClick = {
+                                            preselectedSubjectForGoalModal = stat.courseCode
+                                            showSubjectGoalsModal = true
+                                        },
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .testTag("btn_edit_goal_${stat.courseCode}")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Edit,
+                                            contentDescription = "Edit subject goal",
+                                            tint = IndigoPrimary,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+
+                                    IconButton(onClick = { selectedStat = null }, modifier = Modifier.size(24.dp)) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                    }
                                 }
-                                IconButton(onClick = { selectedStat = null }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                            }
+
+                            // Progress Bar toward this subject's custom target
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Weekly Target Progress (${String.format(Locale.US, "%.1f", customGoal)}h goal)",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", stat.totalHours)} / ${String.format(Locale.US, "%.1f", customGoal)} hrs ($progressPct%)",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
+                                    )
+                                }
+
+                                val progressFraction = (stat.totalHours / customGoal).toFloat().coerceIn(0f, 1f)
+                                LinearProgressIndicator(
+                                    progress = { progressFraction },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(100)),
+                                    color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+
+                                if (isBelow50) {
+                                    Text(
+                                        text = "Alert: ${String.format(Locale.US, "%.1f", deficitHours)}h below 50% target threshold",
+                                        fontSize = 9.sp,
+                                        color = ErrorRed,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
                             }
                         }
@@ -531,7 +640,8 @@ fun StudyHoursRechartsBarChart(
                         Text("No study sessions logged yet. Complete a Pomodoro block to populate your chart!", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                     }
                 } else {
-                    val maxHoursVal = max(8.0, (studyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5)
+                    val maxSubjectGoal = studyStats.maxOfOrNull { getGoalForCourse(it.courseCode) } ?: 5.0
+                    val maxHoursVal = max(max(8.0, maxSubjectGoal + 1.5), (studyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5)
 
                     Box(
                         modifier = Modifier
@@ -557,9 +667,14 @@ fun StudyHoursRechartsBarChart(
                                 )
                             }
 
-                            // Goal Reference Line (100% Goal: 5.0h)
+                            // Goal Reference Line for selected subject or overall target
                             if (showTargetOverlay) {
-                                val goalY = bottomAxisY - (chartHeight * (subjectGoalHours.toFloat() / maxHoursVal.toFloat()))
+                                val targetGoalHours = if (selectedStat != null) {
+                                    getGoalForCourse(selectedStat!!.courseCode)
+                                } else {
+                                    studyStats.map { getGoalForCourse(it.courseCode) }.average().takeIf { !it.isNaN() } ?: 5.0
+                                }
+                                val goalY = bottomAxisY - (chartHeight * (targetGoalHours.toFloat() / maxHoursVal.toFloat()))
                                 if (goalY in topY..bottomAxisY) {
                                     drawLine(
                                         color = goalLineColor,
@@ -570,8 +685,8 @@ fun StudyHoursRechartsBarChart(
                                     )
                                 }
 
-                                // 50% Target Alert Threshold Reference Line (2.5h)
-                                val threshold50Y = bottomAxisY - (chartHeight * (targetThreshold50Pct.toFloat() / maxHoursVal.toFloat()))
+                                // 50% Target Alert Threshold Reference Line
+                                val threshold50Y = bottomAxisY - (chartHeight * ((targetGoalHours * 0.5f).toFloat() / maxHoursVal.toFloat()))
                                 if (threshold50Y in topY..bottomAxisY) {
                                     drawLine(
                                         color = ErrorRed.copy(alpha = 0.55f),
@@ -594,7 +709,11 @@ fun StudyHoursRechartsBarChart(
                         ) {
                             studyStats.forEach { stat ->
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
+                                val subjectGoal = getGoalForCourse(stat.courseCode)
+                                val targetThreshold50Pct = subjectGoal * 0.5
                                 val isBelow50 = stat.totalHours < targetThreshold50Pct
+                                val isGoalMet = stat.totalHours >= subjectGoal
+                                val pctOfGoal = ((stat.totalHours / subjectGoal) * 100).toInt()
                                 val barHeightFraction = (stat.totalHours / maxHoursVal).toFloat().coerceIn(0.04f, 1f)
                                 val animatedHeight by animateFloatAsState(
                                     targetValue = barHeightFraction,
@@ -612,8 +731,36 @@ fun StudyHoursRechartsBarChart(
                                         .clickable { selectedStat = stat }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
-                                    // Conditional Alert Indicator Badge on Bar
-                                    if (isBelow50) {
+                                    // Status Badge on Bar
+                                    if (isGoalMet) {
+                                        Surface(
+                                            shape = RoundedCornerShape(100),
+                                            color = EmeraldTertiaryContainer,
+                                            border = BorderStroke(0.8.dp, EmeraldTertiary.copy(alpha = 0.6f)),
+                                            modifier = Modifier
+                                                .padding(bottom = 2.dp)
+                                                .testTag("goal_met_indicator_${stat.courseCode}")
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Target Met",
+                                                    tint = EmeraldTertiary,
+                                                    modifier = Modifier.size(9.dp)
+                                                )
+                                                Text(
+                                                    text = "100%",
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = EmeraldOnTertiaryContainer
+                                                )
+                                            }
+                                        }
+                                    } else if (isBelow50) {
                                         Surface(
                                             shape = RoundedCornerShape(100),
                                             color = ErrorContainer,
@@ -641,41 +788,60 @@ fun StudyHoursRechartsBarChart(
                                                 )
                                             }
                                         }
+                                    } else {
+                                        Surface(
+                                            shape = RoundedCornerShape(100),
+                                            color = IndigoPrimaryContainer.copy(alpha = 0.6f),
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "$pctOfGoal%",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = IndigoOnPrimaryContainer,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
                                     }
 
+                                    // Hours value and target label
                                     Text(
-                                        text = "${String.format("%.1f", stat.totalHours)}h",
+                                        text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isBelow50) ErrorRed else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
-                                        modifier = Modifier.padding(bottom = 3.dp)
+                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "/${String.format(Locale.US, "%.0f", subjectGoal)}h",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 2.dp)
                                     )
 
-                                    // Bar with Conditional Alert Gradient
+                                    // Bar with Gradient reflecting progress towards target
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth(0.6f)
-                                            .fillMaxHeight(animatedHeight * 0.75f)
+                                            .fillMaxHeight(animatedHeight * 0.72f)
                                             .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                             .background(
                                                 Brush.verticalGradient(
-                                                    if (isBelow50) {
-                                                        listOf(
-                                                            if (isSelected) Color(0xFFF87171) else Color(0xFFFB923C),
-                                                            if (isSelected) Color(0xFFDC2626) else ErrorRed
-                                                        )
+                                                    if (isSelected) {
+                                                        listOf(VioletSecondary, IndigoPrimary)
+                                                    } else if (isGoalMet) {
+                                                        listOf(Color(0xFF34D399), EmeraldTertiary)
+                                                    } else if (isBelow50) {
+                                                        listOf(Color(0xFFFB923C), ErrorRed)
                                                     } else {
-                                                        listOf(
-                                                            if (isSelected) VioletSecondary else IndigoPrimary,
-                                                            if (isSelected) IndigoPrimary else Color(0xFF6366F1)
-                                                        )
+                                                        listOf(IndigoPrimary, Color(0xFF6366F1))
                                                     }
                                                 )
                                             )
                                             .then(
                                                 if (isSelected) Modifier.border(
                                                     2.dp,
-                                                    if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
+                                                    if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
                                                     RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                 ) else if (isBelow50) Modifier.border(
                                                     1.dp,
@@ -907,6 +1073,7 @@ fun StudyHoursRechartsBarChart(
                         modifier = Modifier.weight(1f)
                     )
 
+                    val metCount = studyStats.count { it.totalHours >= getGoalForCourse(it.courseCode) }
                     if (subjectsBelow50Pct.isNotEmpty()) {
                         SummaryMiniCard(
                             title = "Below 50% Goal",
@@ -920,8 +1087,8 @@ fun StudyHoursRechartsBarChart(
                     } else {
                         SummaryMiniCard(
                             title = "Goal Progress",
-                            value = "All On Track",
-                            subtitle = "≥50% goal met 🎉",
+                            value = "$metCount / ${studyStats.size} Met",
+                            subtitle = if (metCount == studyStats.size) "All targets met! 🎉" else "≥50% on track 👍",
                             icon = Icons.Default.CheckCircle,
                             color = EmeraldTertiary,
                             containerColor = EmeraldTertiaryContainer,
@@ -940,6 +1107,25 @@ fun StudyHoursRechartsBarChart(
             onSaveGoal = { newGoal ->
                 viewModel.updateDailyStudyGoalHours(newGoal)
                 showGoalSettingsModal = false
+            }
+        )
+    }
+
+    if (showSubjectGoalsModal) {
+        CustomizeSubjectGoalsDialog(
+            courses = courses,
+            studyStats = studyStats,
+            currentGoals = subjectWeeklyGoals,
+            preselectedCourseCode = preselectedSubjectForGoalModal,
+            onDismiss = {
+                showSubjectGoalsModal = false
+                preselectedSubjectForGoalModal = null
+            },
+            onSaveGoal = { courseCode, newGoal ->
+                viewModel.updateSubjectWeeklyStudyGoal(courseCode, newGoal)
+            },
+            onResetDefaults = {
+                viewModel.resetSubjectWeeklyStudyGoals()
             }
         )
     }
@@ -1337,4 +1523,481 @@ fun CustomizeDailyGoalDialog(
         }
     )
 }
+
+@Composable
+fun CustomizeSubjectGoalsDialog(
+    courses: List<CourseEntity>,
+    studyStats: List<SubjectStudyStats>,
+    currentGoals: Map<String, Double>,
+    preselectedCourseCode: String?,
+    onDismiss: () -> Unit,
+    onSaveGoal: (courseCode: String, goalHours: Double) -> Unit,
+    onResetDefaults: () -> Unit
+) {
+    val availableCourses = remember(courses, studyStats) {
+        val courseCodes = (courses.map { it.code } + studyStats.map { it.courseCode }).distinct()
+        courseCodes.map { code ->
+            val course = courses.firstOrNull { it.code == code }
+            Pair(code, course?.name ?: "Subject $code")
+        }
+    }
+
+    var selectedCourseCode by remember(preselectedCourseCode, availableCourses) {
+        mutableStateOf(
+            preselectedCourseCode?.takeIf { code -> availableCourses.any { it.first == code } }
+                ?: availableCourses.firstOrNull()?.first
+                ?: "CS201"
+        )
+    }
+
+    val currentCourseGoal = currentGoals[selectedCourseCode] ?: 5.0
+    var goalHoursInput by remember(selectedCourseCode, currentGoals) {
+        mutableStateOf(String.format(Locale.US, "%.1f", currentGoals[selectedCourseCode] ?: 5.0))
+    }
+    var sliderValue by remember(selectedCourseCode, currentGoals) {
+        mutableFloatStateOf((currentGoals[selectedCourseCode] ?: 5.0).coerceIn(1.0, 15.0).toFloat())
+    }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var saveSuccessMessage by remember { mutableStateOf<String?>(null) }
+
+    fun applyGoalValue(value: Double) {
+        val clamped = (value * 10).roundToInt() / 10.0
+        goalHoursInput = String.format(Locale.US, "%.1f", clamped)
+        sliderValue = clamped.coerceIn(1.0, 15.0).toFloat()
+        errorMessage = null
+        saveSuccessMessage = null
+    }
+
+    val presets = listOf(2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+
+    val activeStat = studyStats.firstOrNull { it.courseCode == selectedCourseCode }
+    val loggedHours = activeStat?.totalHours ?: 0.0
+    val activeCourseObj = courses.firstOrNull { it.code == selectedCourseCode }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("customize_subject_goals_dialog"),
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(IndigoPrimaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.TrackChanges,
+                    contentDescription = null,
+                    tint = IndigoPrimary,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Subject Weekly Goals",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "Customize individual weekly study targets for each subject. Charts and alerts reflect each subject's progress.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Horizontal Subject Picker Chips
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Select Course to Configure:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        availableCourses.forEach { (code, name) ->
+                            val isSelected = code == selectedCourseCode
+                            val courseTarget = currentGoals[code] ?: 5.0
+                            val stat = studyStats.firstOrNull { it.courseCode == code }
+                            val hours = stat?.totalHours ?: 0.0
+                            val isMet = hours >= courseTarget
+
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    selectedCourseCode = code
+                                    applyGoalValue(currentGoals[code] ?: 5.0)
+                                },
+                                label = {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(code, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, fontSize = 11.sp)
+                                        if (isMet) {
+                                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(10.dp), tint = EmeraldTertiary)
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(100),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = IndigoPrimary,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.testTag("chip_select_subject_$code")
+                            )
+                        }
+                    }
+                }
+
+                // Active Subject Detail Card with Current Target & Progress
+                val parsedGoal = goalHoursInput.toDoubleOrNull() ?: currentCourseGoal
+                val progressPct = if (parsedGoal > 0) ((loggedHours / parsedGoal) * 100).toInt() else 0
+                val isGoalMet = loggedHours >= parsedGoal
+                val isBelow50 = loggedHours < (parsedGoal * 0.5)
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, if (isGoalMet) EmeraldTertiary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = IndigoPrimary
+                                    ) {
+                                        Text(
+                                            text = selectedCourseCode,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = activeCourseObj?.name ?: "Subject Course",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = "${activeCourseObj?.instructor ?: "Faculty"} • ${activeCourseObj?.room ?: "Room"}",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Progress Tag
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = if (isGoalMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
+                            ) {
+                                Text(
+                                    text = if (isGoalMet) "Target Met 🎉" else if (isBelow50) "<50% Behind ⚠️" else "$progressPct% Progress",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isGoalMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        // Progress Bar toward target
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Logged: ${String.format(Locale.US, "%.1f", loggedHours)}h",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Target: ${String.format(Locale.US, "%.1f", parsedGoal)}h / week",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = IndigoPrimary
+                                )
+                            }
+                            val progressFraction = if (parsedGoal > 0) (loggedHours / parsedGoal).toFloat().coerceIn(0f, 1f) else 0f
+                            LinearProgressIndicator(
+                                progress = { progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(100)),
+                                color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Stepper + Direct Input for Selected Subject
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Weekly Target for $selectedCourseCode",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalIconButton(
+                            onClick = {
+                                val current = goalHoursInput.toDoubleOrNull() ?: currentCourseGoal
+                                if (current > 0.5) {
+                                    applyGoalValue(current - 0.5)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("btn_stepper_subject_minus")
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = "Decrease goal by 0.5 hours")
+                        }
+
+                        OutlinedTextField(
+                            value = goalHoursInput,
+                            onValueChange = { input ->
+                                goalHoursInput = input
+                                val parsed = input.toDoubleOrNull()
+                                if (parsed == null) {
+                                    errorMessage = "Please enter a valid number"
+                                } else if (parsed < 0.5 || parsed > 25.0) {
+                                    errorMessage = "Goal must be between 0.5h and 25.0h"
+                                } else {
+                                    errorMessage = null
+                                    sliderValue = parsed.coerceIn(1.0, 15.0).toFloat()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("input_subject_goal_hours"),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            trailingIcon = {
+                                Text(
+                                    text = "hrs/wk",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                            },
+                            isError = errorMessage != null,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                val current = goalHoursInput.toDoubleOrNull() ?: currentCourseGoal
+                                if (current < 25.0) {
+                                    applyGoalValue(current + 0.5)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("btn_stepper_subject_plus")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Increase goal by 0.5 hours")
+                        }
+                    }
+
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage ?: "",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+
+                    if (saveSuccessMessage != null) {
+                        Text(
+                            text = saveSuccessMessage ?: "",
+                            fontSize = 11.sp,
+                            color = EmeraldTertiary,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+
+                // Slider
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Slider Adjust (1h – 15h)",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", sliderValue)}h",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = IndigoPrimary
+                        )
+                    }
+
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { newValue ->
+                            val stepped = ((newValue * 2f).roundToInt() / 2.0f)
+                            sliderValue = stepped
+                            goalHoursInput = String.format(Locale.US, "%.1f", stepped)
+                            errorMessage = null
+                            saveSuccessMessage = null
+                        },
+                        valueRange = 1.0f..15.0f,
+                        steps = 27,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("slider_subject_goal"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = IndigoPrimary,
+                            activeTrackColor = IndigoPrimary,
+                            inactiveTrackColor = IndigoPrimary.copy(alpha = 0.2f)
+                        )
+                    )
+                }
+
+                // Preset Chips
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Quick Presets:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        presets.take(4).forEach { preset ->
+                            val isSelected = (goalHoursInput.toDoubleOrNull() ?: 0.0) == preset
+                            SuggestionChip(
+                                onClick = { applyGoalValue(preset) },
+                                label = { Text("${preset.toInt()}h", fontSize = 11.sp) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (isSelected) IndigoPrimaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    labelColor = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                ),
+                                border = if (isSelected) BorderStroke(1.dp, IndigoPrimary) else null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("chip_subject_preset_${preset.toInt()}")
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        presets.drop(4).forEach { preset ->
+                            val isSelected = (goalHoursInput.toDoubleOrNull() ?: 0.0) == preset
+                            SuggestionChip(
+                                onClick = { applyGoalValue(preset) },
+                                label = { Text("${preset.toInt()}h", fontSize = 11.sp) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = if (isSelected) IndigoPrimaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    labelColor = if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                ),
+                                border = if (isSelected) BorderStroke(1.dp, IndigoPrimary) else null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("chip_subject_preset_${preset.toInt()}")
+                            )
+                        }
+                        SuggestionChip(
+                            onClick = { applyGoalValue(5.0) },
+                            label = { Text("5h (Def)", fontSize = 10.sp) },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = WarningContainer.copy(alpha = 0.5f),
+                                labelColor = OnWarningContainer
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = goalHoursInput.toDoubleOrNull()
+                    if (parsed != null && parsed in 0.5..25.0) {
+                        onSaveGoal(selectedCourseCode, parsed)
+                        saveSuccessMessage = "Saved ${String.format(Locale.US, "%.1f", parsed)}h goal for $selectedCourseCode! ✓"
+                    } else {
+                        errorMessage = "Enter a value between 0.5 and 25.0"
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                modifier = Modifier.testTag("btn_save_subject_goal")
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Save for $selectedCourseCode", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = onResetDefaults,
+                    modifier = Modifier.testTag("btn_reset_subject_goals")
+                ) {
+                    Text("Reset All", color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.testTag("btn_close_subject_goals")
+                ) {
+                    Text("Done")
+                }
+            }
+        }
+    )
+}
+
 
