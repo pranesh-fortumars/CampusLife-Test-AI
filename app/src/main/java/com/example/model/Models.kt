@@ -84,6 +84,13 @@ data class Subject(
     }
 }
 
+enum class TaskSortOption(val label: String) {
+    DUE_DATE("Earliest Due Date"),
+    PRIORITY("Highest Priority"),
+    SUBJECT("By Course Code"),
+    RECENTLY_ADDED("Recently Added")
+}
+
 data class AcademicTask(
     val id: String = java.util.UUID.randomUUID().toString(),
     val title: String,

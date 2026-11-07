@@ -29,7 +29,7 @@ import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import com.example.viewmodel.SearchCategory
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
     viewModel: CampusLifeViewModel,

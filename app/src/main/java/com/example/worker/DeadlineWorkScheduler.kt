@@ -6,6 +6,8 @@ import java.util.concurrent.TimeUnit
 
 object DeadlineWorkScheduler {
 
+    const val UNIQUE_PERIODIC_WORK_NAME = "periodic_deadline_checks"
+    const val UNIQUE_IMMEDIATE_WORK_NAME = "immediate_deadline_check"
     private const val UNIQUE_24H_PERIODIC_WORK_NAME = "project_assignment_24h_periodic_worker"
     private const val UNIQUE_24H_IMMEDIATE_WORK_NAME = "project_assignment_24h_immediate_worker"
 

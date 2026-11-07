@@ -187,6 +187,7 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
         }
     }
 }
+}
 
 @Composable
 fun ScheduleCourseCard(
@@ -314,5 +315,4 @@ fun ScheduleCourseCard(
             }
         }
     }
-}
 }

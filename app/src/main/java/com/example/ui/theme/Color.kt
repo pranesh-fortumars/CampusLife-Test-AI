@@ -38,3 +38,27 @@ val OnErrorContainer = Color(0xFF7F1D1D)
 val WarningAmber = Color(0xFFD97706)
 val WarningContainer = Color(0xFFFEF3C7)
 val OnWarningContainer = Color(0xFF78350F)
+
+// Theme semantic aliases
+val Primary = IndigoPrimary
+val OnPrimary = IndigoOnPrimary
+val PrimaryContainer = IndigoPrimaryContainer
+val OnPrimaryContainer = IndigoOnPrimaryContainer
+val Secondary = VioletSecondary
+val OnSecondary = VioletOnSecondary
+val SecondaryContainer = VioletSecondaryContainer
+val OnSecondaryContainer = VioletOnSecondaryContainer
+val Tertiary = EmeraldTertiary
+val OnTertiary = EmeraldOnTertiary
+val TertiaryContainer = EmeraldTertiaryContainer
+val OnTertiaryContainer = EmeraldOnTertiaryContainer
+val Outline = SlateOutline
+val OutlineVariant = Color(0xFFE2E8F0)
+val Error = ErrorRed
+val Success = EmeraldTertiary
+val Warning = WarningAmber
+val PrimaryFixed = Color(0xFFE0E7FF)
+val TertiaryFixed = Color(0xFFD1FAE5)
+val InfoBlue = Color(0xFF0284C7)
+val AmberAlert = Color(0xFFF59E0B)
+

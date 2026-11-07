@@ -72,10 +72,19 @@ data class TaskEntity(
     val title: String,
     val courseCode: String,
     val dueDate: String,
-    val priority: String, // HIGH, MEDIUM, LOW
+    val priority: String, // HIGH, MEDIUM, LOW, URGENT
     val isCompleted: Boolean = false,
-    val details: String = ""
-)
+    val details: String = "",
+    val category: String = "Assignment",
+    val type: String = "ASSIGNMENT",
+    val dueTime: String = "11:59 PM",
+    val weightage: String = "15% Internal",
+    val dueTimestamp: Long = 0L
+) {
+    val subjectCode: String get() = courseCode
+    val note: String get() = details
+    val subjectName: String get() = courseCode
+}
 
 @Entity(tableName = "academic_calendar_events")
 data class AcademicCalendarEventEntity(

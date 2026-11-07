@@ -4,6 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.*
+import com.example.model.AcademicTask
+import com.example.model.Subject
+import com.example.worker.DeadlineWorkScheduler
+import com.example.worker.ProjectAssignmentDeadlineService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -137,6 +141,99 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             else taskDao.searchTasks(query.trim())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val subjects: StateFlow<List<Subject>> = courses.map { courseList ->
+        courseList.map { course ->
+            Subject(
+                code = course.code,
+                name = course.name,
+                credits = 4,
+                faculty = course.instructor,
+                department = "Dept. of Computer Science",
+                attendedClasses = course.attendedClasses,
+                totalClasses = course.totalClasses,
+                targetPercentage = course.targetPercent,
+                nextClassTime = "${course.dayOfWeek} • ${course.timeSlot}",
+                room = course.room
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val academicTasks: StateFlow<List<AcademicTask>> = combine(tasks, courses) { taskList, courseList ->
+        val courseMap = courseList.associate { it.code to it.name }
+        taskList.map { task ->
+            AcademicTask(
+                id = task.id.toString(),
+                title = task.title,
+                subjectCode = task.courseCode,
+                subjectName = courseMap[task.courseCode] ?: task.courseCode,
+                category = "Assignment",
+                type = "ASSIGNMENT",
+                dueDate = task.dueDate,
+                dueTime = "11:59 PM",
+                priority = task.priority,
+                weightage = "15% Internal",
+                isCompleted = task.isCompleted,
+                progressPercent = if (task.isCompleted) 100 else 0,
+                faculty = "",
+                note = task.details,
+                dueTimestamp = System.currentTimeMillis() + 86400000L,
+                createdAt = System.currentTimeMillis()
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addAcademicTask(
+        title: String,
+        subjectCode: String,
+        subjectName: String = "",
+        category: String = "Assignment",
+        type: String = "ASSIGNMENT",
+        dueDate: String,
+        dueTime: String = "11:59 PM",
+        priority: String = "HIGH",
+        weightage: String = "",
+        note: String = "",
+        dueTimestamp: Long = System.currentTimeMillis() + 86400000L
+    ) {
+        addTask(
+            title = title,
+            courseCode = subjectCode,
+            dueDate = dueDate,
+            priority = priority,
+            details = if (note.isNotBlank()) note else "$category - $type ($weightage)"
+        )
+    }
+
+    fun toggleAcademicTaskComplete(id: String) {
+        val numericId = id.toLongOrNull() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val task = tasks.value.firstOrNull { it.id == numericId } ?: return@launch
+            toggleTask(task)
+        }
+    }
+
+    fun deleteAcademicTask(id: String) {
+        val numericId = id.toLongOrNull() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val task = tasks.value.firstOrNull { it.id == numericId } ?: return@launch
+            taskDao.deleteTask(task)
+        }
+    }
+
+    fun rescheduleTaskDueDate(id: String, newDate: String, newTimestamp: Long) {
+        val numericId = id.toLongOrNull() ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val task = tasks.value.firstOrNull { it.id == numericId } ?: return@launch
+            taskDao.updateTask(task.copy(dueDate = newDate))
+        }
+    }
+
+    fun triggerUpcomingTasksReminder() {
+        val context = getApplication<Application>()
+        DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(context)
+        ProjectAssignmentDeadlineService.startDeadlineScan(context, forceNotify = true)
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val calendarEvents: StateFlow<List<AcademicCalendarEventEntity>> = _searchQuery
