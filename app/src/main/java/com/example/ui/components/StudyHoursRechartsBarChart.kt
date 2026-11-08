@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.SubjectStudyStats
+import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 import java.util.Locale
@@ -55,6 +56,7 @@ fun StudyHoursRechartsBarChart(
 ) {
     val studyStats by viewModel.studyStatsPerSubject.collectAsState()
     val weeklyTrends by viewModel.weeklyStudyTrends.collectAsState()
+    val weeklySubjectContributions by viewModel.weeklySubjectContributions.collectAsState()
     val totalFocusMinutes by viewModel.totalFocusMinutes.collectAsState()
     val courses by viewModel.courses.collectAsState()
     val dailyGoalHours by viewModel.dailyStudyGoalHours.collectAsState()
@@ -62,12 +64,31 @@ fun StudyHoursRechartsBarChart(
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
+    var showWeeklySubjectBreakdown by remember { mutableStateOf(false) }
+    var selectedWeeklySubjectFilter by remember { mutableStateOf<String?>(null) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
     var showSubjectGoalsModal by remember { mutableStateOf(false) }
     var preselectedSubjectForGoalModal by remember { mutableStateOf<String?>(null) }
 
     var selectedStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
+
+    fun getSubjectColor(courseCode: String): Color {
+        return when (courseCode) {
+            "CS201" -> IndigoPrimary
+            "CS310" -> VioletSecondary
+            "MATH204" -> EmeraldTertiary
+            "PHY102" -> Color(0xFF0284C7)
+            "ENG215" -> Color(0xFFEA580C)
+            else -> when (Math.abs(courseCode.hashCode()) % 5) {
+                0 -> IndigoPrimary
+                1 -> VioletSecondary
+                2 -> EmeraldTertiary
+                3 -> Color(0xFF0284C7)
+                else -> Color(0xFFEA580C)
+            }
+        }
+    }
 
     fun getGoalForCourse(courseCode: String): Double {
         return subjectWeeklyGoals[courseCode] ?: viewModel.defaultSubjectWeeklyGoals[courseCode] ?: 5.0
@@ -144,49 +165,150 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Interactive View Mode Switcher Toggle & Target Overlay Pill
-            Row(
+            // Interactive View Mode Switcher Toggle & Option Controls
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Segmented Toggle: By Subject vs Weekly Trend
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(100))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                        .padding(3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ChartViewMode.values().forEach { mode ->
-                        val isSelected = viewMode == mode
-                        Surface(
-                            shape = RoundedCornerShape(100),
-                            color = if (isSelected) IndigoPrimary else Color.Transparent,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(100))
-                                .clickable {
-                                    viewMode = mode
-                                    selectedStat = null
-                                    selectedDayTrend = null
+                    // Segmented Toggle: By Subject vs Weekly Trend
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(100))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        ChartViewMode.values().forEach { mode ->
+                            val isSelected = viewMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = if (isSelected) IndigoPrimary else Color.Transparent,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(100))
+                                    .clickable {
+                                        viewMode = mode
+                                        selectedStat = null
+                                        selectedDayTrend = null
+                                        if (mode == ChartViewMode.BY_SUBJECT) {
+                                            selectedWeeklySubjectFilter = null
+                                        }
+                                    }
+                                    .testTag("toggle_chart_${mode.name.lowercase()}")
+                            ) {
+                                Text(
+                                    text = mode.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Button to open Goal Customization Modal (Daily Goal for Weekly View, Subject Goals for By Subject View)
+                        FilledTonalIconButton(
+                            onClick = {
+                                if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                                    showGoalSettingsModal = true
+                                } else {
+                                    preselectedSubjectForGoalModal = selectedStat?.courseCode
+                                    showSubjectGoalsModal = true
                                 }
-                                .testTag("toggle_chart_${mode.name.lowercase()}")
+                            },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .testTag("btn_open_goal_settings_modal")
                         ) {
-                            Text(
-                                text = mode.label,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = if (viewMode == ChartViewMode.WEEKLY_TREND) "Customize daily study goal" else "Customize subject study goals",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(15.dp)
                             )
+                        }
+
+                        if (viewMode == ChartViewMode.BY_SUBJECT) {
+                            FilledTonalButton(
+                                onClick = {
+                                    preselectedSubjectForGoalModal = selectedStat?.courseCode
+                                    showSubjectGoalsModal = true
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(100),
+                                modifier = Modifier
+                                    .heightIn(min = 32.dp)
+                                    .testTag("btn_open_subject_goals_modal")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TrackChanges,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Set Goals",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
 
+                // Interactive Filters & Toggles Row
                 Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Weekly Trend: Subject Breakdown Toggle
+                    if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                        FilterChip(
+                            selected = showWeeklySubjectBreakdown,
+                            onClick = {
+                                showWeeklySubjectBreakdown = !showWeeklySubjectBreakdown
+                                if (!showWeeklySubjectBreakdown) {
+                                    selectedWeeklySubjectFilter = null
+                                }
+                            },
+                            label = {
+                                Text(
+                                    if (showWeeklySubjectBreakdown) "Subject Breakdown: ON" else "Subject Breakdown",
+                                    fontSize = 10.sp,
+                                    fontWeight = if (showWeeklySubjectBreakdown) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (showWeeklySubjectBreakdown) Icons.Default.PieChart else Icons.Default.Category,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(100),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = VioletSecondary.copy(alpha = 0.2f),
+                                selectedLabelColor = VioletSecondary,
+                                selectedLeadingIconColor = VioletSecondary
+                            ),
+                            modifier = Modifier
+                                .heightIn(min = 30.dp)
+                                .testTag("toggle_weekly_subject_breakdown")
+                        )
+                    }
+
                     // Overlay Goal Target Toggle
                     FilterChip(
                         selected = showTargetOverlay,
@@ -194,7 +316,7 @@ fun StudyHoursRechartsBarChart(
                         label = {
                             Text(
                                 if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                    "Goal (${String.format(Locale.US, "%.1f", dailyGoalHours)}h)"
+                                    "Target Goal (${String.format(Locale.US, "%.1f", dailyGoalHours)}h)"
                                 } else if (selectedStat != null) {
                                     "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(selectedStat!!.courseCode))}h: ${selectedStat!!.courseCode})"
                                 } else {
@@ -217,57 +339,9 @@ fun StudyHoursRechartsBarChart(
                             selectedLeadingIconColor = OnWarningContainer
                         ),
                         modifier = Modifier
-                            .heightIn(min = 32.dp)
+                            .heightIn(min = 30.dp)
                             .testTag("toggle_target_overlay")
                     )
-
-                    // Button to open Goal Customization Modal (Daily Goal for Weekly View, Subject Goals for By Subject View)
-                    FilledTonalIconButton(
-                        onClick = {
-                            if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                showGoalSettingsModal = true
-                            } else {
-                                preselectedSubjectForGoalModal = selectedStat?.courseCode
-                                showSubjectGoalsModal = true
-                            }
-                        },
-                        modifier = Modifier
-                            .size(32.dp)
-                            .testTag("btn_open_goal_settings_modal")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = if (viewMode == ChartViewMode.WEEKLY_TREND) "Customize daily study goal" else "Customize subject study goals",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-
-                    if (viewMode == ChartViewMode.BY_SUBJECT) {
-                        FilledTonalButton(
-                            onClick = {
-                                preselectedSubjectForGoalModal = selectedStat?.courseCode
-                                showSubjectGoalsModal = true
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            shape = RoundedCornerShape(100),
-                            modifier = Modifier
-                                .heightIn(min = 32.dp)
-                                .testTag("btn_open_subject_goals_modal")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TrackChanges,
-                                contentDescription = null,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Set Goals",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
                 }
             }
 
@@ -586,42 +660,89 @@ fun StudyHoursRechartsBarChart(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
                         border = androidx.compose.foundation.BorderStroke(1.dp, EmeraldTertiary.copy(alpha = 0.5f))
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    "${day.dayLabel} • ${String.format("%.1f", day.totalHours)} Hours",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    "Primary: ${day.primarySubject} ($courseTitle) • ${day.sessionCount} sessions",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(100),
-                                    color = if (goalPct >= 100) EmeraldTertiaryContainer else WarningContainer
-                                ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = if (goalPct >= 100) "Goal Reached ($goalPct%)" else "$goalPct% of ${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h goal",
-                                        fontSize = 10.sp,
+                                        "${day.dayLabel} • ${String.format(Locale.US, "%.1f", day.totalHours)} Hours",
                                         fontWeight = FontWeight.Bold,
-                                        color = if (goalPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        "Primary: ${day.primarySubject} ($courseTitle) • ${day.sessionCount} sessions",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                IconButton(onClick = { selectedDayTrend = null }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (goalPct >= 100) EmeraldTertiaryContainer else WarningContainer
+                                    ) {
+                                        Text(
+                                            text = if (goalPct >= 100) "Goal Reached ($goalPct%)" else "$goalPct% of ${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h goal",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (goalPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                    IconButton(onClick = { selectedDayTrend = null }, modifier = Modifier.size(24.dp)) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+
+                            // Day subject breakdown chips
+                            if (day.subjectBreakdown.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    day.subjectBreakdown.entries.filter { it.value > 0 }.sortedByDescending { it.value }.forEach { (sub, mins) ->
+                                        val isSubSelected = selectedWeeklySubjectFilter == sub
+                                        val subColor = getSubjectColor(sub)
+                                        Surface(
+                                            shape = RoundedCornerShape(100),
+                                            color = if (isSubSelected) subColor.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(1.dp, if (isSubSelected) subColor else subColor.copy(alpha = 0.35f)),
+                                            modifier = Modifier.clickable {
+                                                selectedWeeklySubjectFilter = if (isSubSelected) null else sub
+                                            }
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .clip(CircleShape)
+                                                        .background(subColor)
+                                                )
+                                                Text(
+                                                    text = "$sub: ${String.format(Locale.US, "%.1f", mins / 60.0)}h",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (isSubSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSubSelected) subColor else MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -933,11 +1054,22 @@ fun StudyHoursRechartsBarChart(
                             val isSelected = selectedDayTrend?.dayKey == dayTrend.dayKey
                             val reachesGoal = dayTrend.totalHours >= dailyGoalHours
                             val isToday = dayTrend.dayKey == "Tue"
-                            val barHeightFraction = (dayTrend.totalHours / maxDailyHours).toFloat().coerceIn(0.04f, 1f)
+
+                            // Subject filter logic
+                            val subjectFilterMins = if (selectedWeeklySubjectFilter != null) {
+                                dayTrend.subjectBreakdown[selectedWeeklySubjectFilter] ?: 0
+                            } else null
+                            val subjectFilterHours = subjectFilterMins?.let { it / 60.0 }
+
+                            val targetFraction = if (selectedWeeklySubjectFilter != null) {
+                                ((subjectFilterHours ?: 0.0) / maxDailyHours).toFloat().coerceIn(if ((subjectFilterMins ?: 0) > 0) 0.06f else 0.02f, 1f)
+                            } else {
+                                (dayTrend.totalHours / maxDailyHours).toFloat().coerceIn(0.04f, 1f)
+                            }
 
                             val animatedHeight by animateFloatAsState(
-                                targetValue = barHeightFraction,
-                                animationSpec = tween(durationMillis = 800),
+                                targetValue = targetFraction,
+                                animationSpec = tween(durationMillis = 650),
                                 label = "trend_${dayTrend.dayKey}"
                             )
 
@@ -952,36 +1084,107 @@ fun StudyHoursRechartsBarChart(
                                     .testTag("bar_day_${dayTrend.dayKey}")
                             ) {
                                 // Value label
+                                val labelText = if (selectedWeeklySubjectFilter != null) {
+                                    "${String.format(Locale.US, "%.1f", subjectFilterHours ?: 0.0)}h"
+                                } else {
+                                    "${String.format(Locale.US, "%.1f", dayTrend.totalHours)}h"
+                                }
+
+                                val labelColor = if (selectedWeeklySubjectFilter != null) {
+                                    if ((subjectFilterMins ?: 0) > 0) getSubjectColor(selectedWeeklySubjectFilter!!)
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                } else if (reachesGoal) EmeraldTertiary else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+
                                 Text(
-                                    text = "${String.format("%.1f", dayTrend.totalHours)}h",
+                                    text = labelText,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (reachesGoal) EmeraldTertiary else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
+                                    color = labelColor,
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
 
                                 // Vertical Bar
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.65f)
-                                        .fillMaxHeight(animatedHeight * 0.75f)
-                                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                        .background(
-                                            Brush.verticalGradient(
-                                                listOf(
-                                                    if (isSelected) VioletSecondary else if (reachesGoal) EmeraldTertiary else IndigoPrimary,
-                                                    if (isSelected) IndigoPrimary else if (reachesGoal) Color(0xFF059669) else Color(0xFF6366F1)
+                                if (showWeeklySubjectBreakdown && selectedWeeklySubjectFilter == null) {
+                                    // Stacked Subject Breakdown Bar
+                                    val validEntries = dayTrend.subjectBreakdown.entries.filter { it.value > 0 }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .fillMaxHeight(animatedHeight * 0.75f)
+                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                            .then(
+                                                if (isToday) Modifier.border(
+                                                    1.5.dp,
+                                                    WarningAmber,
+                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                ) else Modifier
+                                            )
+                                    ) {
+                                        if (validEntries.isNotEmpty() && dayTrend.totalMinutes > 0) {
+                                            Column(modifier = Modifier.fillMaxSize()) {
+                                                validEntries.forEach { entry ->
+                                                    val weight = entry.value.toFloat() / dayTrend.totalMinutes.toFloat()
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .weight(weight.coerceAtLeast(0.01f))
+                                                            .background(getSubjectColor(entry.key))
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            )
+                                        }
+                                    }
+                                } else if (selectedWeeklySubjectFilter != null) {
+                                    // Single Filtered Subject Bar
+                                    val hasHours = (subjectFilterMins ?: 0) > 0
+                                    val subColor = getSubjectColor(selectedWeeklySubjectFilter!!)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .fillMaxHeight(animatedHeight * 0.75f)
+                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                            .background(
+                                                if (hasHours) subColor
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                            )
+                                            .then(
+                                                if (isToday) Modifier.border(
+                                                    1.5.dp,
+                                                    WarningAmber,
+                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                ) else Modifier
+                                            )
+                                    )
+                                } else {
+                                    // Standard Gradient Bar
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(0.65f)
+                                            .fillMaxHeight(animatedHeight * 0.75f)
+                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(
+                                                        if (isSelected) VioletSecondary else if (reachesGoal) EmeraldTertiary else IndigoPrimary,
+                                                        if (isSelected) IndigoPrimary else if (reachesGoal) Color(0xFF059669) else Color(0xFF6366F1)
+                                                    )
                                                 )
                                             )
-                                        )
-                                        .then(
-                                            if (isToday) Modifier.border(
-                                                1.5.dp,
-                                                WarningAmber,
-                                                RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                                            ) else Modifier
-                                        )
-                                )
+                                            .then(
+                                                if (isToday) Modifier.border(
+                                                    1.5.dp,
+                                                    WarningAmber,
+                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                ) else Modifier
+                                            )
+                                    )
+                                }
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -996,6 +1199,356 @@ fun StudyHoursRechartsBarChart(
                                         fontWeight = if (isToday || isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                                         color = if (isToday) WarningAmber else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Interactive Legend: Weekly Subject Breakdown
+            AnimatedVisibility(
+                visible = viewMode == ChartViewMode.WEEKLY_TREND && showWeeklySubjectBreakdown,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("weekly_subject_breakdown_legend")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Legend Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(VioletSecondary.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PieChart,
+                                        contentDescription = null,
+                                        tint = VioletSecondary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Weekly Subject Contributions",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Ranked by study hours • Tap to highlight on chart",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            if (selectedWeeklySubjectFilter != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(100),
+                                    color = IndigoPrimaryContainer,
+                                    modifier = Modifier
+                                        .clickable { selectedWeeklySubjectFilter = null }
+                                        .testTag("btn_clear_subject_filter")
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(
+                                            text = "Reset Filter",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = IndigoPrimary
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            tint = IndigoPrimary,
+                                            modifier = Modifier.size(11.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Proportional Stacked Ribbon
+                        val totalWeekMinutes = weeklyTrends.sumOf { it.totalMinutes }
+                        if (totalWeekMinutes > 0 && weeklySubjectContributions.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(100))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                weeklySubjectContributions.forEach { item ->
+                                    val weight = item.percentageOfTotal.toFloat().coerceAtLeast(1f)
+                                    val isHighlighted = selectedWeeklySubjectFilter == null || selectedWeeklySubjectFilter == item.courseCode
+                                    val subColor = getSubjectColor(item.courseCode)
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(weight)
+                                            .fillMaxHeight()
+                                            .background(
+                                                if (isHighlighted) subColor
+                                                else subColor.copy(alpha = 0.25f)
+                                            )
+                                            .clickable {
+                                                selectedWeeklySubjectFilter = if (selectedWeeklySubjectFilter == item.courseCode) null else item.courseCode
+                                            }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Interactive Subject Legend List Items
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            weeklySubjectContributions.forEachIndexed { index, item ->
+                                val isSelected = selectedWeeklySubjectFilter == item.courseCode
+                                val subjectColor = getSubjectColor(item.courseCode)
+                                val courseObj = courses.firstOrNull { it.code == item.courseCode }
+                                val courseGoal = getGoalForCourse(item.courseCode)
+                                val goalProgressPct = if (courseGoal > 0) ((item.totalHours / courseGoal) * 100).toInt() else 0
+                                val rankLabel = if (index == 0) "#1 🏆" else "#${index + 1}"
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) subjectColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(
+                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                        color = if (isSelected) subjectColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            selectedWeeklySubjectFilter = if (isSelected) null else item.courseCode
+                                        }
+                                        .testTag("legend_subject_${item.courseCode}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (index == 0) WarningAmber.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
+                                                modifier = Modifier.padding(end = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = rankLabel,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (index == 0) WarningAmber else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                )
+                                            }
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(subjectColor)
+                                            )
+
+                                            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                    Text(
+                                                        text = item.courseCode,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.sp,
+                                                        color = if (isSelected) subjectColor else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = courseObj?.name ?: "Course Study",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+
+                                                // Active days badges
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                ) {
+                                                    Text("Active:", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun").forEach { d ->
+                                                        val isActive = item.daysActive.contains(d)
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(14.dp)
+                                                                .clip(CircleShape)
+                                                                .background(
+                                                                    if (isActive) subjectColor.copy(alpha = 0.2f)
+                                                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                                                ),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = d.take(1),
+                                                                fontSize = 8.sp,
+                                                                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                                                                color = if (isActive) subjectColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Hours & Percentage
+                                        Column(
+                                            horizontalAlignment = Alignment.End,
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(
+                                                    text = "${String.format(Locale.US, "%.1f", item.totalHours)}h",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Surface(
+                                                    shape = RoundedCornerShape(100),
+                                                    color = subjectColor.copy(alpha = 0.15f)
+                                                ) {
+                                                    Text(
+                                                        text = "${item.percentageOfTotal.roundToInt()}%",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = subjectColor,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Text(
+                                                text = "Goal: ${String.format(Locale.US, "%.1f", courseGoal)}h ($goalProgressPct%)",
+                                                fontSize = 9.sp,
+                                                color = if (item.totalHours >= courseGoal) EmeraldTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontWeight = if (item.totalHours >= courseGoal) FontWeight.SemiBold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Selected Subject Spotlight Box
+                        if (selectedWeeklySubjectFilter != null) {
+                            val selectedItem = weeklySubjectContributions.firstOrNull { it.courseCode == selectedWeeklySubjectFilter }
+                            if (selectedItem != null) {
+                                val subColor = getSubjectColor(selectedItem.courseCode)
+                                val targetHours = getGoalForCourse(selectedItem.courseCode)
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = subColor.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, subColor.copy(alpha = 0.35f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("weekly_subject_spotlight_card")
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Icon(Icons.Default.Insights, contentDescription = null, tint = subColor, modifier = Modifier.size(15.dp))
+                                                Text(
+                                                    text = "${selectedItem.courseCode} Daily Breakdown",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp,
+                                                    color = subColor
+                                                )
+                                            }
+                                            Text(
+                                                text = "Total: ${String.format(Locale.US, "%.1f", selectedItem.totalHours)}h (${selectedItem.percentageOfTotal.roundToInt()}%)",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        // Day by day distribution for this subject
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            weeklyTrends.forEach { day ->
+                                                val mins = day.subjectBreakdown[selectedItem.courseCode] ?: 0
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(day.dayKey, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(
+                                                        text = if (mins > 0) "${String.format(Locale.US, "%.1f", mins / 60.0)}h" else "-",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = if (mins > 0) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (mins > 0) subColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            TextButton(
+                                                onClick = {
+                                                    preselectedSubjectForGoalModal = selectedItem.courseCode
+                                                    showSubjectGoalsModal = true
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                            ) {
+                                                Icon(Icons.Default.TrackChanges, contentDescription = null, modifier = Modifier.size(12.dp), tint = subColor)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Adjust ${selectedItem.courseCode} Goal (${String.format(Locale.US, "%.1f", targetHours)}h)", fontSize = 10.sp, color = subColor)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

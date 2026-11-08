@@ -103,4 +103,31 @@ class ExampleUnitTest {
         assertEquals(50, semester.daysRemaining(midMs))
         assertEquals(8, semester.currentWeek(midMs)) // (50/7) + 1 = 8
     }
+
+    @Test
+    fun `test WeeklySubjectContribution and DayStudyTrend subject breakdown`() {
+        val breakdown = mapOf("CS201" to 90, "MATH204" to 60)
+        val day = com.example.data.local.DayStudyTrend(
+            dayKey = "Mon",
+            dayLabel = "Monday",
+            totalMinutes = 150,
+            sessionCount = 3,
+            primarySubject = "CS201",
+            subjectBreakdown = breakdown
+        )
+        assertEquals(2.5, day.totalHours, 0.001)
+        assertEquals(90, day.subjectBreakdown["CS201"])
+        assertEquals(60, day.subjectBreakdown["MATH204"])
+
+        val contribution = com.example.data.local.WeeklySubjectContribution(
+            courseCode = "CS201",
+            totalMinutes = 315,
+            sessionCount = 7,
+            percentageOfTotal = 32.5,
+            daysActive = listOf("Mon", "Tue", "Thu", "Sat")
+        )
+        assertEquals(5.25, contribution.totalHours, 0.001)
+        assertEquals(4, contribution.daysActive.size)
+        assertTrue(contribution.daysActive.contains("Mon"))
+    }
 }

@@ -405,41 +405,70 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
-        val baseMinutes = mapOf(
-            "Mon" to 150, // 2.5h
-            "Tue" to 195, // 3.25h
-            "Wed" to 165, // 2.75h
-            "Thu" to 210, // 3.5h
-            "Fri" to 135, // 2.25h
-            "Sat" to 90,  // 1.5h
-            "Sun" to 75   // 1.25h
-        )
-        val baseSubjects = mapOf(
-            "Mon" to "CS201",
-            "Tue" to "CS310",
-            "Wed" to "MATH204",
-            "Thu" to "CS201",
-            "Fri" to "PHY102",
-            "Sat" to "MATH204",
-            "Sun" to "ENG215"
+        val baseBreakdowns = mapOf(
+            "Mon" to mapOf("CS201" to 90, "MATH204" to 60),      // 150m (2.5h)
+            "Tue" to mapOf("CS310" to 120, "CS201" to 75),       // 195m (3.25h)
+            "Wed" to mapOf("MATH204" to 105, "PHY102" to 60),    // 165m (2.75h)
+            "Thu" to mapOf("CS201" to 120, "CS310" to 90),       // 210m (3.5h)
+            "Fri" to mapOf("PHY102" to 90, "ENG215" to 45),      // 135m (2.25h)
+            "Sat" to mapOf("MATH204" to 60, "CS201" to 30),      // 90m (1.5h)
+            "Sun" to mapOf("ENG215" to 45, "CS310" to 30)        // 75m (1.25h)
         )
 
-        val extraTodayMinutes = sessions.filter { it.dateDisplay == "Today" }.sumOf { it.durationMinutes }
+        val todaySessions = sessions.filter { it.dateDisplay == "Today" }
 
         days.mapIndexed { index, dayKey ->
             val isToday = (dayKey == "Tue") // 2026-11-03 is Tuesday
-            val mins = (baseMinutes[dayKey] ?: 0) + (if (isToday) extraTodayMinutes else 0)
-            val count = maxOf(1, mins / 45)
-            val subject = if (isToday && sessions.isNotEmpty()) sessions.first().courseCode else (baseSubjects[dayKey] ?: "CS201")
+            val dayBreakdown = (baseBreakdowns[dayKey] ?: emptyMap()).toMutableMap()
+            if (isToday) {
+                todaySessions.forEach { s ->
+                    val cur = dayBreakdown[s.courseCode] ?: 0
+                    dayBreakdown[s.courseCode] = cur + s.durationMinutes
+                }
+            }
+            val totalMins = dayBreakdown.values.sum()
+            val sessionCount = maxOf(1, totalMins / 45)
+            val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
 
             DayStudyTrend(
                 dayKey = dayKey,
                 dayLabel = fullDays[index],
-                totalMinutes = mins,
-                sessionCount = count,
-                primarySubject = subject
+                totalMinutes = totalMins,
+                sessionCount = sessionCount,
+                primarySubject = topSubject,
+                subjectBreakdown = dayBreakdown
             )
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val weeklySubjectContributions: StateFlow<List<WeeklySubjectContribution>> = weeklyStudyTrends.map { trends ->
+        val totalWeekMinutes = trends.sumOf { it.totalMinutes }
+        val subjectMinutesMap = mutableMapOf<String, Int>()
+        val subjectDaysMap = mutableMapOf<String, MutableList<String>>()
+
+        trends.forEach { day ->
+            day.subjectBreakdown.forEach { (subject, mins) ->
+                if (mins > 0) {
+                    subjectMinutesMap[subject] = (subjectMinutesMap[subject] ?: 0) + mins
+                    val daysList = subjectDaysMap.getOrPut(subject) { mutableListOf() }
+                    if (!daysList.contains(day.dayKey)) {
+                        daysList.add(day.dayKey)
+                    }
+                }
+            }
+        }
+
+        subjectMinutesMap.map { (courseCode, mins) ->
+            val pct = if (totalWeekMinutes > 0) (mins.toDouble() / totalWeekMinutes) * 100.0 else 0.0
+            val sessionEst = maxOf(1, mins / 45)
+            WeeklySubjectContribution(
+                courseCode = courseCode,
+                totalMinutes = mins,
+                sessionCount = sessionEst,
+                percentageOfTotal = pct,
+                daysActive = subjectDaysMap[courseCode] ?: emptyList()
+            )
+        }.sortedByDescending { it.totalMinutes }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun recordStudySession(

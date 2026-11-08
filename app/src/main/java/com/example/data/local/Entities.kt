@@ -169,7 +169,19 @@ data class DayStudyTrend(
     val dayLabel: String, // "Monday", etc.
     val totalMinutes: Int,
     val sessionCount: Int,
-    val primarySubject: String
+    val primarySubject: String,
+    val subjectBreakdown: Map<String, Int> = emptyMap()
+) {
+    val totalHours: Double
+        get() = totalMinutes / 60.0
+}
+
+data class WeeklySubjectContribution(
+    val courseCode: String,
+    val totalMinutes: Int,
+    val sessionCount: Int,
+    val percentageOfTotal: Double,
+    val daysActive: List<String> = emptyList()
 ) {
     val totalHours: Double
         get() = totalMinutes / 60.0
