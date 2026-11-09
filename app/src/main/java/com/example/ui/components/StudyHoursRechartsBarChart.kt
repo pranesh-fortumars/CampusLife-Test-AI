@@ -34,6 +34,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.SubjectStudyStats
@@ -49,6 +56,7 @@ enum class ChartViewMode(val label: String) {
     WEEKLY_TREND("Weekly Trend")
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun StudyHoursRechartsBarChart(
     viewModel: CampusLifeViewModel,
@@ -62,6 +70,8 @@ fun StudyHoursRechartsBarChart(
     val dailyGoalHours by viewModel.dailyStudyGoalHours.collectAsState()
     val subjectWeeklyGoals by viewModel.subjectWeeklyStudyGoals.collectAsState()
     val selectedSessionTagFilter by viewModel.selectedSessionTagFilter.collectAsState()
+    val tasks by viewModel.tasks.collectAsState()
+    val allStudySessions by viewModel.allStudySessions.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
@@ -72,6 +82,7 @@ fun StudyHoursRechartsBarChart(
     var preselectedSubjectForGoalModal by remember { mutableStateOf<String?>(null) }
 
     var selectedStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
+    var hoveredStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
 
     fun getSubjectColor(courseCode: String): Color {
@@ -603,13 +614,14 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Active Recharts Tooltip for Subject Mode
+            // Detailed Breakdown Tooltip for Subject Mode (Revealed on mouseover or click)
+            val activeTooltipStat = hoveredStat ?: selectedStat
             AnimatedVisibility(
-                visible = viewMode == ChartViewMode.BY_SUBJECT && selectedStat != null,
-                enter = fadeIn(),
-                exit = fadeOut()
+                visible = viewMode == ChartViewMode.BY_SUBJECT && activeTooltipStat != null,
+                enter = fadeIn(animationSpec = tween(180)),
+                exit = fadeOut(animationSpec = tween(180))
             ) {
-                selectedStat?.let { stat ->
+                activeTooltipStat?.let { stat ->
                     val courseName = courses.firstOrNull { it.code == stat.courseCode }?.name ?: "Subject Course"
                     val customGoal = getGoalForCourse(stat.courseCode)
                     val targetThreshold50Pct = customGoal * 0.5
@@ -618,62 +630,98 @@ fun StudyHoursRechartsBarChart(
                     val isGoalMet = stat.totalHours >= customGoal
                     val deficitHours = (targetThreshold50Pct - stat.totalHours).coerceAtLeast(0.0)
 
+                    // Sessions & Average Duration calculations
+                    val subjectSessions = allStudySessions.filter { it.courseCode == stat.courseCode }
+                    val totalSessions = if (stat.sessionCount > 0) stat.sessionCount else subjectSessions.size
+                    val avgDurationMins = if (totalSessions > 0) (stat.totalMinutes / totalSessions) else 0
+
+                    // Pending assignments for this course
+                    val courseTasks = tasks.filter { it.courseCode == stat.courseCode }
+                    val pendingAssignments = courseTasks.filter { !it.isCompleted }
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("recharts_subject_tooltip"),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)),
                         border = BorderStroke(
-                            1.dp,
-                            if (isGoalMet) EmeraldTertiary.copy(alpha = 0.7f)
-                            else if (isBelow50) ErrorRed.copy(alpha = 0.5f)
-                            else IndigoPrimary.copy(alpha = 0.4f)
+                            1.5.dp,
+                            if (isGoalMet) EmeraldTertiary.copy(alpha = 0.8f)
+                            else if (isBelow50) ErrorRed.copy(alpha = 0.7f)
+                            else IndigoPrimary.copy(alpha = 0.6f)
                         )
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // Header Row
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
-                                        ) {
-                                            Text(
-                                                stat.courseCode,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp,
-                                                color = Color.White,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
+                                    ) {
+                                        Text(
+                                            stat.courseCode,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                    Column {
                                         Text(
                                             courseName,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
+                                            fontSize = 13.sp,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        if (selectedSessionTagFilter != "All") {
+                                            Text(
+                                                "Category Tag: $selectedSessionTagFilter",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = IndigoPrimary
+                                            )
+                                        }
                                     }
-                                    Text(
-                                        "${String.format(Locale.US, "%.1f", stat.totalHours)}h logged • ${stat.sessionCount} focus sessions" +
-                                                if (selectedSessionTagFilter != "All") " ($selectedSessionTagFilter)" else "",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 }
 
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(100),
+                                        color = if (hoveredStat != null && selectedStat?.courseCode != stat.courseCode) {
+                                            IndigoPrimaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        }
+                                    ) {
+                                        Text(
+                                            text = if (hoveredStat != null && selectedStat?.courseCode != stat.courseCode) "Mouseover Active" else "Pinned",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (hoveredStat != null && selectedStat?.courseCode != stat.courseCode) IndigoOnPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                        )
+                                    }
+
                                     Surface(
                                         shape = RoundedCornerShape(100),
                                         color = if (isGoalMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
@@ -687,7 +735,6 @@ fun StudyHoursRechartsBarChart(
                                         )
                                     }
 
-                                    // Button to customize goal for this specific subject
                                     IconButton(
                                         onClick = {
                                             preselectedSubjectForGoalModal = stat.courseCode
@@ -705,8 +752,123 @@ fun StudyHoursRechartsBarChart(
                                         )
                                     }
 
-                                    IconButton(onClick = { selectedStat = null }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                    IconButton(
+                                        onClick = {
+                                            selectedStat = null
+                                            hoveredStat = null
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Close breakdown tooltip",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 3 Metric Cards: Total Study Sessions | Average Duration | Pending Assignments
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Metric 1: Total Study Sessions
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("metric_total_sessions_${stat.courseCode}")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(13.dp), tint = IndigoPrimary)
+                                            Text("Sessions", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Text(
+                                            "$totalSessions total",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "${String.format(Locale.US, "%.1f", stat.totalHours)}h focus",
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                // Metric 2: Average Duration
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("metric_avg_duration_${stat.courseCode}")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Icon(Icons.Default.HourglassBottom, contentDescription = null, modifier = Modifier.size(13.dp), tint = VioletSecondary)
+                                            Text("Avg Duration", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Text(
+                                            "${avgDurationMins} min",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            "per session",
+                                            fontSize = 9.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                // Metric 3: Pending Assignments
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (pendingAssignments.isNotEmpty()) WarningContainer.copy(alpha = 0.6f) else EmeraldTertiaryContainer.copy(alpha = 0.6f),
+                                    border = BorderStroke(1.dp, if (pendingAssignments.isNotEmpty()) WarningAmber.copy(alpha = 0.4f) else EmeraldTertiary.copy(alpha = 0.4f)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("metric_pending_assignments_${stat.courseCode}")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Icon(
+                                                Icons.Default.Assignment,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(13.dp),
+                                                tint = if (pendingAssignments.isNotEmpty()) OnWarningContainer else EmeraldTertiary
+                                            )
+                                            Text("Pending Tasks", fontSize = 10.sp, color = if (pendingAssignments.isNotEmpty()) OnWarningContainer else EmeraldOnTertiaryContainer)
+                                        }
+                                        Text(
+                                            "${pendingAssignments.size} pending",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (pendingAssignments.isNotEmpty()) OnWarningContainer else EmeraldOnTertiaryContainer
+                                        )
+                                        Text(
+                                            if (pendingAssignments.isEmpty()) "All caught up ✓" else "Needs work",
+                                            fontSize = 9.sp,
+                                            color = if (pendingAssignments.isNotEmpty()) OnWarningContainer.copy(alpha = 0.8f) else EmeraldOnTertiaryContainer.copy(alpha = 0.8f)
+                                        )
                                     }
                                 }
                             }
@@ -750,6 +912,103 @@ fun StudyHoursRechartsBarChart(
                                         color = ErrorRed,
                                         fontWeight = FontWeight.Medium
                                     )
+                                }
+                            }
+
+                            // Detailed Pending Assignments List
+                            if (pendingAssignments.isNotEmpty()) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "Pending Assignments for ${stat.courseCode} (${pendingAssignments.size}):",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    pendingAssignments.take(3).forEach { task ->
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                            border = BorderStroke(0.6.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.PendingActions,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(12.dp),
+                                                        tint = if (task.priority == "URGENT" || task.priority == "HIGH") ErrorRed else WarningAmber
+                                                    )
+                                                    Text(
+                                                        text = task.title,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(4.dp),
+                                                        color = if (task.priority == "URGENT" || task.priority == "HIGH") ErrorContainer else WarningContainer
+                                                    ) {
+                                                        Text(
+                                                            text = task.priority,
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (task.priority == "URGENT" || task.priority == "HIGH") OnErrorContainer else OnWarningContainer,
+                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                        )
+                                                    }
+                                                    Text(
+                                                        text = "Due ${task.dueDate}",
+                                                        fontSize = 9.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = EmeraldTertiaryContainer.copy(alpha = 0.35f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldTertiary, modifier = Modifier.size(13.dp))
+                                        Text(
+                                            "No pending assignments for ${stat.courseCode}! All coursework is up to date.",
+                                            fontSize = 10.sp,
+                                            color = EmeraldOnTertiaryContainer,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -944,7 +1203,9 @@ fun StudyHoursRechartsBarChart(
                             verticalAlignment = Alignment.Bottom
                         ) {
                             studyStats.forEach { stat ->
+                                val isHovered = hoveredStat?.courseCode == stat.courseCode
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
+                                val isHighlighted = isHovered || isSelected
                                 val subjectGoal = getGoalForCourse(stat.courseCode)
                                 val targetThreshold50Pct = subjectGoal * 0.5
                                 val isBelow50 = stat.totalHours < targetThreshold50Pct
@@ -956,6 +1217,22 @@ fun StudyHoursRechartsBarChart(
                                     animationSpec = tween(durationMillis = 800),
                                     label = "bar_${stat.courseCode}"
                                 )
+                                val animatedScale by animateFloatAsState(
+                                    targetValue = if (isHovered) 1.06f else if (isSelected) 1.03f else 1.0f,
+                                    animationSpec = tween(durationMillis = 150),
+                                    label = "scale_${stat.courseCode}"
+                                )
+
+                                val interactionSource = remember(stat.courseCode) { MutableInteractionSource() }
+                                val isSystemHovered by interactionSource.collectIsHoveredAsState()
+
+                                LaunchedEffect(isSystemHovered) {
+                                    if (isSystemHovered) {
+                                        hoveredStat = stat
+                                    } else if (hoveredStat?.courseCode == stat.courseCode) {
+                                        hoveredStat = null
+                                    }
+                                }
 
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -964,11 +1241,58 @@ fun StudyHoursRechartsBarChart(
                                         .fillMaxHeight()
                                         .weight(1f)
                                         .padding(horizontal = 4.dp)
-                                        .clickable { selectedStat = stat }
+                                        .hoverable(interactionSource = interactionSource)
+                                        .pointerInput(stat.courseCode) {
+                                            awaitPointerEventScope {
+                                                while (true) {
+                                                    val event = awaitPointerEvent()
+                                                    when (event.type) {
+                                                        PointerEventType.Enter, PointerEventType.Move -> {
+                                                            hoveredStat = stat
+                                                        }
+                                                        PointerEventType.Exit -> {
+                                                            if (hoveredStat?.courseCode == stat.courseCode) {
+                                                                hoveredStat = null
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .clickable {
+                                            selectedStat = if (selectedStat?.courseCode == stat.courseCode) null else stat
+                                        }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
-                                    // Status Badge on Bar
-                                    if (isGoalMet) {
+                                    // Mini Hover Indicator Pill
+                                    if (isHovered) {
+                                        Surface(
+                                            shape = RoundedCornerShape(100),
+                                            color = IndigoPrimary,
+                                            modifier = Modifier
+                                                .padding(bottom = 2.dp)
+                                                .testTag("hover_badge_${stat.courseCode}")
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Visibility,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(8.dp)
+                                                )
+                                                Text(
+                                                    text = "Details",
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White
+                                                )
+                                            }
+                                        }
+                                    } else if (isGoalMet) {
                                         Surface(
                                             shape = RoundedCornerShape(100),
                                             color = EmeraldTertiaryContainer,
@@ -1045,7 +1369,7 @@ fun StudyHoursRechartsBarChart(
                                         text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "/${String.format(Locale.US, "%.0f", subjectGoal)}h",
@@ -1055,15 +1379,21 @@ fun StudyHoursRechartsBarChart(
                                         modifier = Modifier.padding(bottom = 2.dp)
                                     )
 
-                                    // Bar with Gradient reflecting progress towards target
+                                    // Bar with Gradient reflecting progress towards target & hover scaling
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth(0.6f)
+                                            .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
                                             .fillMaxHeight(animatedHeight * 0.72f)
+                                            .graphicsLayer {
+                                                scaleX = animatedScale
+                                                scaleY = animatedScale
+                                            }
                                             .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                             .background(
                                                 Brush.verticalGradient(
-                                                    if (isSelected) {
+                                                    if (isHovered) {
+                                                        listOf(Color(0xFF818CF8), IndigoPrimary)
+                                                    } else if (isSelected) {
                                                         listOf(VioletSecondary, IndigoPrimary)
                                                     } else if (isGoalMet) {
                                                         listOf(Color(0xFF34D399), EmeraldTertiary)
@@ -1075,7 +1405,11 @@ fun StudyHoursRechartsBarChart(
                                                 )
                                             )
                                             .then(
-                                                if (isSelected) Modifier.border(
+                                                if (isHovered) Modifier.border(
+                                                    2.5.dp,
+                                                    IndigoPrimary,
+                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                ) else if (isSelected) Modifier.border(
                                                     2.dp,
                                                     if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
                                                     RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
@@ -1097,8 +1431,8 @@ fun StudyHoursRechartsBarChart(
                                         Text(
                                             text = stat.courseCode,
                                             fontSize = 11.sp,
-                                            fontWeight = if (isSelected || isBelow50) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                            color = if (isBelow50) ErrorRed else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            fontWeight = if (isHighlighted || isBelow50) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                            color = if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         if (isBelow50) {
                                             Box(

@@ -178,4 +178,71 @@ class ExampleUnitTest {
         assertEquals(3, all.size)
         assertEquals(145, all.sumOf { it.durationMinutes })
     }
+
+    @Test
+    fun `test Subject bar breakdown tooltip metrics calculation`() {
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 50,
+                dateDisplay = "Today"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 40,
+                dateDisplay = "Yesterday"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 30,
+                dateDisplay = "2 days ago"
+            )
+        )
+
+        val totalMinutes = sessions.sumOf { it.durationMinutes } // 120
+        val totalSessions = sessions.size // 3
+        val avgDuration = if (totalSessions > 0) totalMinutes / totalSessions else 0
+        assertEquals(40, avgDuration)
+
+        val tasks = listOf(
+            TaskEntity(
+                title = "Binary Tree Project",
+                courseCode = "CS201",
+                dueDate = "Tomorrow",
+                priority = "HIGH",
+                isCompleted = false
+            ),
+            TaskEntity(
+                title = "Heaps Homework",
+                courseCode = "CS201",
+                dueDate = "Friday",
+                priority = "MEDIUM",
+                isCompleted = false
+            ),
+            TaskEntity(
+                title = "Lab 1 Submission",
+                courseCode = "CS201",
+                dueDate = "Past",
+                priority = "LOW",
+                isCompleted = true
+            ),
+            TaskEntity(
+                title = "OS Lab 2",
+                courseCode = "CS310",
+                dueDate = "Next Week",
+                priority = "HIGH",
+                isCompleted = false
+            )
+        )
+
+        val cs201Tasks = tasks.filter { it.courseCode == "CS201" }
+        val cs201Pending = cs201Tasks.filter { !it.isCompleted }
+        assertEquals(3, cs201Tasks.size)
+        assertEquals(2, cs201Pending.size)
+        assertEquals("Binary Tree Project", cs201Pending[0].title)
+        assertEquals("Heaps Homework", cs201Pending[1].title)
+    }
 }
