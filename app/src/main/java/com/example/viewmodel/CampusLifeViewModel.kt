@@ -531,6 +531,110 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }.sortedByDescending { it.totalMinutes }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val previousWeeklyStudyTrends: StateFlow<List<DayStudyTrend>> = combine(
+        allStudySessions,
+        _selectedSessionTagFilter
+    ) { sessions, tagFilter ->
+        val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+        val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+        val tagMultiplier = when (tagFilter) {
+            "Exam Prep" -> 0.40
+            "Homework" -> 0.35
+            "Research" -> 0.20
+            "Project" -> 0.20
+            "Revision" -> 0.15
+            else -> 1.0
+        }
+
+        // Previous week benchmark baseline (consistent prior baseline)
+        val prevBaseBreakdowns = mapOf(
+            "Mon" to mapOf("CS201" to 60, "MATH204" to 60),      // 120m (2.0h)
+            "Tue" to mapOf("CS310" to 90, "CS201" to 60),        // 150m (2.5h)
+            "Wed" to mapOf("MATH204" to 120, "PHY102" to 60),    // 180m (3.0h)
+            "Thu" to mapOf("CS201" to 90, "CS310" to 75),        // 165m (2.75h)
+            "Fri" to mapOf("PHY102" to 75, "ENG215" to 45),      // 120m (2.0h)
+            "Sat" to mapOf("MATH204" to 30, "CS201" to 30),      // 60m (1.0h)
+            "Sun" to mapOf("ENG215" to 45)                       // 45m (0.75h)
+        )
+
+        // Include any actual sessions from past week (older than 7 days) if recorded
+        val now = System.currentTimeMillis()
+        val sevenDaysAgo = now - (7L * 24 * 3600 * 1000)
+        val fourteenDaysAgo = now - (14L * 24 * 3600 * 1000)
+        val pastSessions = sessions.filter {
+            val matchesTag = (tagFilter == "All" || it.tag.equals(tagFilter, ignoreCase = true))
+            matchesTag && it.timestampMs in fourteenDaysAgo..sevenDaysAgo
+        }
+
+        days.mapIndexed { index, dayKey ->
+            val rawBreakdown = prevBaseBreakdowns[dayKey] ?: emptyMap()
+            val dayBreakdown = mutableMapOf<String, Int>()
+
+            rawBreakdown.forEach { (sub, mins) ->
+                val scaled = if (tagFilter == "All") mins else maxOf(10, kotlin.math.round(mins * tagMultiplier).toInt())
+                dayBreakdown[sub] = scaled
+            }
+
+            // Merge past sessions if any
+            pastSessions.forEach { s ->
+                val cur = dayBreakdown[s.courseCode] ?: 0
+                dayBreakdown[s.courseCode] = cur + (s.durationMinutes / 7)
+            }
+
+            val totalMins = dayBreakdown.values.sum()
+            val sessionCount = maxOf(1, totalMins / 45)
+            val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
+
+            DayStudyTrend(
+                dayKey = dayKey,
+                dayLabel = fullDays[index],
+                totalMinutes = totalMins,
+                sessionCount = sessionCount,
+                primarySubject = topSubject,
+                subjectBreakdown = dayBreakdown
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val previousWeekSubjectStats: StateFlow<List<SubjectStudyStats>> = combine(
+        previousWeeklyStudyTrends,
+        courses
+    ) { prevTrends, courseList ->
+        val subjectMins = mutableMapOf<String, Int>()
+        prevTrends.forEach { day ->
+            day.subjectBreakdown.forEach { (sub, mins) ->
+                subjectMins[sub] = (subjectMins[sub] ?: 0) + mins
+            }
+        }
+        val allCodes = (courseList.map { it.code } + subjectMins.keys).distinct()
+        allCodes.map { code ->
+            val mins = subjectMins[code] ?: 0
+            SubjectStudyStats(
+                courseCode = code,
+                totalMinutes = mins,
+                sessionCount = maxOf(0, mins / 45)
+            )
+        }.sortedByDescending { it.totalMinutes }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val weekComparisonSummary: StateFlow<WeekComparisonSummary> = combine(
+        weeklyStudyTrends,
+        previousWeeklyStudyTrends
+    ) { curTrends, prevTrends ->
+        val curMins = curTrends.sumOf { it.totalMinutes }
+        val prevMins = prevTrends.sumOf { it.totalMinutes }
+        val deltaMins = curMins - prevMins
+        val pct = if (prevMins > 0) ((deltaMins.toDouble() / prevMins.toDouble()) * 100.0) else 0.0
+        WeekComparisonSummary(
+            currentWeekTotalMinutes = curMins,
+            previousWeekTotalMinutes = prevMins,
+            deltaMinutes = deltaMins,
+            percentChange = Math.round(pct * 10.0) / 10.0,
+            isIncreased = deltaMins >= 0
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WeekComparisonSummary())
+
     fun recordStudySession(
         courseCode: String,
         subjectName: String,

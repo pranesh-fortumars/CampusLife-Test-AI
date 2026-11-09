@@ -72,11 +72,15 @@ fun StudyHoursRechartsBarChart(
     val selectedSessionTagFilter by viewModel.selectedSessionTagFilter.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val allStudySessions by viewModel.allStudySessions.collectAsState()
+    val previousWeeklyTrends by viewModel.previousWeeklyStudyTrends.collectAsState()
+    val previousSubjectStats by viewModel.previousWeekSubjectStats.collectAsState()
+    val weekComparisonSummary by viewModel.weekComparisonSummary.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
     var showWeeklySubjectBreakdown by remember { mutableStateOf(false) }
     var selectedWeeklySubjectFilter by remember { mutableStateOf<String?>(null) }
+    var compareWithPreviousWeek by remember { mutableStateOf(false) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
     var showSubjectGoalsModal by remember { mutableStateOf(false) }
     var preselectedSubjectForGoalModal by remember { mutableStateOf<String?>(null) }
@@ -467,6 +471,103 @@ fun StudyHoursRechartsBarChart(
                             .heightIn(min = 30.dp)
                             .testTag("toggle_target_overlay")
                     )
+
+                    // Compare Previous Week Toggle
+                    FilterChip(
+                        selected = compareWithPreviousWeek,
+                        onClick = { compareWithPreviousWeek = !compareWithPreviousWeek },
+                        label = {
+                            Text(
+                                if (compareWithPreviousWeek) "vs Previous Week: ON" else "vs Prev Week",
+                                fontSize = 10.sp,
+                                fontWeight = if (compareWithPreviousWeek) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (compareWithPreviousWeek) Icons.Default.CompareArrows else Icons.Default.History,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        },
+                        shape = RoundedCornerShape(100),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFF0284C7).copy(alpha = 0.18f),
+                            selectedLabelColor = Color(0xFF0284C7),
+                            selectedLeadingIconColor = Color(0xFF0284C7)
+                        ),
+                        border = if (compareWithPreviousWeek) BorderStroke(1.2.dp, Color(0xFF0284C7)) else null,
+                        modifier = Modifier
+                            .heightIn(min = 30.dp)
+                            .testTag("toggle_compare_previous_week")
+                    )
+                }
+            }
+
+            // Comparative Summary Banner (This Week vs Previous Week)
+            AnimatedVisibility(
+                visible = compareWithPreviousWeek,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (weekComparisonSummary.isIncreased) EmeraldTertiaryContainer.copy(alpha = 0.5f) else WarningContainer.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, if (weekComparisonSummary.isIncreased) EmeraldTertiary.copy(alpha = 0.35f) else WarningAmber.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("week_comparison_summary_banner")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(if (weekComparisonSummary.isIncreased) EmeraldTertiary.copy(alpha = 0.2f) else WarningAmber.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (weekComparisonSummary.isIncreased) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                    contentDescription = null,
+                                    tint = if (weekComparisonSummary.isIncreased) EmeraldTertiary else WarningAmber,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Week-over-Week Performance",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "This Week: ${String.format(Locale.US, "%.1f", weekComparisonSummary.currentWeekTotalHours)}h • Prev Week: ${String.format(Locale.US, "%.1f", weekComparisonSummary.previousWeekTotalHours)}h",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = if (weekComparisonSummary.isIncreased) EmeraldTertiary else WarningAmber
+                        ) {
+                            Text(
+                                text = "${if (weekComparisonSummary.isIncreased) "+" else ""}${String.format(Locale.US, "%.1f", weekComparisonSummary.percentChange)}%",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -565,10 +666,33 @@ fun StudyHoursRechartsBarChart(
                             .background(if (viewMode == ChartViewMode.WEEKLY_TREND) EmeraldTertiary else IndigoPrimary)
                     )
                     Text(
-                        if (viewMode == ChartViewMode.WEEKLY_TREND) "Daily Study" else "≥50% Goal",
+                        if (compareWithPreviousWeek) "This Week"
+                        else if (viewMode == ChartViewMode.WEEKLY_TREND) "Daily Study" else "≥50% Goal",
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Comparison Bar Legend when compareWithPreviousWeek is enabled
+                if (compareWithPreviousWeek) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.testTag("legend_previous_week_indicator")
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color(0xFF94A3B8))
+                        )
+                        Text(
+                            "Previous Week",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 // Alert Bar Legend for Subject Mode
@@ -873,6 +997,67 @@ fun StudyHoursRechartsBarChart(
                                 }
                             }
 
+                            // Week-over-Week Subject Performance Card when comparison toggle is active
+                            if (compareWithPreviousWeek) {
+                                val prevSubject = previousSubjectStats.firstOrNull { it.courseCode == stat.courseCode }
+                                val prevHours = prevSubject?.totalHours ?: 0.0
+                                val deltaHours = stat.totalHours - prevHours
+                                val isIncreased = deltaHours >= 0
+                                val pctDelta = if (prevHours > 0) ((deltaHours / prevHours) * 100).toInt() else if (stat.totalHours > 0) 100 else 0
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isIncreased) EmeraldTertiaryContainer.copy(alpha = 0.5f) else WarningContainer.copy(alpha = 0.5f),
+                                    border = BorderStroke(1.dp, if (isIncreased) EmeraldTertiary.copy(alpha = 0.4f) else WarningAmber.copy(alpha = 0.4f)),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("subject_comparison_card_${stat.courseCode}")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Icon(
+                                                imageVector = if (isIncreased) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = if (isIncreased) EmeraldTertiary else WarningAmber
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = "Vs Previous Week (${stat.courseCode})",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Text(
+                                                    text = "This Week: ${String.format(Locale.US, "%.1f", stat.totalHours)}h • Prev Week: ${String.format(Locale.US, "%.1f", prevHours)}h (${if (isIncreased) "+" else ""}${String.format(Locale.US, "%.1f", deltaHours)}h)",
+                                                    fontSize = 9.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+
+                                        Surface(
+                                            shape = RoundedCornerShape(100),
+                                            color = if (isIncreased) EmeraldTertiary else WarningAmber
+                                        ) {
+                                            Text(
+                                                text = "${if (isIncreased) "+" else ""}$pctDelta%",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             // Progress Bar toward this subject's custom target
                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Row(
@@ -1052,6 +1237,18 @@ fun StudyHoursRechartsBarChart(
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
+                                    if (compareWithPreviousWeek) {
+                                        val prevDay = previousWeeklyTrends.firstOrNull { it.dayKey == day.dayKey }
+                                        val prevDayH = prevDay?.totalHours ?: 0.0
+                                        val deltaDayH = day.totalHours - prevDayH
+                                        val isDayInc = deltaDayH >= 0
+                                        Text(
+                                            "Prev Week (${day.dayLabel}): ${String.format(Locale.US, "%.1f", prevDayH)}h • Delta: ${if (isDayInc) "+" else ""}${String.format(Locale.US, "%.1f", deltaDayH)}h (${if (isDayInc) "▲" else "▼"})",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (isDayInc) EmeraldTertiary else WarningAmber
+                                        )
+                                    }
                                     Text(
                                         "Primary: ${day.primarySubject} ($courseTitle) • ${day.sessionCount} sessions",
                                         fontSize = 11.sp,
@@ -1136,7 +1333,10 @@ fun StudyHoursRechartsBarChart(
                     }
                 } else {
                     val maxSubjectGoal = studyStats.maxOfOrNull { getGoalForCourse(it.courseCode) } ?: 5.0
-                    val maxHoursVal = max(max(8.0, maxSubjectGoal + 1.5), (studyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5)
+                    val maxHoursVal = max(
+                        max(max(8.0, maxSubjectGoal + 1.5), (studyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5),
+                        if (compareWithPreviousWeek) (previousSubjectStats.maxOfOrNull { it.totalHours } ?: 0.0) + 1.5 else 0.0
+                    )
 
                     Box(
                         modifier = Modifier
@@ -1364,62 +1564,143 @@ fun StudyHoursRechartsBarChart(
                                         }
                                     }
 
-                                    // Hours value and target label
-                                    Text(
-                                        text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "/${String.format(Locale.US, "%.0f", subjectGoal)}h",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    val prevStat = if (compareWithPreviousWeek) {
+                                        previousSubjectStats.firstOrNull { it.courseCode == stat.courseCode }
+                                    } else null
+                                    val prevH = prevStat?.totalHours ?: 0.0
+                                    val prevHeightFraction = (prevH / maxHoursVal).toFloat().coerceIn(0.04f, 1f)
+                                    val prevAnimatedHeight by animateFloatAsState(
+                                        targetValue = prevHeightFraction,
+                                        animationSpec = tween(durationMillis = 800),
+                                        label = "bar_prev_${stat.courseCode}"
                                     )
 
+                                    // Hours value and target label
+                                    if (compareWithPreviousWeek) {
+                                        Text(
+                                            text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h | ${String.format(Locale.US, "%.1f", prevH)}h",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "This | Prev",
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "/${String.format(Locale.US, "%.0f", subjectGoal)}h",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        )
+                                    }
+
                                     // Bar with Gradient reflecting progress towards target & hover scaling
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
-                                            .fillMaxHeight(animatedHeight * 0.72f)
-                                            .graphicsLayer {
-                                                scaleX = animatedScale
-                                                scaleY = animatedScale
-                                            }
-                                            .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    if (isHovered) {
-                                                        listOf(Color(0xFF818CF8), IndigoPrimary)
-                                                    } else if (isSelected) {
-                                                        listOf(VioletSecondary, IndigoPrimary)
-                                                    } else if (isGoalMet) {
-                                                        listOf(Color(0xFF34D399), EmeraldTertiary)
-                                                    } else if (isBelow50) {
-                                                        listOf(Color(0xFFFB923C), ErrorRed)
-                                                    } else {
-                                                        listOf(IndigoPrimary, Color(0xFF6366F1))
+                                    if (compareWithPreviousWeek) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .fillMaxHeight(0.72f),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.Bottom
+                                        ) {
+                                            // Current Week Bar
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(13.dp)
+                                                    .fillMaxHeight(animatedHeight)
+                                                    .graphicsLayer {
+                                                        scaleX = animatedScale
+                                                        scaleY = animatedScale
                                                     }
+                                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            if (isHovered) listOf(Color(0xFF818CF8), IndigoPrimary)
+                                                            else if (isSelected) listOf(VioletSecondary, IndigoPrimary)
+                                                            else if (isGoalMet) listOf(Color(0xFF34D399), EmeraldTertiary)
+                                                            else if (isBelow50) listOf(Color(0xFFFB923C), ErrorRed)
+                                                            else listOf(IndigoPrimary, Color(0xFF6366F1))
+                                                        )
+                                                    )
+                                                    .then(
+                                                        if (isHovered) Modifier.border(2.dp, IndigoPrimary, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        else if (isSelected) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        else if (isBelow50) Modifier.border(1.dp, ErrorRed.copy(alpha = 0.5f), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        else Modifier
+                                                    )
+                                                    .testTag("bar_subject_curr_${stat.courseCode}")
+                                            )
+
+                                            Spacer(modifier = Modifier.width(3.dp))
+
+                                            // Previous Week Bar
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(13.dp)
+                                                    .fillMaxHeight(prevAnimatedHeight)
+                                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                    .background(
+                                                        Brush.verticalGradient(
+                                                            listOf(Color(0xFF94A3B8), Color(0xFF64748B))
+                                                        )
+                                                    )
+                                                    .testTag("bar_subject_prev_${stat.courseCode}")
+                                            )
+                                        }
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
+                                                .fillMaxHeight(animatedHeight * 0.72f)
+                                                .graphicsLayer {
+                                                    scaleX = animatedScale
+                                                    scaleY = animatedScale
+                                                }
+                                                .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        if (isHovered) {
+                                                            listOf(Color(0xFF818CF8), IndigoPrimary)
+                                                        } else if (isSelected) {
+                                                            listOf(VioletSecondary, IndigoPrimary)
+                                                        } else if (isGoalMet) {
+                                                            listOf(Color(0xFF34D399), EmeraldTertiary)
+                                                        } else if (isBelow50) {
+                                                            listOf(Color(0xFFFB923C), ErrorRed)
+                                                        } else {
+                                                            listOf(IndigoPrimary, Color(0xFF6366F1))
+                                                        }
+                                                    )
                                                 )
-                                            )
-                                            .then(
-                                                if (isHovered) Modifier.border(
-                                                    2.5.dp,
-                                                    IndigoPrimary,
-                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                                                ) else if (isSelected) Modifier.border(
-                                                    2.dp,
-                                                    if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
-                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                                                ) else if (isBelow50) Modifier.border(
-                                                    1.dp,
-                                                    ErrorRed.copy(alpha = 0.5f),
-                                                    RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
-                                                ) else Modifier
-                                            )
-                                    )
+                                                .then(
+                                                    if (isHovered) Modifier.border(
+                                                        2.5.dp,
+                                                        IndigoPrimary,
+                                                        RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                    ) else if (isSelected) Modifier.border(
+                                                        2.dp,
+                                                        if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
+                                                        RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                    ) else if (isBelow50) Modifier.border(
+                                                        1.dp,
+                                                        ErrorRed.copy(alpha = 0.5f),
+                                                        RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+                                                    ) else Modifier
+                                                )
+                                        )
+                                    }
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -1450,7 +1731,10 @@ fun StudyHoursRechartsBarChart(
                 }
             } else {
                 // Weekly Trend View: 7 Days (Mon - Sun)
-                val maxDailyHours = max(max(4.0, dailyGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8)
+                val maxDailyHours = max(
+                    max(max(4.0, dailyGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
+                    if (compareWithPreviousWeek) (previousWeeklyTrends.maxOfOrNull { it.totalHours } ?: 0.0) + 0.8 else 0.0
+                )
 
                 Box(
                     modifier = Modifier
@@ -1516,6 +1800,17 @@ fun StudyHoursRechartsBarChart(
                                 (dayTrend.totalHours / maxDailyHours).toFloat().coerceIn(0.04f, 1f)
                             }
 
+                            val prevDayTrend = if (compareWithPreviousWeek) {
+                                previousWeeklyTrends.firstOrNull { it.dayKey == dayTrend.dayKey }
+                            } else null
+                            val prevDayHours = prevDayTrend?.totalHours ?: 0.0
+                            val prevTargetFraction = (prevDayHours / maxDailyHours).toFloat().coerceIn(0.04f, 1f)
+                            val prevAnimatedHeight by animateFloatAsState(
+                                targetValue = prevTargetFraction,
+                                animationSpec = tween(durationMillis = 650),
+                                label = "trend_prev_${dayTrend.dayKey}"
+                            )
+
                             val animatedHeight by animateFloatAsState(
                                 targetValue = targetFraction,
                                 animationSpec = tween(durationMillis = 650),
@@ -1533,27 +1828,80 @@ fun StudyHoursRechartsBarChart(
                                     .testTag("bar_day_${dayTrend.dayKey}")
                             ) {
                                 // Value label
-                                val labelText = if (selectedWeeklySubjectFilter != null) {
+                                val labelText = if (compareWithPreviousWeek) {
+                                    "${String.format(Locale.US, "%.1f", dayTrend.totalHours)}h | ${String.format(Locale.US, "%.1f", prevDayHours)}h"
+                                } else if (selectedWeeklySubjectFilter != null) {
                                     "${String.format(Locale.US, "%.1f", subjectFilterHours ?: 0.0)}h"
                                 } else {
                                     "${String.format(Locale.US, "%.1f", dayTrend.totalHours)}h"
                                 }
 
-                                val labelColor = if (selectedWeeklySubjectFilter != null) {
+                                val labelColor = if (compareWithPreviousWeek) {
+                                    if (reachesGoal) EmeraldTertiary else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
+                                } else if (selectedWeeklySubjectFilter != null) {
                                     if ((subjectFilterMins ?: 0) > 0) getSubjectColor(selectedWeeklySubjectFilter!!)
                                     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                 } else if (reachesGoal) EmeraldTertiary else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurface
 
                                 Text(
                                     text = labelText,
-                                    fontSize = 10.sp,
+                                    fontSize = if (compareWithPreviousWeek) 9.sp else 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = labelColor,
                                     modifier = Modifier.padding(bottom = 4.dp)
                                 )
 
                                 // Vertical Bar
-                                if (showWeeklySubjectBreakdown && selectedWeeklySubjectFilter == null) {
+                                if (compareWithPreviousWeek) {
+                                    // Paired Bars: This Week & Previous Week
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(0.75f),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.Bottom
+                                    ) {
+                                        // Current Week Bar
+                                        Box(
+                                            modifier = Modifier
+                                                .width(11.dp)
+                                                .fillMaxHeight(animatedHeight)
+                                                .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(
+                                                            if (isSelected) VioletSecondary else if (reachesGoal) EmeraldTertiary else IndigoPrimary,
+                                                            if (isSelected) IndigoPrimary else if (reachesGoal) Color(0xFF059669) else Color(0xFF6366F1)
+                                                        )
+                                                    )
+                                                )
+                                                .then(
+                                                    if (isToday) Modifier.border(
+                                                        1.5.dp,
+                                                        WarningAmber,
+                                                        RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp)
+                                                    ) else Modifier
+                                                )
+                                                .testTag("bar_day_curr_${dayTrend.dayKey}")
+                                        )
+
+                                        Spacer(modifier = Modifier.width(3.dp))
+
+                                        // Previous Week Bar
+                                        Box(
+                                            modifier = Modifier
+                                                .width(11.dp)
+                                                .fillMaxHeight(prevAnimatedHeight)
+                                                .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(Color(0xFF94A3B8), Color(0xFF64748B))
+                                                    )
+                                                )
+                                                .testTag("bar_day_prev_${dayTrend.dayKey}")
+                                        )
+                                    }
+                                } else if (showWeeklySubjectBreakdown && selectedWeeklySubjectFilter == null) {
                                     // Stacked Subject Breakdown Bar
                                     val validEntries = dayTrend.subjectBreakdown.entries.filter { it.value > 0 }
                                     Box(

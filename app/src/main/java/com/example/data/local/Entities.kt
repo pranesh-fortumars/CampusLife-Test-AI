@@ -188,6 +188,18 @@ data class WeeklySubjectContribution(
         get() = totalMinutes / 60.0
 }
 
+data class WeekComparisonSummary(
+    val currentWeekTotalMinutes: Int = 0,
+    val previousWeekTotalMinutes: Int = 0,
+    val deltaMinutes: Int = 0,
+    val percentChange: Double = 0.0,
+    val isIncreased: Boolean = true
+) {
+    val currentWeekTotalHours: Double get() = currentWeekTotalMinutes / 60.0
+    val previousWeekTotalHours: Double get() = previousWeekTotalMinutes / 60.0
+    val deltaHours: Double get() = Math.abs(currentWeekTotalHours - previousWeekTotalHours)
+}
+
 
 
 

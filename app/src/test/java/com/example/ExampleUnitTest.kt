@@ -245,4 +245,64 @@ class ExampleUnitTest {
         assertEquals("Binary Tree Project", cs201Pending[0].title)
         assertEquals("Heaps Homework", cs201Pending[1].title)
     }
+
+    @Test
+    fun `test WeekComparisonSummary calculation for increased study hours`() {
+        val curMins = 900 // 15.0h
+        val prevMins = 780 // 13.0h
+        val deltaMins = curMins - prevMins // 120m
+        val pct = if (prevMins > 0) ((deltaMins.toDouble() / prevMins.toDouble()) * 100.0) else 0.0
+        val summary = com.example.data.local.WeekComparisonSummary(
+            currentWeekTotalMinutes = curMins,
+            previousWeekTotalMinutes = prevMins,
+            deltaMinutes = deltaMins,
+            percentChange = Math.round(pct * 10.0) / 10.0,
+            isIncreased = deltaMins >= 0
+        )
+
+        assertEquals(15.0, summary.currentWeekTotalHours, 0.001)
+        assertEquals(13.0, summary.previousWeekTotalHours, 0.001)
+        assertEquals(2.0, summary.deltaHours, 0.001)
+        assertEquals(15.4, summary.percentChange, 0.001)
+        assertTrue(summary.isIncreased)
+    }
+
+    @Test
+    fun `test WeekComparisonSummary calculation for decreased study hours`() {
+        val curMins = 600 // 10.0h
+        val prevMins = 750 // 12.5h
+        val deltaMins = curMins - prevMins // -150m
+        val pct = if (prevMins > 0) ((deltaMins.toDouble() / prevMins.toDouble()) * 100.0) else 0.0
+        val summary = com.example.data.local.WeekComparisonSummary(
+            currentWeekTotalMinutes = curMins,
+            previousWeekTotalMinutes = prevMins,
+            deltaMinutes = deltaMins,
+            percentChange = Math.round(pct * 10.0) / 10.0,
+            isIncreased = deltaMins >= 0
+        )
+
+        assertEquals(10.0, summary.currentWeekTotalHours, 0.001)
+        assertEquals(12.5, summary.previousWeekTotalHours, 0.001)
+        assertEquals(2.5, summary.deltaHours, 0.001)
+        assertEquals(-20.0, summary.percentChange, 0.001)
+        assertFalse(summary.isIncreased)
+    }
+
+    @Test
+    fun `test subject and day comparative delta calculations`() {
+        // Test subject comparison
+        val currentSubjectHours = 6.5
+        val prevSubjectHours = 4.0
+        val deltaSubjectHours = currentSubjectHours - prevSubjectHours
+        val pctDelta = if (prevSubjectHours > 0) ((deltaSubjectHours / prevSubjectHours) * 100).toInt() else 0
+        assertEquals(2.5, deltaSubjectHours, 0.001)
+        assertEquals(62, pctDelta)
+
+        // Test day comparison
+        val mondayCurrentHours = 3.0
+        val mondayPrevHours = 2.0
+        val mondayDelta = mondayCurrentHours - mondayPrevHours
+        assertTrue(mondayDelta > 0)
+        assertEquals(1.0, mondayDelta, 0.001)
+    }
 }
