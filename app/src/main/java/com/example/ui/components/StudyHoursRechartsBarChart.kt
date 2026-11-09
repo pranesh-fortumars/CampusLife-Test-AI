@@ -61,6 +61,7 @@ fun StudyHoursRechartsBarChart(
     val courses by viewModel.courses.collectAsState()
     val dailyGoalHours by viewModel.dailyStudyGoalHours.collectAsState()
     val subjectWeeklyGoals by viewModel.subjectWeeklyStudyGoals.collectAsState()
+    val selectedSessionTagFilter by viewModel.selectedSessionTagFilter.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
@@ -145,7 +146,11 @@ fun StudyHoursRechartsBarChart(
                         )
                     }
                     Text(
-                        text = if (viewMode == ChartViewMode.WEEKLY_TREND) "Day-by-day consistency from Room study records" else "Recharts-style analytics from Room database",
+                        text = if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                            if (selectedSessionTagFilter == "All") "Day-by-day consistency from Room study records" else "Consistency for '$selectedSessionTagFilter' sessions"
+                        } else {
+                            if (selectedSessionTagFilter == "All") "Recharts-style analytics from Room database" else "Filtered by '$selectedSessionTagFilter' category"
+                        },
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -156,7 +161,11 @@ fun StudyHoursRechartsBarChart(
                     color = EmeraldTertiaryContainer
                 ) {
                     Text(
-                        text = "${String.format("%.1f", totalFocusMinutes / 60.0)}h Logged",
+                        text = if (selectedSessionTagFilter == "All") {
+                            "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h Logged"
+                        } else {
+                            "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h ($selectedSessionTagFilter)"
+                        },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = EmeraldOnTertiaryContainer,
@@ -261,6 +270,111 @@ fun StudyHoursRechartsBarChart(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+                    }
+                }
+
+                // Session Category / Tag Filter Chips Row
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.FilterList,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Filter by Session Tag:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (selectedSessionTagFilter != "All") {
+                            Text(
+                                text = "Showing '$selectedSessionTagFilter' • Reset",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = IndigoPrimary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { viewModel.selectSessionTagFilter("All") }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    .testTag("btn_reset_tag_filter")
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        viewModel.availableSessionTags.forEach { tag ->
+                            val isSelected = selectedSessionTagFilter.equals(tag, ignoreCase = true)
+                            val tagIcon = when (tag) {
+                                "Exam Prep" -> Icons.Default.Quiz
+                                "Homework" -> Icons.Default.EditNote
+                                "Research" -> Icons.Default.Science
+                                "Project" -> Icons.Default.Code
+                                "Revision" -> Icons.Default.Refresh
+                                else -> Icons.Default.AllInclusive
+                            }
+                            val tagColor = when (tag) {
+                                "Exam Prep" -> IndigoPrimary
+                                "Homework" -> EmeraldTertiary
+                                "Research" -> Color(0xFF0284C7)
+                                "Project" -> VioletSecondary
+                                "Revision" -> Color(0xFFEA580C)
+                                else -> IndigoPrimary
+                            }
+
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    viewModel.selectSessionTagFilter(tag)
+                                    selectedStat = null
+                                    selectedDayTrend = null
+                                },
+                                label = {
+                                    Text(
+                                        text = tag,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        tagIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                },
+                                shape = RoundedCornerShape(100),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = tagColor.copy(alpha = 0.16f),
+                                    selectedLabelColor = tagColor,
+                                    selectedLeadingIconColor = tagColor
+                                ),
+                                border = if (isSelected) BorderStroke(1.2.dp, tagColor) else null,
+                                modifier = Modifier
+                                    .heightIn(min = 32.dp)
+                                    .testTag("filter_chip_tag_${tag.lowercase().replace(" ", "_")}")
+                            )
                         }
                     }
                 }
@@ -552,7 +666,8 @@ fun StudyHoursRechartsBarChart(
                                         )
                                     }
                                     Text(
-                                        "${String.format(Locale.US, "%.1f", stat.totalHours)}h logged • ${stat.sessionCount} focus sessions",
+                                        "${String.format(Locale.US, "%.1f", stat.totalHours)}h logged • ${stat.sessionCount} focus sessions" +
+                                                if (selectedSessionTagFilter != "All") " ($selectedSessionTagFilter)" else "",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

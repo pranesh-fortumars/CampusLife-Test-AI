@@ -59,6 +59,8 @@ fun PomodoroStudyTimerComponent(
 
     var selectedMode by remember { mutableStateOf(TimerMode.FOCUS_25) }
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
+    var selectedTag by remember { mutableStateOf("Exam Prep") }
+    val sessionTags = remember { listOf("Exam Prep", "Homework", "Research", "Project", "Revision") }
     var showSubjectGoalsModal by remember { mutableStateOf(false) }
     var selectedGoalCourseCode by remember { mutableStateOf<String?>(null) }
 
@@ -85,18 +87,19 @@ fun PomodoroStudyTimerComponent(
             val subjectName = course?.name ?: "General Academics"
 
             if (selectedMode == TimerMode.FOCUS_25 || selectedMode == TimerMode.FOCUS_50) {
-                // Save study session to Room
+                // Save study session to Room with tag
                 viewModel.recordStudySession(
                     courseCode = courseCode,
                     subjectName = subjectName,
                     durationMinutes = selectedMode.defaultMinutes,
-                    mode = "FOCUS"
+                    mode = "FOCUS",
+                    tag = selectedTag
                 )
                 // Fire notification
                 TaskNotificationHelper.showFocusSessionFinishedNotification(
                     context = context,
                     courseCode = courseCode,
-                    subjectName = subjectName,
+                    subjectName = "$subjectName ($selectedTag)",
                     durationMinutes = selectedMode.defaultMinutes
                 )
             } else {
@@ -253,6 +256,69 @@ fun PomodoroStudyTimerComponent(
                             }
                         }
                     }
+
+                    // Session Category / Tag Selector
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        "Session Category / Tag:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(sessionTags) { tag ->
+                            val isSelected = selectedTag == tag
+                            val tagColor = when (tag) {
+                                "Exam Prep" -> IndigoPrimary
+                                "Homework" -> EmeraldTertiary
+                                "Research" -> Color(0xFF0284C7)
+                                "Project" -> VioletSecondary
+                                "Revision" -> Color(0xFFEA580C)
+                                else -> IndigoPrimary
+                            }
+                            val tagIcon = when (tag) {
+                                "Exam Prep" -> Icons.Default.Quiz
+                                "Homework" -> Icons.Default.EditNote
+                                "Research" -> Icons.Default.Science
+                                "Project" -> Icons.Default.Code
+                                "Revision" -> Icons.Default.Refresh
+                                else -> Icons.Default.Bookmark
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) tagColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, tagColor) else null,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { selectedTag = tag }
+                                    .testTag("chip_tag_${tag.lowercase().replace(" ", "_")}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Icon(
+                                        tagIcon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(12.dp),
+                                        tint = if (isSelected) tagColor else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = tag,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) tagColor else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (isSelected) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(11.dp), tint = tagColor)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -310,8 +376,12 @@ fun PomodoroStudyTimerComponent(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = selectedCourse?.code ?: "General",
-                        fontSize = 12.sp,
+                        text = if (selectedMode == TimerMode.FOCUS_25 || selectedMode == TimerMode.FOCUS_50) {
+                            "${selectedCourse?.code ?: "General"} • $selectedTag"
+                        } else {
+                            selectedCourse?.code ?: "Break Time"
+                        },
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = timerColor
                     )
@@ -379,12 +449,13 @@ fun PomodoroStudyTimerComponent(
                                 courseCode = courseCode,
                                 subjectName = subjectName,
                                 durationMinutes = loggedMins,
-                                mode = "FOCUS"
+                                mode = "FOCUS",
+                                tag = selectedTag
                             )
                             TaskNotificationHelper.showFocusSessionFinishedNotification(
                                 context,
                                 courseCode,
-                                subjectName,
+                                "$subjectName ($selectedTag)",
                                 loggedMins
                             )
                             isRunning = false

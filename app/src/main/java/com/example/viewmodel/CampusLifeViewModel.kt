@@ -391,19 +391,67 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Study Sessions & Pomodoro tracking
-    val studyStatsPerSubject: StateFlow<List<SubjectStudyStats>> = studySessionDao.getStudyStatsPerSubject()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val availableSessionTags = listOf("All", "Exam Prep", "Homework", "Research", "Project", "Revision")
 
-    val totalFocusMinutes: StateFlow<Int> = studySessionDao.getTotalFocusMinutes()
-        .map { it ?: 0 }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+    private val _selectedSessionTagFilter = MutableStateFlow("All")
+    val selectedSessionTagFilter: StateFlow<String> = _selectedSessionTagFilter.asStateFlow()
+
+    fun selectSessionTagFilter(tag: String) {
+        _selectedSessionTagFilter.value = tag
+    }
 
     val allStudySessions: StateFlow<List<StudySessionEntity>> = studySessionDao.getAllSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val weeklyStudyTrends: StateFlow<List<DayStudyTrend>> = allStudySessions.map { sessions ->
+    val studyStatsPerSubject: StateFlow<List<SubjectStudyStats>> = combine(
+        allStudySessions,
+        _selectedSessionTagFilter,
+        courses
+    ) { sessions, tagFilter, courseList ->
+        val filtered = if (tagFilter == "All") {
+            sessions
+        } else {
+            sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
+        }
+        val grouped = filtered.groupBy { it.courseCode }
+        val allCodes = (courseList.map { it.code } + grouped.keys).distinct()
+        allCodes.map { code ->
+            val list = grouped[code] ?: emptyList()
+            SubjectStudyStats(
+                courseCode = code,
+                totalMinutes = list.sumOf { it.durationMinutes },
+                sessionCount = list.size
+            )
+        }.sortedByDescending { it.totalMinutes }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalFocusMinutes: StateFlow<Int> = combine(
+        allStudySessions,
+        _selectedSessionTagFilter
+    ) { sessions, tagFilter ->
+        val filtered = if (tagFilter == "All") {
+            sessions
+        } else {
+            sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
+        }
+        filtered.filter { it.mode == "FOCUS" }.sumOf { it.durationMinutes }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val weeklyStudyTrends: StateFlow<List<DayStudyTrend>> = combine(
+        allStudySessions,
+        _selectedSessionTagFilter
+    ) { sessions, tagFilter ->
         val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+        val tagMultiplier = when (tagFilter) {
+            "Exam Prep" -> 0.45
+            "Homework" -> 0.35
+            "Research" -> 0.20
+            "Project" -> 0.25
+            "Revision" -> 0.20
+            else -> 1.0
+        }
 
         val baseBreakdowns = mapOf(
             "Mon" to mapOf("CS201" to 90, "MATH204" to 60),      // 150m (2.5h)
@@ -415,11 +463,23 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             "Sun" to mapOf("ENG215" to 45, "CS310" to 30)        // 75m (1.25h)
         )
 
-        val todaySessions = sessions.filter { it.dateDisplay == "Today" }
+        val filteredSessions = if (tagFilter == "All") {
+            sessions
+        } else {
+            sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
+        }
+        val todaySessions = filteredSessions.filter { it.dateDisplay == "Today" }
 
         days.mapIndexed { index, dayKey ->
             val isToday = (dayKey == "Tue") // 2026-11-03 is Tuesday
-            val dayBreakdown = (baseBreakdowns[dayKey] ?: emptyMap()).toMutableMap()
+            val rawBreakdown = baseBreakdowns[dayKey] ?: emptyMap()
+            val dayBreakdown = mutableMapOf<String, Int>()
+
+            rawBreakdown.forEach { (sub, mins) ->
+                val scaled = if (tagFilter == "All") mins else maxOf(10, kotlin.math.round(mins * tagMultiplier).toInt())
+                dayBreakdown[sub] = scaled
+            }
+
             if (isToday) {
                 todaySessions.forEach { s ->
                     val cur = dayBreakdown[s.courseCode] ?: 0
@@ -472,12 +532,12 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun recordStudySession(
-
         courseCode: String,
         subjectName: String,
         durationMinutes: Int,
         mode: String,
-        notes: String = ""
+        notes: String = "",
+        tag: String = "Exam Prep"
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             studySessionDao.insertSession(
@@ -488,7 +548,8 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                     timestampMs = System.currentTimeMillis(),
                     dateDisplay = "Today",
                     mode = mode,
-                    notes = notes
+                    notes = notes,
+                    tag = tag
                 )
             )
         }

@@ -183,6 +183,12 @@ interface StudySessionDao {
     @Query("SELECT * FROM study_sessions ORDER BY timestampMs DESC")
     fun getAllSessions(): Flow<List<StudySessionEntity>>
 
+    @Query("SELECT * FROM study_sessions WHERE tag = :tag ORDER BY timestampMs DESC")
+    fun getSessionsByTag(tag: String): Flow<List<StudySessionEntity>>
+
+    @Query("SELECT DISTINCT tag FROM study_sessions")
+    fun getDistinctTags(): Flow<List<String>>
+
     @Query("SELECT courseCode, SUM(durationMinutes) as totalMinutes, COUNT(*) as sessionCount FROM study_sessions GROUP BY courseCode ORDER BY totalMinutes DESC")
     fun getStudyStatsPerSubject(): Flow<List<SubjectStudyStats>>
 

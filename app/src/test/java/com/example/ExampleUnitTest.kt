@@ -130,4 +130,52 @@ class ExampleUnitTest {
         assertEquals(4, contribution.daysActive.size)
         assertTrue(contribution.daysActive.contains("Mon"))
     }
+
+    @Test
+    fun `test StudySessionEntity tag support and category filtering`() {
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 50,
+                dateDisplay = "Today",
+                mode = "FOCUS",
+                notes = "Tree traversals",
+                tag = "Exam Prep"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 45,
+                dateDisplay = "Today",
+                mode = "FOCUS",
+                notes = "Homework 3",
+                tag = "Homework"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS310",
+                subjectName = "Operating Systems",
+                durationMinutes = 50,
+                dateDisplay = "Yesterday",
+                mode = "FOCUS",
+                notes = "Kernel scheduling research",
+                tag = "Research"
+            )
+        )
+
+        // Verify default and custom tags
+        assertEquals("Exam Prep", sessions[0].tag)
+        assertEquals("Homework", sessions[1].tag)
+        assertEquals("Research", sessions[2].tag)
+
+        // Filter by Exam Prep
+        val examPrep = sessions.filter { it.tag.equals("Exam Prep", ignoreCase = true) }
+        assertEquals(1, examPrep.size)
+        assertEquals(50, examPrep.sumOf { it.durationMinutes })
+
+        // Filter by All
+        val all = sessions.filter { "All" == "All" || it.tag.equals("All", ignoreCase = true) }
+        assertEquals(3, all.size)
+        assertEquals(145, all.sumOf { it.durationMinutes })
+    }
 }

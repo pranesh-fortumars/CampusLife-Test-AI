@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
         SemesterEntity::class,
         StudySessionEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -426,7 +426,18 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (2 * 3600 * 1000),
                         dateDisplay = "Today",
                         mode = "FOCUS",
-                        notes = "Binary Search Tree rotations & balance factors"
+                        notes = "Binary Search Tree rotations & balance factors",
+                        tag = "Exam Prep"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "CS201",
+                        subjectName = "Data Structures & Algorithms",
+                        durationMinutes = 45,
+                        timestampMs = now - (6 * 3600 * 1000),
+                        dateDisplay = "Today",
+                        mode = "FOCUS",
+                        notes = "Graph traversal Dijkstra implementation",
+                        tag = "Homework"
                     ),
                     StudySessionEntity(
                         courseCode = "CS201",
@@ -435,7 +446,8 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (24 * 3600 * 1000),
                         dateDisplay = "Yesterday",
                         mode = "FOCUS",
-                        notes = "Heap sort priority queue implementations"
+                        notes = "Heap sort priority queue implementations",
+                        tag = "Revision"
                     ),
                     StudySessionEntity(
                         courseCode = "MATH204",
@@ -444,7 +456,18 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (36 * 3600 * 1000),
                         dateDisplay = "Yesterday",
                         mode = "FOCUS",
-                        notes = "Combinatorics & recurrence relations proofs"
+                        notes = "Combinatorics & recurrence relations proofs",
+                        tag = "Exam Prep"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "MATH204",
+                        subjectName = "Discrete Mathematics",
+                        durationMinutes = 40,
+                        timestampMs = now - (42 * 3600 * 1000),
+                        dateDisplay = "Yesterday",
+                        mode = "FOCUS",
+                        notes = "Set theory problem set #4",
+                        tag = "Homework"
                     ),
                     StudySessionEntity(
                         courseCode = "MATH204",
@@ -453,7 +476,8 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (48 * 3600 * 1000),
                         dateDisplay = "2 days ago",
                         mode = "FOCUS",
-                        notes = "Euler and Hamiltonian graphs practice"
+                        notes = "Euler and Hamiltonian graphs practice",
+                        tag = "Revision"
                     ),
                     StudySessionEntity(
                         courseCode = "CS310",
@@ -462,7 +486,18 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (52 * 3600 * 1000),
                         dateDisplay = "2 days ago",
                         mode = "FOCUS",
-                        notes = "Semaphores & Dining Philosophers problem"
+                        notes = "Semaphores & Dining Philosophers problem",
+                        tag = "Project"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "CS310",
+                        subjectName = "Operating Systems",
+                        durationMinutes = 45,
+                        timestampMs = now - (56 * 3600 * 1000),
+                        dateDisplay = "2 days ago",
+                        mode = "FOCUS",
+                        notes = "Virtual memory paging research paper",
+                        tag = "Research"
                     ),
                     StudySessionEntity(
                         courseCode = "PHY102",
@@ -471,7 +506,28 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (72 * 3600 * 1000),
                         dateDisplay = "3 days ago",
                         mode = "FOCUS",
-                        notes = "Poynting vector & Maxwell wave equations"
+                        notes = "Poynting vector & Maxwell wave equations",
+                        tag = "Exam Prep"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "PHY102",
+                        subjectName = "Applied Electromagnetism",
+                        durationMinutes = 35,
+                        timestampMs = now - (76 * 3600 * 1000),
+                        dateDisplay = "3 days ago",
+                        mode = "FOCUS",
+                        notes = "Electromagnetic wave propagation lab report",
+                        tag = "Homework"
+                    ),
+                    StudySessionEntity(
+                        courseCode = "ENG215",
+                        subjectName = "Technical Writing",
+                        durationMinutes = 40,
+                        timestampMs = now - (80 * 3600 * 1000),
+                        dateDisplay = "3 days ago",
+                        mode = "FOCUS",
+                        notes = "Literature review & ACM bibliography styles",
+                        tag = "Research"
                     ),
                     StudySessionEntity(
                         courseCode = "ENG215",
@@ -480,7 +536,8 @@ abstract class AppDatabase : RoomDatabase() {
                         timestampMs = now - (96 * 3600 * 1000),
                         dateDisplay = "4 days ago",
                         mode = "FOCUS",
-                        notes = "IEEE reference formatting and abstract refinement"
+                        notes = "IEEE reference formatting and abstract refinement",
+                        tag = "Revision"
                     )
                 )
             )

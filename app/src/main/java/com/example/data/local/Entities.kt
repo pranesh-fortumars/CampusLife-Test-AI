@@ -152,7 +152,8 @@ data class StudySessionEntity(
     val timestampMs: Long = System.currentTimeMillis(),
     val dateDisplay: String,
     val mode: String = "FOCUS", // FOCUS, SHORT_BREAK, LONG_BREAK
-    val notes: String = ""
+    val notes: String = "",
+    val tag: String = "Exam Prep" // Exam Prep, Homework, Research, Project, Revision
 )
 
 data class SubjectStudyStats(
