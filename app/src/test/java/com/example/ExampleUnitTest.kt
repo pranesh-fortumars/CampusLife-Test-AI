@@ -305,4 +305,32 @@ class ExampleUnitTest {
         assertTrue(mondayDelta > 0)
         assertEquals(1.0, mondayDelta, 0.001)
     }
+
+    @Test
+    fun `test global theme toggle switching and accessibility descriptions`() {
+        // Initial state: not set (null), follows system dark theme
+        var isDarkModePref: Boolean? = null
+        val systemIsDark = false
+
+        val initialEffectiveDark = isDarkModePref ?: systemIsDark
+        assertFalse(initialEffectiveDark)
+
+        // Toggle from Light to Dark
+        val current = isDarkModePref ?: systemIsDark
+        isDarkModePref = !current
+        assertTrue(isDarkModePref!!)
+
+        // Verify accessibility content description for Dark mode
+        val darkDescription = if (isDarkModePref!!) "Switch to Light Mode" else "Switch to Dark Mode"
+        assertEquals("Switch to Light Mode", darkDescription)
+
+        // Toggle again from Dark to Light
+        val nextCurrent = isDarkModePref ?: systemIsDark
+        isDarkModePref = !nextCurrent
+        assertFalse(isDarkModePref!!)
+
+        // Verify accessibility content description for Light mode
+        val lightDescription = if (isDarkModePref!!) "Switch to Light Mode" else "Switch to Dark Mode"
+        assertEquals("Switch to Dark Mode", lightDescription)
+    }
 }

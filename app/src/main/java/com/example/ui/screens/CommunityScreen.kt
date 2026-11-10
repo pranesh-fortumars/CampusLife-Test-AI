@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CommunityPostEntity
+import com.example.ui.components.GlobalThemeToggleButton
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 
@@ -51,7 +53,7 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Peer Community Feed",
                                 style = MaterialTheme.typography.titleLarge,
@@ -64,15 +66,29 @@ fun CommunityScreen(viewModel: CampusLifeViewModel) {
                             )
                         }
 
-                        FilledTonalButton(
-                            onClick = { showCreateDialog = true },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            modifier = Modifier.testTag("btn_open_post_dialog")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Ask Peer", fontSize = 12.sp)
+                            val isDarkModePref by viewModel.isDarkMode.collectAsState()
+                            val isSystemDark = isSystemInDarkTheme()
+                            val isDark = isDarkModePref ?: isSystemDark
+
+                            GlobalThemeToggleButton(
+                                isDark = isDark,
+                                onToggle = { viewModel.toggleTheme(isSystemDark) }
+                            )
+
+                            FilledTonalButton(
+                                onClick = { showCreateDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.testTag("btn_create_post")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Post", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
 

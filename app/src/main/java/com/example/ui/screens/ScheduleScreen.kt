@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CourseEntity
+import com.example.ui.components.GlobalThemeToggleButton
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
 
@@ -42,7 +44,7 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Academics & Schedule",
                                 style = MaterialTheme.typography.titleLarge,
@@ -54,6 +56,15 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        val isDarkModePref by viewModel.isDarkMode.collectAsState()
+                        val isSystemDark = isSystemInDarkTheme()
+                        val isDark = isDarkModePref ?: isSystemDark
+
+                        GlobalThemeToggleButton(
+                            isDark = isDark,
+                            onToggle = { viewModel.toggleTheme(isSystemDark) }
+                        )
                     }
 
                     TabRow(

@@ -129,6 +129,15 @@ fun SearchScreen(
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
                             )
                         )
+
+                        val isDarkModePref by viewModel.isDarkMode.collectAsState()
+                        val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+                        val isDark = isDarkModePref ?: isSystemDark
+
+                        com.example.ui.components.GlobalThemeToggleButton(
+                            isDark = isDark,
+                            onToggle = { viewModel.toggleTheme(isSystemDark) }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))

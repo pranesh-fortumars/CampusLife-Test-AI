@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.CourseEntity
+import com.example.ui.components.GlobalThemeToggleButton
 import com.example.ui.theme.*
 import com.example.viewmodel.AppDestination
 import com.example.viewmodel.CampusLifeViewModel
@@ -49,15 +51,26 @@ fun HomeScreen(
     ) {
         // Hero Header & Quick Search Bar
         item {
+            val isDarkModePref by viewModel.isDarkMode.collectAsState()
+            val isSystemDark = isSystemInDarkTheme()
+            val isDark = isDarkModePref ?: isSystemDark
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                            )
+                            if (isDark) {
+                                listOf(
+                                    Color(0xFF1E1B4B),
+                                    Color(0xFF0F172A)
+                                )
+                            } else {
+                                listOf(
+                                    MaterialTheme.colorScheme.primary,
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                                )
+                            }
                         )
                     )
                     .statusBarsPadding()
@@ -69,7 +82,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Welcome back, Devon!",
                                 style = MaterialTheme.typography.titleLarge,
@@ -83,18 +96,30 @@ fun HomeScreen(
                             )
                         }
 
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.2f),
-                            modifier = Modifier.size(44.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.School,
-                                    contentDescription = "Profile",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                            // Global Theme Toggle Button in Header
+                            GlobalThemeToggleButton(
+                                isDark = isDark,
+                                onToggle = { viewModel.toggleTheme(isSystemDark) },
+                                onHeroHeader = true
+                            )
+
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.2f),
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.School,
+                                        contentDescription = "Profile",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -102,7 +127,7 @@ fun HomeScreen(
                     // Prominent Global Search Bar
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 4.dp,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -121,25 +146,25 @@ fun HomeScreen(
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = "Search",
-                                tint = IndigoPrimary,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(22.dp)
                             )
                             Text(
                                 "Find courses, notes, questions...",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = SlateOnSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.weight(1f)
                             )
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = IndigoPrimaryContainer,
+                                color = MaterialTheme.colorScheme.primaryContainer,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             ) {
                                 Text(
                                     "Quick Search",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = IndigoOnPrimaryContainer,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }

@@ -747,6 +747,30 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             }
         }
     }
+
+    // Global Dark / Light Theme mode toggle for accessibility
+    private val themePrefs = getApplication<Application>().getSharedPreferences("campus_life_theme_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _isDarkMode = MutableStateFlow<Boolean?>(
+        if (themePrefs.contains("is_dark_mode")) themePrefs.getBoolean("is_dark_mode", false) else null
+    )
+    val isDarkMode: StateFlow<Boolean?> = _isDarkMode.asStateFlow()
+
+    fun toggleTheme(systemIsDark: Boolean = false) {
+        val current = _isDarkMode.value ?: systemIsDark
+        val newMode = !current
+        _isDarkMode.value = newMode
+        viewModelScope.launch(Dispatchers.IO) {
+            themePrefs.edit().putBoolean("is_dark_mode", newMode).apply()
+        }
+    }
+
+    fun setDarkMode(dark: Boolean) {
+        _isDarkMode.value = dark
+        viewModelScope.launch(Dispatchers.IO) {
+            themePrefs.edit().putBoolean("is_dark_mode", dark).apply()
+        }
+    }
 }
 
 

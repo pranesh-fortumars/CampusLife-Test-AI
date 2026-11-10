@@ -17,12 +17,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.ui.components.GlobalThemeToggleButton
 import com.example.ui.theme.*
 import com.example.util.AppUpdateManager
+import com.example.viewmodel.CampusLifeViewModel
 import kotlinx.coroutines.launch
 
 @Composable
-fun MeScreen() {
+fun MeScreen(viewModel: CampusLifeViewModel = viewModel()) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -36,6 +40,10 @@ fun MeScreen() {
     var showEditUrlDialog by remember { mutableStateOf(false) }
     var customUrlInput by remember { mutableStateOf(AppUpdateManager.getVercelUrl(context)) }
 
+    val isDarkModePref by viewModel.isDarkMode.collectAsState()
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = isDarkModePref ?: isSystemDark
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -44,7 +52,7 @@ fun MeScreen() {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Profile Identity Card
+        // Profile Identity Card with Header Theme Toggle Button
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -59,28 +67,105 @@ fun MeScreen() {
                         .fillMaxWidth()
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = IndigoPrimaryContainer,
-                        modifier = Modifier.size(56.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                "DM",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
-                                color = IndigoOnPrimaryContainer
-                            )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    "DM",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Devon Miles", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("Computer Science & Engineering • 4th Sem", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Roll No: 2024-CSE-042 • Section A", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                         }
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("Devon Miles", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Computer Science & Engineering • 4th Sem", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Roll No: 2024-CSE-042 • Section A", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                    // Global Theme Toggle Button in Header
+                    GlobalThemeToggleButton(
+                        isDark = isDark,
+                        onToggle = { viewModel.toggleTheme(isSystemDark) }
+                    )
+                }
+            }
+        }
+
+        // Accessibility & Appearance Card
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("accessibility_theme_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isDark) WarningContainer else IndigoPrimaryContainer,
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isDark) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                        contentDescription = null,
+                                        tint = if (isDark) OnWarningContainer else IndigoPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "Accessibility & Display",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (isDark) "Dark mode active (Reduced eye strain)" else "Light mode active (High contrast)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = isDark,
+                            onCheckedChange = { viewModel.setDarkMode(it) },
+                            modifier = Modifier.testTag("theme_accessibility_switch")
+                        )
                     }
+
+                    Text(
+                        text = "Switches background and text contrast between dark and light themes for optimal reading accessibility and comfortable viewing across varying ambient lighting.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 16.sp
+                    )
                 }
             }
         }

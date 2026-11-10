@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -46,9 +47,13 @@ class MainActivity : ComponentActivity() {
         val navigateToTasks = intent?.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
 
         setContent {
-            CampusLifeTheme {
+            val viewModel: CampusLifeViewModel = viewModel()
+            val isDarkThemePref by viewModel.isDarkMode.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val effectiveDark = isDarkThemePref ?: systemDark
+
+            CampusLifeTheme(darkTheme = effectiveDark) {
                 val context = LocalContext.current
-                val viewModel: CampusLifeViewModel = viewModel()
                 val currentDestination by viewModel.currentDestination.collectAsState()
 
                 // Request POST_NOTIFICATIONS runtime permission on Android 13+
@@ -149,7 +154,7 @@ class MainActivity : ComponentActivity() {
                             )
                             AppDestination.SCHEDULE -> ScheduleScreen(viewModel = viewModel)
                             AppDestination.COMMUNITY -> CommunityScreen(viewModel = viewModel)
-                            AppDestination.ME -> MeScreen()
+                            AppDestination.ME -> MeScreen(viewModel = viewModel)
                         }
                     }
                 }
