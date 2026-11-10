@@ -333,4 +333,82 @@ class ExampleUnitTest {
         val lightDescription = if (isDarkModePref!!) "Switch to Light Mode" else "Switch to Dark Mode"
         assertEquals("Switch to Dark Mode", lightDescription)
     }
+
+    @Test
+    fun `test Pomodoro session calculation based on weekly study goal deficit`() {
+        val targetWeeklyHours = 5.0
+        val loggedHours = 2.0
+        val deficitHours = targetWeeklyHours - loggedHours // 3.0h
+        val remainingMinutes = (deficitHours * 60.0) // 180 min
+        val pomodorosRemaining = Math.ceil(remainingMinutes / 25.0).toInt() // 180 / 25 = 7.2 -> 8 sessions
+
+        assertEquals(3.0, deficitHours, 0.001)
+        assertEquals(8, pomodorosRemaining)
+
+        val progress = com.example.worker.PomodoroGoalNotificationHelper.SubjectGoalProgress(
+            courseCode = "CS201",
+            subjectName = "Data Structures",
+            completedHours = loggedHours,
+            targetWeeklyHours = targetWeeklyHours,
+            deficitHours = deficitHours,
+            pomodorosRemaining = pomodorosRemaining,
+            isBelow50Pct = loggedHours < (targetWeeklyHours * 0.5),
+            isMet = loggedHours >= targetWeeklyHours
+        )
+
+        assertTrue(progress.isBelow50Pct)
+        assertFalse(progress.isMet)
+        assertEquals("CS201", progress.courseCode)
+    }
+
+    @Test
+    fun `test Pomodoro reminder priority ordering when subjects are below 50 percent goal`() {
+        val list = listOf(
+            com.example.worker.PomodoroGoalNotificationHelper.SubjectGoalProgress(
+                courseCode = "PHY102",
+                subjectName = "Physics",
+                completedHours = 3.0,
+                targetWeeklyHours = 4.0,
+                deficitHours = 1.0,
+                pomodorosRemaining = 3,
+                isBelow50Pct = false,
+                isMet = false
+            ),
+            com.example.worker.PomodoroGoalNotificationHelper.SubjectGoalProgress(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                completedHours = 1.5,
+                targetWeeklyHours = 5.0,
+                deficitHours = 3.5,
+                pomodorosRemaining = 9,
+                isBelow50Pct = true, // < 50%
+                isMet = false
+            ),
+            com.example.worker.PomodoroGoalNotificationHelper.SubjectGoalProgress(
+                courseCode = "MATH204",
+                subjectName = "Linear Algebra",
+                completedHours = 5.0,
+                targetWeeklyHours = 5.0,
+                deficitHours = 0.0,
+                pomodorosRemaining = 0,
+                isBelow50Pct = false,
+                isMet = true
+            )
+        ).sortedWith(
+            compareByDescending<com.example.worker.PomodoroGoalNotificationHelper.SubjectGoalProgress> { it.isBelow50Pct }
+                .thenByDescending { it.deficitHours }
+        )
+
+        // Subject below 50% (CS201) must be prioritized first
+        assertEquals("CS201", list.first().courseCode)
+        assertTrue(list.first().isBelow50Pct)
+        assertEquals(9, list.first().pomodorosRemaining)
+
+        // Then other unfinished subjects
+        assertEquals("PHY102", list[1].courseCode)
+
+        // Completed subjects last
+        assertEquals("MATH204", list.last().courseCode)
+        assertTrue(list.last().isMet)
+    }
 }

@@ -38,13 +38,16 @@ class MainActivity : ComponentActivity() {
         // Initialize WorkManager notification channels and periodic deadline checks
         TaskNotificationHelper.createNotificationChannel(this)
         ProjectAssignment24hNotificationHelper.createNotificationChannel(this)
+        com.example.worker.PomodoroGoalNotificationHelper.createNotificationChannel(this)
         DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(this)
         DeadlineWorkScheduler.schedule24HourPeriodicChecks(this)
+        DeadlineWorkScheduler.schedulePeriodicPomodoroReminders(this)
 
         // Prime the 24-hour background deadline service scan from Room database
         ProjectAssignmentDeadlineService.startDeadlineScan(this)
 
         val navigateToTasks = intent?.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
+        val startPomodoro = intent?.getBooleanExtra("EXTRA_START_POMODORO", false) == true
 
         setContent {
             val viewModel: CampusLifeViewModel = viewModel()
@@ -63,6 +66,7 @@ class MainActivity : ComponentActivity() {
                     if (isGranted) {
                         DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(context)
                         DeadlineWorkScheduler.schedule24HourPeriodicChecks(context)
+                        DeadlineWorkScheduler.schedulePeriodicPomodoroReminders(context)
                         ProjectAssignmentDeadlineService.startDeadlineScan(context)
                     }
                 }
@@ -70,6 +74,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     if (navigateToTasks) {
                         viewModel.navigateTo(AppDestination.SEARCH)
+                    } else if (startPomodoro) {
+                        viewModel.navigateTo(AppDestination.HOME)
                     }
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

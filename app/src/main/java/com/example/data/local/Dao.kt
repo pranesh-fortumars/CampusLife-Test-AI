@@ -8,6 +8,9 @@ interface CourseDao {
     @Query("SELECT * FROM courses ORDER BY code ASC")
     fun getAllCourses(): Flow<List<CourseEntity>>
 
+    @Query("SELECT * FROM courses ORDER BY code ASC")
+    suspend fun getAllCoursesList(): List<CourseEntity>
+
     @Query("SELECT * FROM courses WHERE code LIKE '%' || :query || '%' OR name LIKE '%' || :query || '%' OR instructor LIKE '%' || :query || '%' OR room LIKE '%' || :query || '%' ORDER BY code ASC")
     fun searchCourses(query: String): Flow<List<CourseEntity>>
 
@@ -209,6 +212,12 @@ interface StudySessionDao {
 
     @Query("SELECT COUNT(*) FROM study_sessions")
     suspend fun getCount(): Int
+
+    @Query("SELECT * FROM study_sessions WHERE timestampMs >= :sinceMs ORDER BY timestampMs DESC")
+    suspend fun getSessionsSince(sinceMs: Long): List<StudySessionEntity>
+
+    @Query("SELECT * FROM study_sessions ORDER BY timestampMs DESC")
+    suspend fun getAllSessionsList(): List<StudySessionEntity>
 }
 
 

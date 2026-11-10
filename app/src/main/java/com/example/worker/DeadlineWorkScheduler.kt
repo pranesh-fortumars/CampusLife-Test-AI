@@ -115,4 +115,26 @@ object DeadlineWorkScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_PERIODIC_WORK_NAME)
         WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_24H_PERIODIC_WORK_NAME)
     }
+
+    /**
+     * Schedules recurring Pomodoro study goal reminders based on weekly goals.
+     */
+    fun schedulePeriodicPomodoroReminders(context: Context) {
+        PomodoroGoalNotificationHelper.createNotificationChannel(context)
+        if (PomodoroGoalNotificationHelper.isRemindersEnabled(context)) {
+            val interval = PomodoroGoalNotificationHelper.getReminderIntervalHours(context)
+            PomodoroGoalNotificationHelper.schedulePeriodicGoalReminders(context, intervalHours = interval)
+        }
+    }
+
+    /**
+     * Triggers an immediate one-time Pomodoro study goal reminder evaluation.
+     */
+    fun triggerImmediatePomodoroReminder(context: Context, forceNotify: Boolean = true) {
+        PomodoroGoalNotificationHelper.triggerImmediateReminder(context, forceNotify = forceNotify)
+    }
+
+    fun cancelPomodoroReminders(context: Context) {
+        PomodoroGoalNotificationHelper.cancelPeriodicGoalReminders(context)
+    }
 }

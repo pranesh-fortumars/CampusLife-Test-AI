@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -35,6 +36,7 @@ import com.example.data.local.CourseEntity
 import com.example.data.local.SubjectStudyStats
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
+import com.example.worker.PomodoroGoalNotificationHelper
 import com.example.worker.TaskNotificationHelper
 import kotlinx.coroutines.delay
 
@@ -56,6 +58,9 @@ fun PomodoroStudyTimerComponent(
     val studyStats by viewModel.studyStatsPerSubject.collectAsState()
     val totalFocusMinutes by viewModel.totalFocusMinutes.collectAsState()
     val subjectWeeklyGoals by viewModel.subjectWeeklyStudyGoals.collectAsState()
+
+    var isReminderEnabled by remember { mutableStateOf(PomodoroGoalNotificationHelper.isRemindersEnabled(context)) }
+    var testReminderStatus by remember { mutableStateOf<String?>(null) }
 
     var selectedMode by remember { mutableStateOf(TimerMode.FOCUS_25) }
     var selectedCourse by remember { mutableStateOf<CourseEntity?>(null) }
@@ -632,6 +637,123 @@ fun PomodoroStudyTimerComponent(
                                 )
                             }
                         }
+                    }
+                }
+            }
+
+            // Recurring WorkManager Goal Reminders Section
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("pomodoro_goal_reminder_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (isReminderEnabled) EmeraldTertiaryContainer else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isReminderEnabled) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
+                                        contentDescription = null,
+                                        tint = if (isReminderEnabled) EmeraldTertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Column {
+                                Text(
+                                    text = "Weekly Goal Reminders",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (isReminderEnabled) "WorkManager background checks active" else "Reminders paused",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Switch(
+                            checked = isReminderEnabled,
+                            onCheckedChange = { enabled ->
+                                isReminderEnabled = enabled
+                                PomodoroGoalNotificationHelper.setRemindersEnabled(context, enabled)
+                            },
+                            modifier = Modifier.testTag("switch_pomodoro_goal_reminders")
+                        )
+                    }
+
+                    Text(
+                        text = "WorkManager periodically calculates your logged study hours against individual subject goals and sends reminders to start Pomodoro sessions for subjects falling behind.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 15.sp
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Text(
+                                text = "Every 4 hrs • Flex scan",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                PomodoroGoalNotificationHelper.triggerImmediateReminder(context, forceNotify = true)
+                                testReminderStatus = "Goal evaluated & reminder sent!"
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = timerColor),
+                            modifier = Modifier
+                                .heightIn(min = 36.dp)
+                                .testTag("btn_test_pomodoro_reminder")
+                        ) {
+                            Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Test Reminder Now", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    if (testReminderStatus != null) {
+                        Text(
+                            text = "✓ $testReminderStatus",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = EmeraldTertiary,
+                            modifier = Modifier.testTag("test_reminder_feedback")
+                        )
                     }
                 }
             }
