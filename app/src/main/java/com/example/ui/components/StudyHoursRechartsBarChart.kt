@@ -711,6 +711,22 @@ fun StudyHoursRechartsBarChart(
                             color = ErrorRed
                         )
                     }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .width(16.dp)
+                                .height(5.dp)
+                                .clip(RoundedCornerShape(100))
+                                .background(Brush.horizontalGradient(listOf(Color(0xFF818CF8), IndigoPrimary)))
+                        )
+                        Text(
+                            "Goal Progress",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 // Target Reference Lines Legend
@@ -1341,11 +1357,11 @@ fun StudyHoursRechartsBarChart(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(230.dp)
+                            .height(255.dp)
                             .testTag("recharts_subject_viewport")
                     ) {
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            val bottomAxisY = size.height - 35.dp.toPx()
+                            val bottomAxisY = size.height - 48.dp.toPx()
                             val topY = 20.dp.toPx()
                             val chartHeight = bottomAxisY - topY
 
@@ -1398,7 +1414,7 @@ fun StudyHoursRechartsBarChart(
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(bottom = 8.dp),
+                                .padding(bottom = 6.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.Bottom
                         ) {
@@ -1411,6 +1427,12 @@ fun StudyHoursRechartsBarChart(
                                 val isBelow50 = stat.totalHours < targetThreshold50Pct
                                 val isGoalMet = stat.totalHours >= subjectGoal
                                 val pctOfGoal = ((stat.totalHours / subjectGoal) * 100).toInt()
+                                val goalProgressFraction = (stat.totalHours / subjectGoal).toFloat().coerceIn(0f, 1f)
+                                val animatedGoalProgress by animateFloatAsState(
+                                    targetValue = goalProgressFraction,
+                                    animationSpec = tween(durationMillis = 800),
+                                    label = "progress_${stat.courseCode}"
+                                )
                                 val barHeightFraction = (stat.totalHours / maxHoursVal).toFloat().coerceIn(0.04f, 1f)
                                 val animatedHeight by animateFloatAsState(
                                     targetValue = barHeightFraction,
@@ -1611,7 +1633,7 @@ fun StudyHoursRechartsBarChart(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .fillMaxHeight(0.72f),
+                                                .fillMaxHeight(0.68f),
                                             horizontalArrangement = Arrangement.Center,
                                             verticalAlignment = Alignment.Bottom
                                         ) {
@@ -1663,7 +1685,7 @@ fun StudyHoursRechartsBarChart(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
-                                                .fillMaxHeight(animatedHeight * 0.72f)
+                                                .fillMaxHeight(animatedHeight * 0.68f)
                                                 .graphicsLayer {
                                                     scaleX = animatedScale
                                                     scaleY = animatedScale
@@ -1702,12 +1724,54 @@ fun StudyHoursRechartsBarChart(
                                         )
                                     }
 
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(5.dp))
+
+                                    // Visual Progress Bar beneath the subject bar
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(if (isHighlighted) 0.88f else 0.82f)
+                                            .height(5.dp)
+                                            .clip(RoundedCornerShape(100))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                                            .then(
+                                                if (isHighlighted) Modifier.border(1.dp, IndigoPrimary, RoundedCornerShape(100))
+                                                else if (isBelow50) Modifier.border(0.8.dp, ErrorRed.copy(alpha = 0.4f), RoundedCornerShape(100))
+                                                else Modifier
+                                            )
+                                            .testTag("progress_bar_subject_${stat.courseCode}")
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(animatedGoalProgress.coerceAtLeast(0.04f))
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(100))
+                                                .background(
+                                                    Brush.horizontalGradient(
+                                                        if (isGoalMet) listOf(Color(0xFF34D399), EmeraldTertiary)
+                                                        else if (isBelow50) listOf(Color(0xFFFB923C), ErrorRed)
+                                                        else listOf(Color(0xFF818CF8), IndigoPrimary)
+                                                    )
+                                                )
+                                                .testTag("progress_bar_fill_${stat.courseCode}")
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                    // Percentage of custom goal completed label
+                                    Text(
+                                        text = "$pctOfGoal%",
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.testTag("progress_percent_label_${stat.courseCode}")
+                                    )
 
                                     // Course Code with Conditional Alert Dot
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                        modifier = Modifier.testTag("label_subject_${stat.courseCode}")
                                     ) {
                                         Text(
                                             text = stat.courseCode,
