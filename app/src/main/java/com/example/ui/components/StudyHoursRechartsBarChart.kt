@@ -155,7 +155,7 @@ fun StudyHoursRechartsBarChart(
                             }
                         }
                         Text(
-                            text = if (viewMode == ChartViewMode.WEEKLY_TREND) "Weekly Consistency Trend" else "Study Hours per Subject",
+                            text = if (viewMode == ChartViewMode.WEEKLY_TREND) "Weekly Consistency Trend" else "Subject Analytics: Study Hours",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -263,27 +263,31 @@ fun StudyHoursRechartsBarChart(
                         }
 
                         if (viewMode == ChartViewMode.BY_SUBJECT) {
-                            FilledTonalButton(
+                            Button(
                                 onClick = {
                                     preselectedSubjectForGoalModal = selectedStat?.courseCode
                                     showSubjectGoalsModal = true
                                 },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                                 shape = RoundedCornerShape(100),
+                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
                                 modifier = Modifier
                                     .heightIn(min = 32.dp)
+                                    .testTag("btn_edit_goals")
                                     .testTag("btn_open_subject_goals_modal")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.TrackChanges,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(12.dp)
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Edit Goals",
+                                    modifier = Modifier.size(13.dp),
+                                    tint = Color.White
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "Set Goals",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = "Edit Goals",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
                                 )
                             }
                         }
@@ -3166,12 +3170,17 @@ fun CustomizeSubjectGoalsDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var saveSuccessMessage by remember { mutableStateOf<String?>(null) }
 
-    fun applyGoalValue(value: Double) {
+    fun applyGoalValue(value: Double, autoSave: Boolean = true) {
         val clamped = (value * 10).roundToInt() / 10.0
         goalHoursInput = String.format(Locale.US, "%.1f", clamped)
         sliderValue = clamped.coerceIn(1.0, 15.0).toFloat()
         errorMessage = null
-        saveSuccessMessage = null
+        if (autoSave) {
+            onSaveGoal(selectedCourseCode, clamped)
+            saveSuccessMessage = "Updated $selectedCourseCode target to ${String.format(Locale.US, "%.1f", clamped)}h! Chart updated ✓"
+        } else {
+            saveSuccessMessage = null
+        }
     }
 
     val presets = listOf(2.0, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
@@ -3182,7 +3191,10 @@ fun CustomizeSubjectGoalsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.testTag("customize_subject_goals_dialog"),
+        modifier = Modifier
+            .testTag("customize_subject_goals_dialog")
+            .testTag("edit_goals_modal")
+            .testTag("edit_subject_goals_dialog"),
         shape = RoundedCornerShape(24.dp),
         icon = {
             Box(
@@ -3193,8 +3205,8 @@ fun CustomizeSubjectGoalsDialog(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.TrackChanges,
-                    contentDescription = null,
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "Edit Goals",
                     tint = IndigoPrimary,
                     modifier = Modifier.size(26.dp)
                 )
@@ -3202,7 +3214,7 @@ fun CustomizeSubjectGoalsDialog(
         },
         title = {
             Text(
-                text = "Subject Weekly Goals",
+                text = "Edit Subject Goals",
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 textAlign = TextAlign.Center,
@@ -3217,7 +3229,7 @@ fun CustomizeSubjectGoalsDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    text = "Customize individual weekly study targets for each subject. Charts and alerts reflect each subject's progress.",
+                    text = "Adjust weekly study hour targets for each subject. SVG chart bars, threshold lines, and progress indicators update dynamically.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -3249,11 +3261,15 @@ fun CustomizeSubjectGoalsDialog(
                                 selected = isSelected,
                                 onClick = {
                                     selectedCourseCode = code
-                                    applyGoalValue(currentGoals[code] ?: 5.0)
+                                    applyGoalValue(currentGoals[code] ?: 5.0, autoSave = false)
                                 },
                                 label = {
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Text(code, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, fontSize = 11.sp)
+                                        Text(
+                                            text = "$code (${String.format(Locale.US, "%.1f", courseTarget)}h)",
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 11.sp
+                                        )
                                         if (isMet) {
                                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(10.dp), tint = EmeraldTertiary)
                                         }
@@ -3492,7 +3508,8 @@ fun CustomizeSubjectGoalsDialog(
                             sliderValue = stepped
                             goalHoursInput = String.format(Locale.US, "%.1f", stepped)
                             errorMessage = null
-                            saveSuccessMessage = null
+                            onSaveGoal(selectedCourseCode, stepped.toDouble())
+                            saveSuccessMessage = "Live synced $selectedCourseCode target: ${String.format(Locale.US, "%.1f", stepped)}h ✓"
                         },
                         valueRange = 1.0f..15.0f,
                         steps = 27,
@@ -3573,18 +3590,20 @@ fun CustomizeSubjectGoalsDialog(
                     val parsed = goalHoursInput.toDoubleOrNull()
                     if (parsed != null && parsed in 0.5..25.0) {
                         onSaveGoal(selectedCourseCode, parsed)
-                        saveSuccessMessage = "Saved ${String.format(Locale.US, "%.1f", parsed)}h goal for $selectedCourseCode! ✓"
+                        saveSuccessMessage = "Saved ${String.format(Locale.US, "%.1f", parsed)}h goal for $selectedCourseCode! Chart updated ✓"
                     } else {
                         errorMessage = "Enter a value between 0.5 and 25.0"
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
-                modifier = Modifier.testTag("btn_save_subject_goal")
+                modifier = Modifier
+                    .testTag("btn_save_subject_goal")
+                    .testTag("btn_apply_subject_goal")
             ) {
                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Save for $selectedCourseCode", fontWeight = FontWeight.Bold)
+                Text("Apply Goal for $selectedCourseCode", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
