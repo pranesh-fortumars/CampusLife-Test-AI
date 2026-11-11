@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -754,8 +755,8 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Detailed Breakdown Tooltip for Subject Mode (Revealed on mouseover or click)
-            val activeTooltipStat = hoveredStat ?: selectedStat
+            // Detailed Breakdown Card for Subject Mode (Revealed on subject selection/tap)
+            val activeTooltipStat = selectedStat
             AnimatedVisibility(
                 visible = viewMode == ChartViewMode.BY_SUBJECT && activeTooltipStat != null,
                 enter = fadeIn(animationSpec = tween(180)),
@@ -1354,12 +1355,13 @@ fun StudyHoursRechartsBarChart(
                         if (compareWithPreviousWeek) (previousSubjectStats.maxOfOrNull { it.totalHours } ?: 0.0) + 1.5 else 0.0
                     )
 
-                    Box(
+                    BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(255.dp)
                             .testTag("recharts_subject_viewport")
                     ) {
+                        val totalWidth = maxWidth
                         Canvas(modifier = Modifier.fillMaxSize()) {
                             val bottomAxisY = size.height - 48.dp.toPx()
                             val topY = 20.dp.toPx()
@@ -1791,9 +1793,199 @@ fun StudyHoursRechartsBarChart(
                                 }
                             }
                         }
+
+                        // Small Hover Breakdown Popup Card anchored to the hovered subject bar
+                        val activePopupStat = hoveredStat
+                        if (activePopupStat != null) {
+                            val statIndex = studyStats.indexOfFirst { it.courseCode == activePopupStat.courseCode }
+                                if (statIndex >= 0 && studyStats.isNotEmpty()) {
+                                    val colWidth = totalWidth / studyStats.size
+                                    val barCenterX = (colWidth * statIndex) + (colWidth / 2)
+                                    val cardWidth = 210.dp
+                                    val halfCard = cardWidth / 2
+                                    val leftOffset = (barCenterX - halfCard).coerceIn(4.dp, (totalWidth - cardWidth - 4.dp).coerceAtLeast(4.dp))
+
+                                    val courseName = courses.firstOrNull { it.code == activePopupStat.courseCode }?.name ?: "Course Study"
+                                    val subjectGoal = getGoalForCourse(activePopupStat.courseCode)
+                                    val progressPct = ((activePopupStat.totalHours / subjectGoal) * 100).toInt()
+                                    val isMet = activePopupStat.totalHours >= subjectGoal
+                                    val isBelow50 = activePopupStat.totalHours < (subjectGoal * 0.5)
+                                    val subjectColor = getSubjectColor(activePopupStat.courseCode)
+
+                                    Box(
+                                        modifier = Modifier
+                                            .offset(x = leftOffset, y = 6.dp)
+                                            .width(cardWidth)
+                                            .zIndex(30f)
+                                            .testTag("subject_hover_popup_card")
+                                            .testTag("subject_hover_popup_${activePopupStat.courseCode}")
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shadowElevation = 8.dp,
+                                            border = BorderStroke(1.2.dp, subjectColor.copy(alpha = 0.7f)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                // Header: Subject Code, Name & Status Badge
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                                        modifier = Modifier.weight(1f, fill = false)
+                                                    ) {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            color = subjectColor
+                                                        ) {
+                                                            Text(
+                                                                text = activePopupStat.courseCode,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.ExtraBold,
+                                                                color = Color.White,
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = courseName,
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+
+                                                    Surface(
+                                                        shape = RoundedCornerShape(100),
+                                                        color = if (isMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
+                                                    ) {
+                                                        Text(
+                                                            text = if (isMet) "Met 🎉" else if (isBelow50) "<50% ⚠️" else "$progressPct%",
+                                                            fontSize = 8.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                        )
+                                                    }
+                                                }
+
+                                                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 0.8.dp)
+
+                                                // 2 Key Breakdown Columns: Total Pomodoro Sessions & Total Hours Logged
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    // Metric 1: Total Pomodoro Sessions
+                                                    Column(
+                                                        modifier = Modifier.testTag("hover_total_sessions_${activePopupStat.courseCode}")
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                            Icon(
+                                                                Icons.Default.Timer,
+                                                                contentDescription = null,
+                                                                tint = IndigoPrimary,
+                                                                modifier = Modifier.size(12.dp)
+                                                            )
+                                                            Text(
+                                                                "Pomodoros",
+                                                                fontSize = 9.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = "${activePopupStat.sessionCount} sessions",
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        val avgMins = if (activePopupStat.sessionCount > 0) activePopupStat.totalMinutes / activePopupStat.sessionCount else 0
+                                                        Text(
+                                                            text = "~${avgMins}m / session",
+                                                            fontSize = 8.5.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+
+                                                    // Metric 2: Total Hours Logged
+                                                    Column(
+                                                        horizontalAlignment = Alignment.End,
+                                                        modifier = Modifier.testTag("hover_total_hours_${activePopupStat.courseCode}")
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                            Icon(
+                                                                Icons.Default.Schedule,
+                                                                contentDescription = null,
+                                                                tint = subjectColor,
+                                                                modifier = Modifier.size(12.dp)
+                                                            )
+                                                            Text(
+                                                                "Hours Logged",
+                                                                fontSize = 9.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = "${String.format(Locale.US, "%.1f", activePopupStat.totalHours)} hrs",
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = subjectColor
+                                                        )
+                                                        Text(
+                                                            text = "${activePopupStat.totalMinutes} mins total",
+                                                            fontSize = 8.5.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+
+                                                // Progress vs Goal Mini Bar
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = "Goal: ${String.format(Locale.US, "%.1f", subjectGoal)}h ($progressPct%)",
+                                                        fontSize = 8.5.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.testTag("hover_goal_progress_${activePopupStat.courseCode}")
+                                                    )
+                                                    val remaining = (subjectGoal - activePopupStat.totalHours).coerceAtLeast(0.0)
+                                                    if (remaining > 0) {
+                                                        Text(
+                                                            text = "${String.format(Locale.US, "%.1f", remaining)}h left",
+                                                            fontSize = 8.5.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = if (isBelow50) ErrorRed else IndigoPrimary
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = "Goal Completed! 🏆",
+                                                            fontSize = 8.5.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = EmeraldTertiary
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
-            } else {
+                } else {
                 // Weekly Trend View: 7 Days (Mon - Sun)
                 val maxDailyHours = max(
                     max(max(4.0, dailyGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),

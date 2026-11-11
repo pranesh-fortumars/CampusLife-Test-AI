@@ -411,4 +411,23 @@ class ExampleUnitTest {
         assertEquals("MATH204", list.last().courseCode)
         assertTrue(list.last().isMet)
     }
+
+    @Test
+    fun `test SubjectStudyStats Pomodoro sessions and total hours logged calculation for hover popup`() {
+        val stat = com.example.data.local.SubjectStudyStats(
+            courseCode = "CS201",
+            totalMinutes = 240, // 4.0 hours
+            sessionCount = 8 // 8 Pomodoro sessions
+        )
+        assertEquals(4.0, stat.totalHours, 0.001)
+        assertEquals(8, stat.sessionCount)
+        val avgDuration = if (stat.sessionCount > 0) stat.totalMinutes / stat.sessionCount else 0
+        assertEquals(30, avgDuration)
+
+        val customGoal = 6.0
+        val progressPct = ((stat.totalHours / customGoal) * 100).toInt()
+        assertEquals(66, progressPct)
+        assertFalse(stat.totalHours >= customGoal)
+        assertFalse(stat.totalHours < (customGoal * 0.5)) // 4.0 is >= 3.0 (not below 50%)
+    }
 }
