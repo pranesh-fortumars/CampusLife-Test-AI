@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -11,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +26,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -76,12 +83,15 @@ fun StudyHoursRechartsBarChart(
     val previousWeeklyTrends by viewModel.previousWeeklyStudyTrends.collectAsState()
     val previousSubjectStats by viewModel.previousWeekSubjectStats.collectAsState()
     val weekComparisonSummary by viewModel.weekComparisonSummary.collectAsState()
+    val subjectPriorities by viewModel.subjectPriorities.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
     var showWeeklySubjectBreakdown by remember { mutableStateOf(false) }
     var selectedWeeklySubjectFilter by remember { mutableStateOf<String?>(null) }
     var compareWithPreviousWeek by remember { mutableStateOf(false) }
+    var onlyHighPriorityFilter by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
     var showSubjectGoalsModal by remember { mutableStateOf(false) }
     var preselectedSubjectForGoalModal by remember { mutableStateOf<String?>(null) }
@@ -107,12 +117,24 @@ fun StudyHoursRechartsBarChart(
         }
     }
 
+    fun getPriorityForCourse(courseCode: String): String {
+        return subjectPriorities[courseCode] ?: viewModel.getSubjectPriority(courseCode)
+    }
+
     fun getGoalForCourse(courseCode: String): Double {
         return subjectWeeklyGoals[courseCode] ?: viewModel.defaultSubjectWeeklyGoals[courseCode] ?: 5.0
     }
 
-    val subjectsBelow50Pct = remember(studyStats, subjectWeeklyGoals) {
-        studyStats.filter { stat ->
+    val displayedStudyStats = remember(studyStats, onlyHighPriorityFilter, subjectPriorities) {
+        if (onlyHighPriorityFilter) {
+            studyStats.filter { getPriorityForCourse(it.courseCode).equals("High", ignoreCase = true) }
+        } else {
+            studyStats
+        }
+    }
+
+    val subjectsBelow50Pct = remember(displayedStudyStats, subjectWeeklyGoals) {
+        displayedStudyStats.filter { stat ->
             val goal = getGoalForCourse(stat.courseCode)
             stat.totalHours < (goal * 0.5)
         }
@@ -291,6 +313,31 @@ fun StudyHoursRechartsBarChart(
                                 )
                             }
                         }
+
+                        // Export Study Logs Button (Available in both views)
+                        Button(
+                            onClick = { showExportDialog = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(100),
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldTertiary),
+                            modifier = Modifier
+                                .heightIn(min = 32.dp)
+                                .testTag("btn_export_study_logs")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Export Study Logs",
+                                modifier = Modifier.size(13.dp),
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Export",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
                     }
                 }
 
@@ -394,6 +441,94 @@ fun StudyHoursRechartsBarChart(
                                 modifier = Modifier
                                     .heightIn(min = 32.dp)
                                     .testTag("filter_chip_tag_${tag.lowercase().replace(" ", "_")}")
+                            )
+                        }
+                    }
+                }
+
+                // Priority Filter Row (Available in Subject Analytics mode)
+                if (viewMode == ChartViewMode.BY_SUBJECT) {
+                    val highPriorityCount = remember(studyStats, subjectPriorities) {
+                        studyStats.count { getPriorityForCourse(it.courseCode).equals("High", ignoreCase = true) }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Flag,
+                                contentDescription = null,
+                                modifier = Modifier.size(13.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Filter Priority:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        FilterChip(
+                            selected = !onlyHighPriorityFilter,
+                            onClick = {
+                                onlyHighPriorityFilter = false
+                                selectedStat = null
+                            },
+                            label = { Text("All Priorities (${studyStats.size})", fontSize = 11.sp, fontWeight = if (!onlyHighPriorityFilter) FontWeight.Bold else FontWeight.Medium) },
+                            shape = RoundedCornerShape(100),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                selectedLabelColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier
+                                .heightIn(min = 30.dp)
+                                .testTag("filter_priority_all")
+                        )
+
+                        FilterChip(
+                            selected = onlyHighPriorityFilter,
+                            onClick = {
+                                onlyHighPriorityFilter = true
+                                selectedStat = null
+                            },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text("High Priority Only ($highPriorityCount)", fontSize = 11.sp, fontWeight = if (onlyHighPriorityFilter) FontWeight.Bold else FontWeight.Medium)
+                                    Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(12.dp))
+                                }
+                            },
+                            shape = RoundedCornerShape(100),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFEF4444).copy(alpha = 0.18f),
+                                selectedLabelColor = Color(0xFFDC2626),
+                                selectedLeadingIconColor = Color(0xFFDC2626)
+                            ),
+                            border = if (onlyHighPriorityFilter) BorderStroke(1.2.dp, Color(0xFFDC2626)) else null,
+                            modifier = Modifier
+                                .heightIn(min = 30.dp)
+                                .testTag("filter_high_priority_only")
+                                .testTag("filter_priority_high")
+                        )
+
+                        if (onlyHighPriorityFilter) {
+                            Text(
+                                text = "Reset",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = IndigoPrimary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable { onlyHighPriorityFilter = false }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    .testTag("btn_reset_priority_filter")
                             )
                         }
                     }
@@ -1348,14 +1483,24 @@ fun StudyHoursRechartsBarChart(
 
             if (viewMode == ChartViewMode.BY_SUBJECT) {
                 // By Subject View
-                if (studyStats.isEmpty()) {
+                if (displayedStudyStats.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                        Text("No study sessions logged yet. Complete a Pomodoro block to populate your chart!", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                        Text(
+                            text = if (onlyHighPriorityFilter && studyStats.isNotEmpty()) {
+                                "No High Priority subjects to display. You can set subject priority levels in 'Edit Goals'!"
+                            } else {
+                                "No study sessions logged yet. Complete a Pomodoro block to populate your chart!"
+                            },
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(16.dp)
+                        )
                     }
                 } else {
-                    val maxSubjectGoal = studyStats.maxOfOrNull { getGoalForCourse(it.courseCode) } ?: 5.0
+                    val maxSubjectGoal = displayedStudyStats.maxOfOrNull { getGoalForCourse(it.courseCode) } ?: 5.0
                     val maxHoursVal = max(
-                        max(max(8.0, maxSubjectGoal + 1.5), (studyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5),
+                        max(max(8.0, maxSubjectGoal + 1.5), (displayedStudyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5),
                         if (compareWithPreviousWeek) (previousSubjectStats.maxOfOrNull { it.totalHours } ?: 0.0) + 1.5 else 0.0
                     )
 
@@ -1389,7 +1534,7 @@ fun StudyHoursRechartsBarChart(
                                 val targetGoalHours = if (selectedStat != null) {
                                     getGoalForCourse(selectedStat!!.courseCode)
                                 } else {
-                                    studyStats.map { getGoalForCourse(it.courseCode) }.average().takeIf { !it.isNaN() } ?: 5.0
+                                    displayedStudyStats.map { getGoalForCourse(it.courseCode) }.average().takeIf { !it.isNaN() } ?: 5.0
                                 }
                                 val goalY = bottomAxisY - (chartHeight * (targetGoalHours.toFloat() / maxHoursVal.toFloat()))
                                 if (goalY in topY..bottomAxisY) {
@@ -1424,7 +1569,7 @@ fun StudyHoursRechartsBarChart(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.Bottom
                         ) {
-                            studyStats.forEach { stat ->
+                            displayedStudyStats.forEach { stat ->
                                 val isHovered = hoveredStat?.courseCode == stat.courseCode
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
                                 val isHighlighted = isHovered || isSelected
@@ -1801,9 +1946,9 @@ fun StudyHoursRechartsBarChart(
                         // Small Hover Breakdown Popup Card anchored to the hovered subject bar
                         val activePopupStat = hoveredStat
                         if (activePopupStat != null) {
-                            val statIndex = studyStats.indexOfFirst { it.courseCode == activePopupStat.courseCode }
-                                if (statIndex >= 0 && studyStats.isNotEmpty()) {
-                                    val colWidth = totalWidth / studyStats.size
+                            val statIndex = displayedStudyStats.indexOfFirst { it.courseCode == activePopupStat.courseCode }
+                                if (statIndex >= 0 && displayedStudyStats.isNotEmpty()) {
+                                    val colWidth = totalWidth / displayedStudyStats.size
                                     val barCenterX = (colWidth * statIndex) + (colWidth / 2)
                                     val cardWidth = 210.dp
                                     val halfCard = cardWidth / 2
@@ -1868,17 +2013,44 @@ fun StudyHoursRechartsBarChart(
                                                         )
                                                     }
 
-                                                    Surface(
-                                                        shape = RoundedCornerShape(100),
-                                                        color = if (isMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                                     ) {
-                                                        Text(
-                                                            text = if (isMet) "Met 🎉" else if (isBelow50) "<50% ⚠️" else "$progressPct%",
-                                                            fontSize = 8.5.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = if (isMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
-                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                                        )
+                                                        val priority = getPriorityForCourse(activePopupStat.courseCode)
+                                                        Surface(
+                                                            shape = RoundedCornerShape(100),
+                                                            color = when (priority.lowercase(Locale.US)) {
+                                                                "high" -> Color(0xFFFEE2E2)
+                                                                "medium" -> Color(0xFFFEF3C7)
+                                                                else -> Color(0xFFD1FAE5)
+                                                            }
+                                                        ) {
+                                                            Text(
+                                                                text = priority,
+                                                                fontSize = 8.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = when (priority.lowercase(Locale.US)) {
+                                                                    "high" -> Color(0xFFDC2626)
+                                                                    "medium" -> Color(0xFFD97706)
+                                                                    else -> Color(0xFF059669)
+                                                                },
+                                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                            )
+                                                        }
+
+                                                        Surface(
+                                                            shape = RoundedCornerShape(100),
+                                                            color = if (isMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
+                                                        ) {
+                                                            Text(
+                                                                text = if (isMet) "Met 🎉" else if (isBelow50) "<50% ⚠️" else "$progressPct%",
+                                                                fontSize = 8.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = if (isMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
+                                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                            )
+                                                        }
                                                     }
                                                 }
 
@@ -2727,6 +2899,7 @@ fun StudyHoursRechartsBarChart(
             studyStats = studyStats,
             currentGoals = subjectWeeklyGoals,
             preselectedCourseCode = preselectedSubjectForGoalModal,
+            currentPriorities = subjectPriorities,
             onDismiss = {
                 showSubjectGoalsModal = false
                 preselectedSubjectForGoalModal = null
@@ -2734,9 +2907,23 @@ fun StudyHoursRechartsBarChart(
             onSaveGoal = { courseCode, newGoal ->
                 viewModel.updateSubjectWeeklyStudyGoal(courseCode, newGoal)
             },
+            onUpdatePriority = { courseCode, priority ->
+                viewModel.updateSubjectPriority(courseCode, priority)
+            },
             onResetDefaults = {
                 viewModel.resetSubjectWeeklyStudyGoals()
             }
+        )
+    }
+
+    if (showExportDialog) {
+        ExportStudyLogsDialog(
+            studyStats = studyStats,
+            courses = courses,
+            subjectGoals = subjectWeeklyGoals,
+            subjectPriorities = subjectPriorities,
+            tagFilter = selectedSessionTagFilter,
+            onDismiss = { showExportDialog = false }
         )
     }
 }
@@ -3142,7 +3329,9 @@ fun CustomizeSubjectGoalsDialog(
     preselectedCourseCode: String?,
     onDismiss: () -> Unit,
     onSaveGoal: (courseCode: String, goalHours: Double) -> Unit,
-    onResetDefaults: () -> Unit
+    onResetDefaults: () -> Unit,
+    currentPriorities: Map<String, String> = emptyMap(),
+    onUpdatePriority: (courseCode: String, priority: String) -> Unit = { _, _ -> }
 ) {
     val availableCourses = remember(courses, studyStats) {
         val courseCodes = (courses.map { it.code } + studyStats.map { it.courseCode }).distinct()
@@ -3386,6 +3575,90 @@ fun CustomizeSubjectGoalsDialog(
                     }
                 }
 
+                // Priority Level Selector (High, Medium, Low) for Selected Subject
+                val activePriority = currentPriorities[selectedCourseCode] ?: "Medium"
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Priority Level for $selectedCourseCode:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = when (activePriority.lowercase(Locale.US)) {
+                                "high" -> Color(0xFFFEE2E2)
+                                "medium" -> Color(0xFFFEF3C7)
+                                else -> Color(0xFFD1FAE5)
+                            }
+                        ) {
+                            Text(
+                                text = "$activePriority Priority",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when (activePriority.lowercase(Locale.US)) {
+                                    "high" -> Color(0xFFDC2626)
+                                    "medium" -> Color(0xFFD97706)
+                                    else -> Color(0xFF059669)
+                                },
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("High", "Medium", "Low").forEach { priorityOption ->
+                            val isSelected = activePriority.equals(priorityOption, ignoreCase = true)
+                            val optionColor = when (priorityOption) {
+                                "High" -> Color(0xFFEF4444)
+                                "Medium" -> Color(0xFFF59E0B)
+                                else -> Color(0xFF10B981)
+                            }
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    onUpdatePriority(selectedCourseCode, priorityOption)
+                                    saveSuccessMessage = "Set $selectedCourseCode priority to $priorityOption!"
+                                },
+                                label = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            priorityOption,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                        if (priorityOption == "High") {
+                                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(12.dp))
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(100),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = optionColor.copy(alpha = 0.2f),
+                                    selectedLabelColor = optionColor
+                                ),
+                                border = if (isSelected) BorderStroke(1.5.dp, optionColor) else null,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 34.dp)
+                                    .testTag("priority_${priorityOption.lowercase()}_$selectedCourseCode")
+                                    .testTag("btn_priority_${priorityOption.lowercase()}")
+                            )
+                        }
+                    }
+                }
+
                 // Stepper + Direct Input for Selected Subject
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -3620,6 +3893,231 @@ fun CustomizeSubjectGoalsDialog(
                 ) {
                     Text("Done")
                 }
+            }
+        }
+    )
+}
+
+enum class ExportFormat {
+    JSON, CSV
+}
+
+@Composable
+fun ExportStudyLogsDialog(
+    studyStats: List<SubjectStudyStats>,
+    courses: List<CourseEntity>,
+    subjectGoals: Map<String, Double>,
+    subjectPriorities: Map<String, String>,
+    tagFilter: String,
+    onDismiss: () -> Unit
+) {
+    var format by remember { mutableStateOf(ExportFormat.JSON) }
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
+
+    val jsonExportText = remember(studyStats, courses, subjectGoals, subjectPriorities, tagFilter) {
+        val totalMins = studyStats.sumOf { it.totalMinutes }
+        val totalHours = totalMins / 60.0
+        val totalSessions = studyStats.sumOf { it.sessionCount }
+
+        val sb = StringBuilder()
+        sb.append("{\n")
+        sb.append("  \"weekSummary\": {\n")
+        sb.append("    \"totalLoggedHours\": ${String.format(Locale.US, "%.1f", totalHours)},\n")
+        sb.append("    \"totalSessions\": $totalSessions,\n")
+        sb.append("    \"sessionTagFilter\": \"$tagFilter\"\n")
+        sb.append("  },\n")
+        sb.append("  \"subjects\": [\n")
+        studyStats.forEachIndexed { index, stat ->
+            val courseName = courses.firstOrNull { it.code == stat.courseCode }?.name ?: "Subject ${stat.courseCode}"
+            val goal = subjectGoals[stat.courseCode] ?: 5.0
+            val priority = subjectPriorities[stat.courseCode] ?: "Medium"
+            val pct = if (goal > 0) ((stat.totalHours / goal) * 100).toInt() else 0
+            sb.append("    {\n")
+            sb.append("      \"courseCode\": \"${stat.courseCode}\",\n")
+            sb.append("      \"subjectName\": \"${courseName.replace("\"", "\\\"")}\",\n")
+            sb.append("      \"loggedHours\": ${String.format(Locale.US, "%.1f", stat.totalHours)},\n")
+            sb.append("      \"goalHours\": ${String.format(Locale.US, "%.1f", goal)},\n")
+            sb.append("      \"priority\": \"$priority\",\n")
+            sb.append("      \"sessionCount\": ${stat.sessionCount},\n")
+            sb.append("      \"completionPercentage\": $pct\n")
+            sb.append("    }${if (index < studyStats.size - 1) "," else ""}\n")
+        }
+        sb.append("  ]\n")
+        sb.append("}")
+        sb.toString()
+    }
+
+    val csvExportText = remember(studyStats, courses, subjectGoals, subjectPriorities, tagFilter) {
+        val totalMins = studyStats.sumOf { it.totalMinutes }
+        val totalHours = totalMins / 60.0
+        val totalSessions = studyStats.sumOf { it.sessionCount }
+
+        val sb = StringBuilder()
+        sb.append("Course Code,Subject Name,Logged Hours,Goal Hours,Priority,Session Count,Completion Pct\n")
+        studyStats.forEach { stat ->
+            val courseName = courses.firstOrNull { it.code == stat.courseCode }?.name ?: "Subject ${stat.courseCode}"
+            val goal = subjectGoals[stat.courseCode] ?: 5.0
+            val priority = subjectPriorities[stat.courseCode] ?: "Medium"
+            val pct = if (goal > 0) ((stat.totalHours / goal) * 100).toInt() else 0
+            val safeName = if (courseName.contains(",")) "\"$courseName\"" else courseName
+            sb.append("${stat.courseCode},$safeName,${String.format(Locale.US, "%.1f", stat.totalHours)},${String.format(Locale.US, "%.1f", goal)},$priority,${stat.sessionCount},$pct%\n")
+        }
+        sb.append("\nSummary,Total Logged Hours,${String.format(Locale.US, "%.1f", totalHours)},Total Sessions,$totalSessions,Filter,$tagFilter\n")
+        sb.toString()
+    }
+
+    val currentExportText = if (format == ExportFormat.JSON) jsonExportText else csvExportText
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("export_study_logs_dialog"),
+        shape = RoundedCornerShape(24.dp),
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(EmeraldTertiaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Export Study Logs",
+                    tint = EmeraldTertiary,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = "Export Study Logs",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Export your weekly study hours, subject targets, and priorities as JSON or CSV summary.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Format Selector Tabs (JSON / CSV)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(100))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .padding(3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    ExportFormat.values().forEach { fmt ->
+                        val isSelected = format == fmt
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = if (isSelected) EmeraldTertiary else Color.Transparent,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(100))
+                                .clickable { format = fmt }
+                                .testTag("tab_export_${fmt.name.lowercase()}")
+                        ) {
+                            Text(
+                                text = fmt.name,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Monospace Preview Box
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp)
+                            .verticalScroll(rememberScrollState())
+                            .testTag("export_data_preview")
+                    ) {
+                        Text(
+                            text = currentExportText,
+                            fontSize = 10.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Copy to Clipboard
+                OutlinedButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(currentExportText))
+                        Toast.makeText(context, "Exported ${format.name} data copied to clipboard!", Toast.LENGTH_SHORT).show()
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("btn_copy_export_data")
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Copy", fontWeight = FontWeight.SemiBold)
+                }
+
+                // Share via Intent
+                Button(
+                    onClick = {
+                        val mimeType = if (format == ExportFormat.JSON) "application/json" else "text/csv"
+                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = mimeType
+                            putExtra(Intent.EXTRA_SUBJECT, "CampusLife Weekly Study Logs (${format.name})")
+                            putExtra(Intent.EXTRA_TEXT, currentExportText)
+                        }
+                        val shareIntent = Intent.createChooser(sendIntent, "Share Study Logs Summary")
+                        context.startActivity(shareIntent)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldTertiary),
+                    modifier = Modifier.testTag("btn_share_export_data")
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(15.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Share", fontWeight = FontWeight.Bold)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("btn_close_export_dialog")
+            ) {
+                Text("Close")
             }
         }
     )

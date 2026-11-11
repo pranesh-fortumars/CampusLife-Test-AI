@@ -748,6 +748,66 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    val defaultSubjectPriorities = mapOf(
+        "CS201" to "High",
+        "MATH204" to "Medium",
+        "CS310" to "High",
+        "PHY102" to "Medium",
+        "ENG215" to "Low"
+    )
+
+    private val _subjectPriorities = MutableStateFlow<Map<String, String>>(
+        loadPersistedSubjectPriorities()
+    )
+    val subjectPriorities: StateFlow<Map<String, String>> = _subjectPriorities.asStateFlow()
+
+    fun getSubjectPriority(courseCode: String): String {
+        return _subjectPriorities.value[courseCode] ?: defaultSubjectPriorities[courseCode] ?: "Medium"
+    }
+
+    fun updateSubjectPriority(courseCode: String, priority: String) {
+        val validPriority = if (priority in listOf("High", "Medium", "Low")) priority else "Medium"
+        val currentMap = _subjectPriorities.value.toMutableMap()
+        currentMap[courseCode] = validPriority
+        _subjectPriorities.value = currentMap
+        persistSubjectPriorities(currentMap)
+    }
+
+    private fun loadPersistedSubjectPriorities(): Map<String, String> {
+        val jsonString = analyticsPrefs.getString("subject_priorities_json", null)
+        if (!jsonString.isNullOrEmpty()) {
+            try {
+                val json = org.json.JSONObject(jsonString)
+                val map = mutableMapOf<String, String>()
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    map[key] = json.optString(key, "Medium")
+                }
+                val result = defaultSubjectPriorities.toMutableMap()
+                result.putAll(map)
+                return result
+            } catch (e: Exception) {
+                // fallback to defaults
+            }
+        }
+        return defaultSubjectPriorities
+    }
+
+    private fun persistSubjectPriorities(priorities: Map<String, String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val json = org.json.JSONObject()
+                priorities.forEach { (code, priority) ->
+                    json.put(code, priority)
+                }
+                analyticsPrefs.edit().putString("subject_priorities_json", json.toString()).apply()
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
     // Global Dark / Light Theme mode toggle for accessibility
     private val themePrefs = getApplication<Application>().getSharedPreferences("campus_life_theme_prefs", android.content.Context.MODE_PRIVATE)
 

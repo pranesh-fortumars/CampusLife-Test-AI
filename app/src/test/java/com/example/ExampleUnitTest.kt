@@ -430,4 +430,84 @@ class ExampleUnitTest {
         assertFalse(stat.totalHours >= customGoal)
         assertFalse(stat.totalHours < (customGoal * 0.5)) // 4.0 is >= 3.0 (not below 50%)
     }
+
+    @Test
+    fun `test Subject priority assignment and High Priority filtering logic`() {
+        val subjectPriorities = mutableMapOf(
+            "CS201" to "High",
+            "MATH204" to "Medium",
+            "CS310" to "High",
+            "PHY102" to "Medium",
+            "ENG215" to "Low"
+        )
+
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", 360, 8),   // 6.0h
+            com.example.data.local.SubjectStudyStats("MATH204", 300, 6),  // 5.0h
+            com.example.data.local.SubjectStudyStats("CS310", 240, 5),    // 4.0h
+            com.example.data.local.SubjectStudyStats("PHY102", 180, 4),   // 3.0h
+            com.example.data.local.SubjectStudyStats("ENG215", 90, 2)     // 1.5h
+        )
+
+        // Filter only High Priority
+        val highPriorityStats = stats.filter { stat ->
+            subjectPriorities[stat.courseCode].equals("High", ignoreCase = true)
+        }
+
+        assertEquals(2, highPriorityStats.size)
+        assertTrue(highPriorityStats.any { it.courseCode == "CS201" })
+        assertTrue(highPriorityStats.any { it.courseCode == "CS310" })
+        assertFalse(highPriorityStats.any { it.courseCode == "MATH204" })
+
+        // Updating priority changes the filter dynamically
+        subjectPriorities["MATH204"] = "High"
+        val updatedHighPriorityStats = stats.filter { stat ->
+            subjectPriorities[stat.courseCode].equals("High", ignoreCase = true)
+        }
+        assertEquals(3, updatedHighPriorityStats.size)
+        assertTrue(updatedHighPriorityStats.any { it.courseCode == "MATH204" })
+    }
+
+    @Test
+    fun `test Study logs JSON and CSV export generation contains subject names and hours`() {
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", 300, 6),  // 5.0h
+            com.example.data.local.SubjectStudyStats("MATH204", 180, 4) // 3.0h
+        )
+        val courseNames = mapOf("CS201" to "Data Structures", "MATH204" to "Linear Algebra")
+        val priorities = mapOf("CS201" to "High", "MATH204" to "Medium")
+        val goals = mapOf("CS201" to 6.0, "MATH204" to 4.0)
+
+        // CSV export format check
+        val csvHeader = "Course Code,Subject Name,Logged Hours,Goal Hours,Priority,Session Count,Completion Pct"
+        val csvRows = stats.map { stat ->
+            val name = courseNames[stat.courseCode] ?: stat.courseCode
+            val priority = priorities[stat.courseCode] ?: "Medium"
+            val goal = goals[stat.courseCode] ?: 5.0
+            val pct = ((stat.totalHours / goal) * 100).toInt()
+            "${stat.courseCode},$name,${String.format(java.util.Locale.US, "%.1f", stat.totalHours)},${String.format(java.util.Locale.US, "%.1f", goal)},$priority,${stat.sessionCount},$pct%"
+        }
+        val csvContent = listOf(csvHeader) + csvRows
+
+        assertTrue(csvContent[0].contains("Course Code"))
+        assertTrue(csvContent[1].contains("CS201,Data Structures,5.0,6.0,High,6,83%"))
+        assertTrue(csvContent[2].contains("MATH204,Linear Algebra,3.0,4.0,Medium,4,75%"))
+
+        // JSON export format check
+        val jsonStringBuilder = StringBuilder()
+        jsonStringBuilder.append("{\n  \"subjects\": [\n")
+        stats.forEachIndexed { idx, stat ->
+            val name = courseNames[stat.courseCode] ?: stat.courseCode
+            val priority = priorities[stat.courseCode] ?: "Medium"
+            val goal = goals[stat.courseCode] ?: 5.0
+            jsonStringBuilder.append("    {\"courseCode\": \"${stat.courseCode}\", \"subjectName\": \"$name\", \"loggedHours\": ${stat.totalHours}, \"priority\": \"$priority\"}${if (idx < stats.size - 1) "," else ""}\n")
+        }
+        jsonStringBuilder.append("  ]\n}")
+        val jsonOutput = jsonStringBuilder.toString()
+
+        assertTrue(jsonOutput.contains("\"courseCode\": \"CS201\""))
+        assertTrue(jsonOutput.contains("\"subjectName\": \"Data Structures\""))
+        assertTrue(jsonOutput.contains("\"loggedHours\": 5.0"))
+        assertTrue(jsonOutput.contains("\"priority\": \"High\""))
+    }
 }
