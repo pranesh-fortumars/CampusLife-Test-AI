@@ -200,6 +200,20 @@ data class WeekComparisonSummary(
     val deltaHours: Double get() = Math.abs(currentWeekTotalHours - previousWeekTotalHours)
 }
 
+@Entity(tableName = "subject_mastery_records")
+data class SubjectMasteryEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val courseCode: String,
+    val weekNumber: Int, // 1 (4 weeks ago), 2 (3 weeks ago), 3 (last week), 4 (current week)
+    val weekLabel: String, // "W1", "W2", "W3", "W4"
+    val masteryPercentage: Double, // 0.0 to 100.0 (e.g. 64.0, 75.0, 82.0, 92.0)
+    val studyHoursInWeek: Double = 4.0,
+    val targetMastery: Double = 85.0,
+    val recordedTimestampMs: Long = System.currentTimeMillis()
+)
+
+
 
 
 

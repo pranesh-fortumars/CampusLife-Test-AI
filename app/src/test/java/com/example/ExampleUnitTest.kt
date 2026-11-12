@@ -510,4 +510,28 @@ class ExampleUnitTest {
         assertTrue(jsonOutput.contains("\"loggedHours\": 5.0"))
         assertTrue(jsonOutput.contains("\"priority\": \"High\""))
     }
+
+    @Test
+    fun `test SubjectMasteryEntity 4-week trend progression and growth calculations`() {
+        val records = listOf(
+            com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 1, weekLabel = "W1", masteryPercentage = 64.0, studyHoursInWeek = 3.5),
+            com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 2, weekLabel = "W2", masteryPercentage = 72.0, studyHoursInWeek = 4.2),
+            com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 3, weekLabel = "W3", masteryPercentage = 81.0, studyHoursInWeek = 5.0),
+            com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 4, weekLabel = "W4", masteryPercentage = 92.0, studyHoursInWeek = 5.8)
+        )
+
+        assertEquals(4, records.size)
+        val sorted = records.sortedBy { it.weekNumber }
+        assertEquals("W1", sorted.first().weekLabel)
+        assertEquals("W4", sorted.last().weekLabel)
+
+        val initialMastery = sorted.first().masteryPercentage
+        val finalMastery = sorted.last().masteryPercentage
+        val netGain = finalMastery - initialMastery
+
+        assertEquals(64.0, initialMastery, 0.001)
+        assertEquals(92.0, finalMastery, 0.001)
+        assertEquals(28.0, netGain, 0.001)
+        assertTrue(finalMastery > initialMastery) // Upward trend
+    }
 }

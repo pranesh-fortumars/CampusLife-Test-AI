@@ -33,7 +33,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.hoverable
+import com.example.data.local.SubjectMasteryEntity
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -84,6 +89,7 @@ fun StudyHoursRechartsBarChart(
     val previousSubjectStats by viewModel.previousWeekSubjectStats.collectAsState()
     val weekComparisonSummary by viewModel.weekComparisonSummary.collectAsState()
     val subjectPriorities by viewModel.subjectPriorities.collectAsState()
+    val subjectMasteryRecords by viewModel.subjectMasteryRecords.collectAsState()
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
@@ -1507,12 +1513,12 @@ fun StudyHoursRechartsBarChart(
                     BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(255.dp)
+                            .height(310.dp)
                             .testTag("recharts_subject_viewport")
                     ) {
                         val totalWidth = maxWidth
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            val bottomAxisY = size.height - 48.dp.toPx()
+                            val bottomAxisY = size.height - 80.dp.toPx()
                             val topY = 20.dp.toPx()
                             val chartHeight = bottomAxisY - topY
 
@@ -1918,6 +1924,24 @@ fun StudyHoursRechartsBarChart(
                                         modifier = Modifier.testTag("progress_percent_label_${stat.courseCode}")
                                     )
 
+                                    Spacer(modifier = Modifier.height(3.dp))
+
+                                    // Small line chart visualizing 4-week mastery trend from Room database
+                                    val masteryTrend = subjectMasteryRecords[stat.courseCode]
+                                        ?: viewModel.getDefaultMasteryForCourse(stat.courseCode)
+                                    val barSubjectColor = getSubjectColor(stat.courseCode)
+
+                                    SubjectMasteryMiniLineChart(
+                                        masteryRecords = masteryTrend,
+                                        subjectColor = barSubjectColor,
+                                        isHighlighted = isHighlighted,
+                                        modifier = Modifier
+                                            .testTag("mastery_line_chart_${stat.courseCode}")
+                                            .testTag("mastery_mini_chart_${stat.courseCode}")
+                                    )
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+
                                     // Course Code with Conditional Alert Dot
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -2152,6 +2176,67 @@ fun StudyHoursRechartsBarChart(
                                                             fontWeight = FontWeight.SemiBold,
                                                             color = EmeraldTertiary
                                                         )
+                                                    }
+                                                }
+
+                                                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 0.8.dp)
+
+                                                // 4-Week Mastery Trend breakdown from Room Database
+                                                val courseMastery = subjectMasteryRecords[activePopupStat.courseCode]
+                                                    ?: viewModel.getDefaultMasteryForCourse(activePopupStat.courseCode)
+
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .testTag("hover_mastery_trend_${activePopupStat.courseCode}"),
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                            Icon(Icons.Default.Insights, contentDescription = null, tint = subjectColor, modifier = Modifier.size(11.dp))
+                                                            Text("4-Week Mastery (Room DB)", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                                        }
+                                                        val firstM = courseMastery.firstOrNull()?.masteryPercentage ?: 0.0
+                                                        val lastM = courseMastery.lastOrNull()?.masteryPercentage ?: 0.0
+                                                        val delta = (lastM - firstM).toInt()
+                                                        Text(
+                                                            text = "${if (delta >= 0) "+$delta%" else "$delta%"}",
+                                                            fontSize = 8.5.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = if (delta >= 0) EmeraldTertiary else ErrorRed
+                                                        )
+                                                    }
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                                    ) {
+                                                        courseMastery.sortedBy { it.weekNumber }.forEach { record ->
+                                                            val isCurrentWeek = record.weekNumber == 4
+                                                            Surface(
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                color = if (isCurrentWeek) subjectColor.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                                border = if (isCurrentWeek) BorderStroke(1.dp, subjectColor) else null,
+                                                                modifier = Modifier.weight(1f)
+                                                            ) {
+                                                                Column(
+                                                                    modifier = Modifier.padding(vertical = 2.dp),
+                                                                    horizontalAlignment = Alignment.CenterHorizontally
+                                                                ) {
+                                                                    Text(record.weekLabel, fontSize = 7.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                                    Text(
+                                                                        "${record.masteryPercentage.toInt()}%",
+                                                                        fontSize = 8.5.sp,
+                                                                        fontWeight = if (isCurrentWeek) FontWeight.Bold else FontWeight.Medium,
+                                                                        color = if (isCurrentWeek) subjectColor else MaterialTheme.colorScheme.onSurface
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2925,6 +3010,148 @@ fun StudyHoursRechartsBarChart(
             tagFilter = selectedSessionTagFilter,
             onDismiss = { showExportDialog = false }
         )
+    }
+}
+
+@Composable
+fun SubjectMasteryMiniLineChart(
+    masteryRecords: List<SubjectMasteryEntity>,
+    subjectColor: Color,
+    isHighlighted: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    val sortedRecords = remember(masteryRecords) {
+        masteryRecords.sortedBy { it.weekNumber }
+    }
+    val latestMastery = sortedRecords.lastOrNull()?.masteryPercentage ?: 0.0
+    val firstMastery = sortedRecords.firstOrNull()?.masteryPercentage ?: 0.0
+    val isUpward = latestMastery >= firstMastery
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .width(52.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                if (isHighlighted) subjectColor.copy(alpha = 0.12f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            )
+            .padding(horizontal = 2.dp, vertical = 2.dp)
+    ) {
+        // Sparkline Canvas with Area Fill and Point Dots
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(18.dp)
+        ) {
+            if (sortedRecords.size >= 2) {
+                val minVal = 30.0
+                val maxVal = 100.0
+                val range = (maxVal - minVal).toFloat()
+
+                val paddingX = 4.dp.toPx()
+                val availableWidth = size.width - (paddingX * 2)
+                val stepX = availableWidth / (sortedRecords.size - 1)
+
+                val points = sortedRecords.mapIndexed { index, record ->
+                    val x = paddingX + (index * stepX)
+                    val normalized = ((record.masteryPercentage - minVal).toFloat() / range).coerceIn(0.05f, 0.95f)
+                    val y = size.height - (normalized * size.height)
+                    Offset(x, y)
+                }
+
+                // 1. Fill Path below the line chart
+                val fillPath = Path().apply {
+                    moveTo(points.first().x, size.height)
+                    lineTo(points.first().x, points.first().y)
+                    for (i in 1 until points.size) {
+                        lineTo(points[i].x, points[i].y)
+                    }
+                    lineTo(points.last().x, size.height)
+                    close()
+                }
+                drawPath(
+                    path = fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            subjectColor.copy(alpha = if (isHighlighted) 0.45f else 0.28f),
+                            subjectColor.copy(alpha = 0.02f)
+                        )
+                    )
+                )
+
+                // 2. Stroke line
+                val strokePath = Path().apply {
+                    moveTo(points.first().x, points.first().y)
+                    for (i in 1 until points.size) {
+                        lineTo(points[i].x, points[i].y)
+                    }
+                }
+                drawPath(
+                    path = strokePath,
+                    color = if (isHighlighted) subjectColor else subjectColor.copy(alpha = 0.85f),
+                    style = Stroke(
+                        width = if (isHighlighted) 2.dp.toPx() else 1.5.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
+
+                // 3. Dots at data points (W1, W2, W3, W4)
+                points.forEachIndexed { i, pt ->
+                    val isLast = i == points.size - 1
+                    if (isLast) {
+                        // Highlight W4 with glowing outer circle
+                        drawCircle(
+                            color = subjectColor.copy(alpha = 0.35f),
+                            radius = 4.dp.toPx(),
+                            center = pt
+                        )
+                        drawCircle(
+                            color = subjectColor,
+                            radius = 2.5.dp.toPx(),
+                            center = pt
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 1.2.dp.toPx(),
+                            center = pt
+                        )
+                    } else {
+                        drawCircle(
+                            color = subjectColor.copy(alpha = 0.75f),
+                            radius = 1.6.dp.toPx(),
+                            center = pt
+                        )
+                    }
+                }
+            }
+        }
+
+        // Mini Mastery Trend Label below sparkline
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(1.dp)
+        ) {
+            Text(
+                text = "4w:",
+                fontSize = 7.5.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "${latestMastery.toInt()}%",
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (latestMastery >= 85.0) EmeraldTertiary else if (latestMastery < 50.0) ErrorRed else subjectColor
+            )
+            Icon(
+                imageVector = if (isUpward) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                contentDescription = null,
+                modifier = Modifier.size(8.dp),
+                tint = if (isUpward) EmeraldTertiary else ErrorRed
+            )
+        }
     }
 }
 

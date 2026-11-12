@@ -220,5 +220,33 @@ interface StudySessionDao {
     suspend fun getAllSessionsList(): List<StudySessionEntity>
 }
 
+@Dao
+interface SubjectMasteryDao {
+    @Query("SELECT * FROM subject_mastery_records ORDER BY courseCode ASC, weekNumber ASC")
+    fun getAllMasteryRecords(): Flow<List<SubjectMasteryEntity>>
+
+    @Query("SELECT * FROM subject_mastery_records WHERE courseCode = :courseCode ORDER BY weekNumber ASC")
+    fun getMasteryRecordsForCourse(courseCode: String): Flow<List<SubjectMasteryEntity>>
+
+    @Query("SELECT * FROM subject_mastery_records ORDER BY courseCode ASC, weekNumber ASC")
+    suspend fun getAllMasteryRecordsList(): List<SubjectMasteryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMasteryRecord(record: SubjectMasteryEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllMasteryRecords(records: List<SubjectMasteryEntity>)
+
+    @Query("SELECT COUNT(*) FROM subject_mastery_records")
+    suspend fun getCount(): Int
+
+    @Query("UPDATE subject_mastery_records SET masteryPercentage = :newMastery, studyHoursInWeek = :hours WHERE courseCode = :courseCode AND weekNumber = :weekNumber")
+    suspend fun updateMasteryScore(courseCode: String, weekNumber: Int, newMastery: Double, hours: Double)
+
+    @Query("DELETE FROM subject_mastery_records WHERE courseCode = :courseCode")
+    suspend fun deleteMasteryForCourse(courseCode: String)
+}
+
+
 
 

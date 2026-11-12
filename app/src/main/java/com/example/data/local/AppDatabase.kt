@@ -17,9 +17,10 @@ import kotlinx.coroutines.launch
         TaskEntity::class,
         AcademicCalendarEventEntity::class,
         SemesterEntity::class,
-        StudySessionEntity::class
+        StudySessionEntity::class,
+        SubjectMasteryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun academicCalendarDao(): AcademicCalendarDao
     abstract fun semesterDao(): SemesterDao
     abstract fun studySessionDao(): StudySessionDao
+    abstract fun subjectMasteryDao(): SubjectMasteryDao
 
 
 
@@ -541,6 +543,43 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 )
             )
+        }
+
+        if (subjectMasteryDao().getCount() == 0) {
+            val oneWeekMs = 7L * 24 * 3600 * 1000
+            val nowMs = System.currentTimeMillis()
+            val initialMastery = listOf(
+                // CS201 - Data Structures & Algorithms (Rising from 64% to 92%)
+                SubjectMasteryEntity(courseCode = "CS201", weekNumber = 1, weekLabel = "W1", masteryPercentage = 64.0, studyHoursInWeek = 3.5, recordedTimestampMs = nowMs - (3 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "CS201", weekNumber = 2, weekLabel = "W2", masteryPercentage = 72.0, studyHoursInWeek = 4.2, recordedTimestampMs = nowMs - (2 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "CS201", weekNumber = 3, weekLabel = "W3", masteryPercentage = 81.0, studyHoursInWeek = 5.0, recordedTimestampMs = nowMs - (1 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "CS201", weekNumber = 4, weekLabel = "W4", masteryPercentage = 92.0, studyHoursInWeek = 5.8, recordedTimestampMs = nowMs),
+
+                // CS310 - Operating Systems (Rising from 58% to 88%)
+                SubjectMasteryEntity(courseCode = "CS310", weekNumber = 1, weekLabel = "W1", masteryPercentage = 58.0, studyHoursInWeek = 3.0, recordedTimestampMs = nowMs - (3 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "CS310", weekNumber = 2, weekLabel = "W2", masteryPercentage = 68.0, studyHoursInWeek = 3.8, recordedTimestampMs = nowMs - (2 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "CS310", weekNumber = 3, weekLabel = "W3", masteryPercentage = 77.0, studyHoursInWeek = 4.5, recordedTimestampMs = nowMs - (1 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "CS310", weekNumber = 4, weekLabel = "W4", masteryPercentage = 88.0, studyHoursInWeek = 5.2, recordedTimestampMs = nowMs),
+
+                // MATH204 - Discrete Mathematics (Rising from 52% to 84%)
+                SubjectMasteryEntity(courseCode = "MATH204", weekNumber = 1, weekLabel = "W1", masteryPercentage = 52.0, studyHoursInWeek = 2.5, recordedTimestampMs = nowMs - (3 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "MATH204", weekNumber = 2, weekLabel = "W2", masteryPercentage = 61.0, studyHoursInWeek = 3.2, recordedTimestampMs = nowMs - (2 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "MATH204", weekNumber = 3, weekLabel = "W3", masteryPercentage = 71.0, studyHoursInWeek = 4.2, recordedTimestampMs = nowMs - (1 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "MATH204", weekNumber = 4, weekLabel = "W4", masteryPercentage = 84.0, studyHoursInWeek = 4.8, recordedTimestampMs = nowMs),
+
+                // PHY102 - Applied Electromagnetism (Rising from 45% to 70%)
+                SubjectMasteryEntity(courseCode = "PHY102", weekNumber = 1, weekLabel = "W1", masteryPercentage = 45.0, studyHoursInWeek = 2.0, recordedTimestampMs = nowMs - (3 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "PHY102", weekNumber = 2, weekLabel = "W2", masteryPercentage = 53.0, studyHoursInWeek = 2.8, recordedTimestampMs = nowMs - (2 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "PHY102", weekNumber = 3, weekLabel = "W3", masteryPercentage = 62.0, studyHoursInWeek = 3.4, recordedTimestampMs = nowMs - (1 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "PHY102", weekNumber = 4, weekLabel = "W4", masteryPercentage = 70.0, studyHoursInWeek = 3.8, recordedTimestampMs = nowMs),
+
+                // ENG215 - Technical Writing (Rising from 70% to 86%)
+                SubjectMasteryEntity(courseCode = "ENG215", weekNumber = 1, weekLabel = "W1", masteryPercentage = 70.0, studyHoursInWeek = 2.0, recordedTimestampMs = nowMs - (3 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "ENG215", weekNumber = 2, weekLabel = "W2", masteryPercentage = 75.0, studyHoursInWeek = 2.2, recordedTimestampMs = nowMs - (2 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "ENG215", weekNumber = 3, weekLabel = "W3", masteryPercentage = 80.0, studyHoursInWeek = 2.5, recordedTimestampMs = nowMs - (1 * oneWeekMs)),
+                SubjectMasteryEntity(courseCode = "ENG215", weekNumber = 4, weekLabel = "W4", masteryPercentage = 86.0, studyHoursInWeek = 2.8, recordedTimestampMs = nowMs)
+            )
+            subjectMasteryDao().insertAllMasteryRecords(initialMastery)
         }
     }
 }

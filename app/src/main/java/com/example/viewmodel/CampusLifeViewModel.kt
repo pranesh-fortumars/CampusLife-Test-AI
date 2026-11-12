@@ -49,13 +49,12 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     private val academicCalendarDao = db.academicCalendarDao()
     private val semesterDao = db.semesterDao()
     private val studySessionDao = db.studySessionDao()
-
-
-
+    private val subjectMasteryDao = db.subjectMasteryDao()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             db.populateInitialData()
+            ensureSubjectMasteryData()
         }
     }
 
@@ -635,6 +634,53 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), WeekComparisonSummary())
 
+    // 4-Week Mastery Trends from Room Database
+    val subjectMasteryRecords: StateFlow<Map<String, List<SubjectMasteryEntity>>> = subjectMasteryDao
+        .getAllMasteryRecords()
+        .map { records ->
+            records.groupBy { it.courseCode }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun getDefaultMasteryForCourse(courseCode: String): List<SubjectMasteryEntity> {
+        val nowMs = System.currentTimeMillis()
+        val oneWeekMs = 7L * 24 * 3600 * 1000
+        val basePcts = when (courseCode) {
+            "CS201" -> listOf(64.0, 72.0, 81.0, 92.0)
+            "CS310" -> listOf(58.0, 68.0, 77.0, 88.0)
+            "MATH204" -> listOf(52.0, 61.0, 71.0, 84.0)
+            "PHY102" -> listOf(45.0, 53.0, 62.0, 70.0)
+            "ENG215" -> listOf(70.0, 75.0, 80.0, 86.0)
+            else -> listOf(50.0, 60.0, 70.0, 80.0)
+        }
+        return basePcts.mapIndexed { index, pct ->
+            SubjectMasteryEntity(
+                courseCode = courseCode,
+                weekNumber = index + 1,
+                weekLabel = "W${index + 1}",
+                masteryPercentage = pct,
+                studyHoursInWeek = 2.0 + (index * 0.8),
+                recordedTimestampMs = nowMs - ((3 - index) * oneWeekMs)
+            )
+        }
+    }
+
+    private suspend fun ensureSubjectMasteryData() {
+        if (subjectMasteryDao.getCount() == 0) {
+            val allCodes = listOf("CS201", "CS310", "MATH204", "PHY102", "ENG215")
+            val records = allCodes.flatMap { code ->
+                getDefaultMasteryForCourse(code)
+            }
+            subjectMasteryDao.insertAllMasteryRecords(records)
+        }
+    }
+
+    fun updateSubjectMastery(courseCode: String, weekNumber: Int, newMastery: Double, studyHours: Double) {
+        viewModelScope.launch(Dispatchers.IO) {
+            subjectMasteryDao.updateMasteryScore(courseCode, weekNumber, newMastery, studyHours)
+        }
+    }
+
     fun recordStudySession(
         courseCode: String,
         subjectName: String,
@@ -656,6 +702,14 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                     tag = tag
                 )
             )
+            // Dynamically boost current week's mastery based on study logging
+            val currentList = subjectMasteryDao.getAllMasteryRecordsList().filter { it.courseCode == courseCode }
+            val w4 = currentList.firstOrNull { it.weekNumber == 4 }
+            if (w4 != null) {
+                val newHours = w4.studyHoursInWeek + (durationMinutes / 60.0)
+                val newMastery = (w4.masteryPercentage + (durationMinutes / 50.0 * 1.5)).coerceAtMost(99.0)
+                subjectMasteryDao.updateMasteryScore(courseCode, 4, Math.round(newMastery * 10.0) / 10.0, Math.round(newHours * 10.0) / 10.0)
+            }
         }
     }
 
