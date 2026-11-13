@@ -18,9 +18,10 @@ import kotlinx.coroutines.launch
         AcademicCalendarEventEntity::class,
         SemesterEntity::class,
         StudySessionEntity::class,
-        SubjectMasteryEntity::class
+        SubjectMasteryEntity::class,
+        WeeklyDayNoteEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun semesterDao(): SemesterDao
     abstract fun studySessionDao(): StudySessionDao
     abstract fun subjectMasteryDao(): SubjectMasteryDao
+    abstract fun weeklyDayNoteDao(): WeeklyDayNoteDao
 
 
 
@@ -580,6 +582,15 @@ abstract class AppDatabase : RoomDatabase() {
                 SubjectMasteryEntity(courseCode = "ENG215", weekNumber = 4, weekLabel = "W4", masteryPercentage = 86.0, studyHoursInWeek = 2.8, recordedTimestampMs = nowMs)
             )
             subjectMasteryDao().insertAllMasteryRecords(initialMastery)
+        }
+
+        if (weeklyDayNoteDao().getCount() == 0) {
+            weeklyDayNoteDao().insertAllNotes(
+                listOf(
+                    WeeklyDayNoteEntity(dayKey = "Thu", note = "Exam Prep"),
+                    WeeklyDayNoteEntity(dayKey = "Tue", note = "Group Study")
+                )
+            )
         }
     }
 }

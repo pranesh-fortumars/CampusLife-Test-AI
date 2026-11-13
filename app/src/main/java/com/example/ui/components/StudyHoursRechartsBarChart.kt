@@ -90,6 +90,9 @@ fun StudyHoursRechartsBarChart(
     val weekComparisonSummary by viewModel.weekComparisonSummary.collectAsState()
     val subjectPriorities by viewModel.subjectPriorities.collectAsState()
     val subjectMasteryRecords by viewModel.subjectMasteryRecords.collectAsState()
+    val weeklyDayNotes by viewModel.weeklyDayNotes.collectAsState()
+    val context = LocalContext.current
+    val currentDayKey = remember { viewModel.getCurrentDayKey() }
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
@@ -137,6 +140,35 @@ fun StudyHoursRechartsBarChart(
         } else {
             studyStats
         }
+    }
+
+    val activeSelectedStat = selectedStat?.let { sel ->
+        displayedStudyStats.firstOrNull { it.courseCode == sel.courseCode } ?: sel
+    }
+    val activeHoveredStat = hoveredStat?.let { hov ->
+        displayedStudyStats.firstOrNull { it.courseCode == hov.courseCode } ?: hov
+    }
+    val activeSelectedDayTrend = selectedDayTrend?.let { sel ->
+        weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
+    }
+
+    val quickAddDayKey = activeSelectedDayTrend?.dayKey ?: currentDayKey
+    val quickAddCourseCode = if (viewMode == ChartViewMode.BY_SUBJECT) {
+        activeSelectedStat?.courseCode
+            ?: activeHoveredStat?.courseCode
+            ?: displayedStudyStats.firstOrNull()?.courseCode
+            ?: courses.firstOrNull()?.code
+            ?: "CS201"
+    } else {
+        selectedWeeklySubjectFilter
+            ?: activeSelectedDayTrend?.primarySubject?.takeIf { it.isNotBlank() && it != "General" }
+            ?: courses.firstOrNull()?.code
+            ?: "CS201"
+    }
+    val quickAddDateDisplay = if (viewMode == ChartViewMode.BY_SUBJECT || quickAddDayKey == currentDayKey) {
+        "Today"
+    } else {
+        quickAddDayKey
     }
 
     val subjectsBelow50Pct = remember(displayedStudyStats, subjectWeeklyGoals) {
@@ -215,6 +247,114 @@ fun StudyHoursRechartsBarChart(
                         color = EmeraldOnTertiaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
+                }
+            }
+
+            // Quick Add +30m Header Action Bar
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = IndigoPrimaryContainer.copy(alpha = 0.45f),
+                border = BorderStroke(1.dp, IndigoPrimary.copy(alpha = 0.2f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("chart_quick_add_header_bar")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(IndigoPrimary.copy(alpha = 0.16f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = null,
+                                tint = IndigoPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = if (viewMode == ChartViewMode.BY_SUBJECT) {
+                                    "Focused Subject: $quickAddCourseCode"
+                                } else {
+                                    val todayMarker = if (quickAddDayKey == currentDayKey) " (Today)" else ""
+                                    "Focused Day: $quickAddDayKey$todayMarker"
+                                },
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (viewMode == ChartViewMode.BY_SUBJECT) {
+                                    val focusedHours = displayedStudyStats.firstOrNull { it.courseCode == quickAddCourseCode }?.totalHours ?: 0.0
+                                    "${String.format(Locale.US, "%.1f", focusedHours)}h logged • Tap +30m to log block"
+                                } else {
+                                    val dayHours = weeklyTrends.firstOrNull { it.dayKey == quickAddDayKey }?.totalHours ?: 0.0
+                                    "${String.format(Locale.US, "%.1f", dayHours)}h logged • Logs to $quickAddCourseCode"
+                                },
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Button(
+                        onClick = {
+                            viewModel.quickAddThirtyMinutes(
+                                courseCode = quickAddCourseCode,
+                                dateDisplay = quickAddDateDisplay
+                            )
+                            val targetLabel = if (viewMode == ChartViewMode.BY_SUBJECT) {
+                                quickAddCourseCode
+                            } else {
+                                "$quickAddDayKey ($quickAddCourseCode)"
+                            }
+                            Toast.makeText(
+                                context,
+                                "+30m study time added for $targetLabel",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(100),
+                        colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                        modifier = Modifier
+                            .heightIn(min = 38.dp)
+                            .testTag("btn_quick_add_30m")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreTime,
+                            contentDescription = "Quick Add 30 minutes",
+                            modifier = Modifier.size(15.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Quick Add +30m",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
                 }
             }
 
@@ -592,8 +732,8 @@ fun StudyHoursRechartsBarChart(
                             Text(
                                 if (viewMode == ChartViewMode.WEEKLY_TREND) {
                                     "Target Goal (${String.format(Locale.US, "%.1f", dailyGoalHours)}h)"
-                                } else if (selectedStat != null) {
-                                    "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(selectedStat!!.courseCode))}h: ${selectedStat!!.courseCode})"
+                                } else if (activeSelectedStat != null) {
+                                    "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(activeSelectedStat.courseCode))}h: ${activeSelectedStat.courseCode})"
                                 } else {
                                     "Subject Goals"
                                 },
@@ -887,9 +1027,9 @@ fun StudyHoursRechartsBarChart(
                         Text(
                             if (viewMode == ChartViewMode.WEEKLY_TREND) {
                                 "${String.format(Locale.US, "%.1f", dailyGoalHours)}h/day Goal"
-                            } else if (selectedStat != null) {
-                                val g = getGoalForCourse(selectedStat!!.courseCode)
-                                "${selectedStat!!.courseCode} Goal: ${String.format(Locale.US, "%.1f", g)}h (50% @ ${String.format(Locale.US, "%.1f", g * 0.5)}h)"
+                            } else if (activeSelectedStat != null) {
+                                val g = getGoalForCourse(activeSelectedStat.courseCode)
+                                "${activeSelectedStat.courseCode} Goal: ${String.format(Locale.US, "%.1f", g)}h (50% @ ${String.format(Locale.US, "%.1f", g * 0.5)}h)"
                             } else {
                                 "Custom Subject Goals (50% threshold)"
                             },
@@ -901,7 +1041,7 @@ fun StudyHoursRechartsBarChart(
             }
 
             // Detailed Breakdown Card for Subject Mode (Revealed on subject selection/tap)
-            val activeTooltipStat = selectedStat
+            val activeTooltipStat = activeSelectedStat
             AnimatedVisibility(
                 visible = viewMode == ChartViewMode.BY_SUBJECT && activeTooltipStat != null,
                 enter = fadeIn(animationSpec = tween(180)),
@@ -1365,11 +1505,11 @@ fun StudyHoursRechartsBarChart(
 
             // Active Recharts Tooltip for Weekly Trend Mode
             AnimatedVisibility(
-                visible = viewMode == ChartViewMode.WEEKLY_TREND && selectedDayTrend != null,
+                visible = viewMode == ChartViewMode.WEEKLY_TREND && activeSelectedDayTrend != null,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                selectedDayTrend?.let { day ->
+                activeSelectedDayTrend?.let { day ->
                     val goalPct = ((day.totalHours / dailyGoalHours) * 100).toInt()
                     val courseTitle = courses.firstOrNull { it.code == day.primarySubject }?.name ?: "Course Study"
 
@@ -1433,6 +1573,34 @@ fun StudyHoursRechartsBarChart(
                                     }
                                     IconButton(onClick = { selectedDayTrend = null }, modifier = Modifier.size(24.dp)) {
                                         Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+
+                            if (day.quickNote.isNotBlank()) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = IndigoPrimaryContainer.copy(alpha = 0.7f),
+                                    border = BorderStroke(1.dp, IndigoPrimary.copy(alpha = 0.3f)),
+                                    modifier = Modifier.testTag("tooltip_day_quick_note_${day.dayKey}")
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.StickyNote2,
+                                            contentDescription = "Quick Note",
+                                            tint = IndigoPrimary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = "Note: ${day.quickNote}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = IndigoOnPrimaryContainer
+                                        )
                                     }
                                 }
                             }
@@ -1537,8 +1705,8 @@ fun StudyHoursRechartsBarChart(
 
                             // Goal Reference Line for selected subject or overall target
                             if (showTargetOverlay) {
-                                val targetGoalHours = if (selectedStat != null) {
-                                    getGoalForCourse(selectedStat!!.courseCode)
+                                val targetGoalHours = if (activeSelectedStat != null) {
+                                    getGoalForCourse(activeSelectedStat.courseCode)
                                 } else {
                                     displayedStudyStats.map { getGoalForCourse(it.courseCode) }.average().takeIf { !it.isNaN() } ?: 5.0
                                 }
@@ -1968,7 +2136,7 @@ fun StudyHoursRechartsBarChart(
                         }
 
                         // Small Hover Breakdown Popup Card anchored to the hovered subject bar
-                        val activePopupStat = hoveredStat
+                        val activePopupStat = activeHoveredStat
                         if (activePopupStat != null) {
                             val statIndex = displayedStudyStats.indexOfFirst { it.courseCode == activePopupStat.courseCode }
                                 if (statIndex >= 0 && displayedStudyStats.isNotEmpty()) {
@@ -2256,11 +2424,11 @@ fun StudyHoursRechartsBarChart(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(230.dp)
+                        .height(255.dp)
                         .testTag("recharts_weekly_viewport")
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val bottomAxisY = size.height - 35.dp.toPx()
+                        val bottomAxisY = size.height - 52.dp.toPx()
                         val topY = 20.dp.toPx()
                         val chartHeight = bottomAxisY - topY
 
@@ -2303,7 +2471,7 @@ fun StudyHoursRechartsBarChart(
                         weeklyTrends.forEach { dayTrend ->
                             val isSelected = selectedDayTrend?.dayKey == dayTrend.dayKey
                             val reachesGoal = dayTrend.totalHours >= dailyGoalHours
-                            val isToday = dayTrend.dayKey == "Tue"
+                            val isToday = dayTrend.dayKey == currentDayKey
 
                             // Subject filter logic
                             val subjectFilterMins = if (selectedWeeklySubjectFilter != null) {
@@ -2512,6 +2680,263 @@ fun StudyHoursRechartsBarChart(
                                         fontSize = 11.sp,
                                         fontWeight = if (isToday || isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
                                         color = if (isToday) WarningAmber else if (isSelected) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                // Fixed-height Quick Note badge slot below every day bar so baselines align
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(18.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (dayTrend.quickNote.isNotBlank()) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (isSelected) IndigoPrimary else IndigoPrimaryContainer,
+                                            border = BorderStroke(
+                                                0.6.dp,
+                                                if (isSelected) IndigoPrimary else IndigoPrimary.copy(alpha = 0.4f)
+                                            ),
+                                            modifier = Modifier
+                                                .padding(horizontal = 1.dp)
+                                                .testTag("day_note_badge_${dayTrend.dayKey}")
+                                        ) {
+                                            Text(
+                                                text = dayTrend.quickNote,
+                                                fontSize = 7.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isSelected) Color.White else IndigoOnPrimaryContainer,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Weekly Trend Quick Note Editor Card
+            AnimatedVisibility(
+                visible = viewMode == ChartViewMode.WEEKLY_TREND,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                var quickNoteTargetDay by remember(currentDayKey) { mutableStateOf(currentDayKey) }
+                LaunchedEffect(selectedDayTrend?.dayKey) {
+                    selectedDayTrend?.dayKey?.let { quickNoteTargetDay = it }
+                }
+                var quickNoteInput by remember { mutableStateOf(weeklyDayNotes[quickNoteTargetDay] ?: "") }
+                LaunchedEffect(quickNoteTargetDay, weeklyDayNotes) {
+                    quickNoteInput = weeklyDayNotes[quickNoteTargetDay] ?: ""
+                }
+                val presetLabels = remember {
+                    listOf("Exam Prep", "Group Study", "Lab Sprint", "Mock Test", "Project Push")
+                }
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    border = BorderStroke(1.dp, IndigoPrimary.copy(alpha = 0.25f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("weekly_quick_note_panel")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .clip(CircleShape)
+                                        .background(IndigoPrimary.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.StickyNote2,
+                                        contentDescription = null,
+                                        tint = IndigoPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Quick Note for Study Spike",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Attach a short label (e.g., 'Exam Prep', 'Group Study') to $quickNoteTargetDay",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Day selector chips (Mon..Sun)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            weeklyTrends.forEach { dayItem ->
+                                val isDaySelected = quickNoteTargetDay == dayItem.dayKey
+                                val hasNote = dayItem.quickNote.isNotBlank()
+                                FilterChip(
+                                    selected = isDaySelected,
+                                    onClick = {
+                                        quickNoteTargetDay = dayItem.dayKey
+                                        selectedDayTrend = dayItem
+                                    },
+                                    label = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = if (dayItem.dayKey == currentDayKey) "${dayItem.dayKey}*" else dayItem.dayKey,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isDaySelected) FontWeight.Bold else FontWeight.Medium
+                                            )
+                                            if (hasNote) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(5.dp)
+                                                        .clip(CircleShape)
+                                                        .background(if (isDaySelected) IndigoPrimary else EmeraldTertiary)
+                                                )
+                                            }
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(100),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = IndigoPrimaryContainer,
+                                        selectedLabelColor = IndigoOnPrimaryContainer
+                                    ),
+                                    modifier = Modifier
+                                        .heightIn(min = 30.dp)
+                                        .testTag("quick_note_day_${dayItem.dayKey}")
+                                )
+                            }
+                        }
+
+                        // Preset label chips
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            presetLabels.forEach { preset ->
+                                val isPresetActive = quickNoteInput.equals(preset, ignoreCase = true)
+                                AssistChip(
+                                    onClick = {
+                                        quickNoteInput = preset
+                                        viewModel.saveQuickNoteForDay(quickNoteTargetDay, preset)
+                                        Toast.makeText(
+                                            context,
+                                            "Saved '$preset' for $quickNoteTargetDay",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    label = {
+                                        Text(
+                                            text = preset,
+                                            fontSize = 10.sp,
+                                            fontWeight = if (isPresetActive) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = if (isPresetActive) IndigoPrimaryContainer else MaterialTheme.colorScheme.surface
+                                    ),
+                                    modifier = Modifier
+                                        .heightIn(min = 30.dp)
+                                        .testTag("quick_note_preset_${preset.lowercase().replace(" ", "_")}")
+                                )
+                            }
+                        }
+
+                        // Input field + Save / Clear actions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = quickNoteInput,
+                                onValueChange = { if (it.length <= 40) quickNoteInput = it },
+                                placeholder = {
+                                    Text(
+                                        "e.g., Exam Prep, Group Study",
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                label = { Text("Note for $quickNoteTargetDay", fontSize = 11.sp) },
+                                singleLine = true,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("input_weekly_quick_note")
+                            )
+
+                            Button(
+                                onClick = {
+                                    viewModel.saveQuickNoteForDay(quickNoteTargetDay, quickNoteInput)
+                                    val msg = if (quickNoteInput.isBlank()) {
+                                        "Cleared note for $quickNoteTargetDay"
+                                    } else {
+                                        "Note saved for $quickNoteTargetDay"
+                                    }
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .testTag("btn_save_quick_note")
+                            ) {
+                                Text("Save", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            if (!weeklyDayNotes[quickNoteTargetDay].isNullOrBlank() || quickNoteInput.isNotBlank()) {
+                                IconButton(
+                                    onClick = {
+                                        quickNoteInput = ""
+                                        viewModel.saveQuickNoteForDay(quickNoteTargetDay, "")
+                                        Toast.makeText(
+                                            context,
+                                            "Cleared note for $quickNoteTargetDay",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .testTag("btn_clear_quick_note")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Clear Quick Note",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }

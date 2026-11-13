@@ -247,6 +247,24 @@ interface SubjectMasteryDao {
     suspend fun deleteMasteryForCourse(courseCode: String)
 }
 
+@Dao
+interface WeeklyDayNoteDao {
+    @Query("SELECT * FROM weekly_day_notes ORDER BY updatedTimestampMs DESC")
+    fun getAllNotes(): Flow<List<WeeklyDayNoteEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertNote(dayNote: WeeklyDayNoteEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllNotes(notes: List<WeeklyDayNoteEntity>)
+
+    @Query("DELETE FROM weekly_day_notes WHERE dayKey = :dayKey")
+    suspend fun deleteNoteForDay(dayKey: String)
+
+    @Query("SELECT COUNT(*) FROM weekly_day_notes")
+    suspend fun getCount(): Int
+}
+
 
 
 

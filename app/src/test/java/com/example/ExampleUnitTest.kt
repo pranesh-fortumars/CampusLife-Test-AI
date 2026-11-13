@@ -534,4 +534,50 @@ class ExampleUnitTest {
         assertEquals(28.0, netGain, 0.001)
         assertTrue(finalMastery > initialMastery) // Upward trend
     }
+
+    @Test
+    fun `test WeeklyDayNoteEntity and DayStudyTrend quickNote attachment`() {
+        val noteEntity = com.example.data.local.WeeklyDayNoteEntity(
+            dayKey = "Thu",
+            note = "Exam Prep"
+        )
+        assertEquals("Thu", noteEntity.dayKey)
+        assertEquals("Exam Prep", noteEntity.note)
+
+        val dayTrend = com.example.data.local.DayStudyTrend(
+            dayKey = "Thu",
+            dayLabel = "Thursday",
+            totalMinutes = 270, // 4.5h spike
+            sessionCount = 5,
+            primarySubject = "CS201",
+            subjectBreakdown = mapOf("CS201" to 180, "MATH204" to 90),
+            quickNote = noteEntity.note
+        )
+        assertEquals(4.5, dayTrend.totalHours, 0.001)
+        assertEquals("Exam Prep", dayTrend.quickNote)
+    }
+
+    @Test
+    fun `test Quick Add +30m session increment calculation`() {
+        val initialMinutes = 240 // 4.0h
+        val quickAddMinutes = 30
+        val updatedMinutes = initialMinutes + quickAddMinutes
+        val updatedHours = updatedMinutes / 60.0
+
+        assertEquals(270, updatedMinutes)
+        assertEquals(4.5, updatedHours, 0.001)
+
+        val quickSession = com.example.data.local.StudySessionEntity(
+            courseCode = "CS201",
+            subjectName = "Data Structures",
+            durationMinutes = 30,
+            dateDisplay = "Today",
+            mode = "FOCUS",
+            notes = "Quick Add +30m study block",
+            tag = "Exam Prep"
+        )
+        assertEquals(30, quickSession.durationMinutes)
+        assertEquals("FOCUS", quickSession.mode)
+        assertEquals("Today", quickSession.dateDisplay)
+    }
 }

@@ -50,11 +50,13 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     private val semesterDao = db.semesterDao()
     private val studySessionDao = db.studySessionDao()
     private val subjectMasteryDao = db.subjectMasteryDao()
+    private val weeklyDayNoteDao = db.weeklyDayNoteDao()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             db.populateInitialData()
             ensureSubjectMasteryData()
+            ensureWeeklyDayNotesData()
         }
     }
 
@@ -436,12 +438,65 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         filtered.filter { it.mode == "FOCUS" }.sumOf { it.durationMinutes }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
+    fun getCurrentDayKey(): String {
+        val cal = java.util.Calendar.getInstance()
+        return when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> "Mon"
+            java.util.Calendar.TUESDAY -> "Tue"
+            java.util.Calendar.WEDNESDAY -> "Wed"
+            java.util.Calendar.THURSDAY -> "Thu"
+            java.util.Calendar.FRIDAY -> "Fri"
+            java.util.Calendar.SATURDAY -> "Sat"
+            java.util.Calendar.SUNDAY -> "Sun"
+            else -> "Mon"
+        }
+    }
+
+    val weeklyDayNotes: StateFlow<Map<String, String>> = weeklyDayNoteDao
+        .getAllNotes()
+        .map { list -> list.associate { it.dayKey to it.note } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    private suspend fun ensureWeeklyDayNotesData() {
+        val alreadySeeded = analyticsPrefs.getBoolean("seeded_weekly_day_notes", false)
+        if (!alreadySeeded && weeklyDayNoteDao.getCount() == 0) {
+            weeklyDayNoteDao.insertAllNotes(
+                listOf(
+                    WeeklyDayNoteEntity(dayKey = "Thu", note = "Exam Prep"),
+                    WeeklyDayNoteEntity(dayKey = "Tue", note = "Group Study")
+                )
+            )
+            analyticsPrefs.edit().putBoolean("seeded_weekly_day_notes", true).apply()
+        } else if (!alreadySeeded) {
+            analyticsPrefs.edit().putBoolean("seeded_weekly_day_notes", true).apply()
+        }
+    }
+
+    fun saveQuickNoteForDay(dayKey: String, note: String) {
+        val trimmed = note.trim().take(40)
+        viewModelScope.launch(Dispatchers.IO) {
+            if (trimmed.isEmpty()) {
+                weeklyDayNoteDao.deleteNoteForDay(dayKey)
+            } else {
+                weeklyDayNoteDao.upsertNote(
+                    WeeklyDayNoteEntity(
+                        dayKey = dayKey,
+                        note = trimmed,
+                        updatedTimestampMs = System.currentTimeMillis()
+                    )
+                )
+            }
+        }
+    }
+
     val weeklyStudyTrends: StateFlow<List<DayStudyTrend>> = combine(
         allStudySessions,
-        _selectedSessionTagFilter
-    ) { sessions, tagFilter ->
+        _selectedSessionTagFilter,
+        weeklyDayNotes
+    ) { sessions, tagFilter, notesMap ->
         val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+        val currentDayKey = getCurrentDayKey()
 
         val tagMultiplier = when (tagFilter) {
             "Exam Prep" -> 0.45
@@ -467,10 +522,9 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         } else {
             sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
         }
-        val todaySessions = filteredSessions.filter { it.dateDisplay == "Today" }
 
         days.mapIndexed { index, dayKey ->
-            val isToday = (dayKey == "Tue") // 2026-11-03 is Tuesday
+            val isToday = (dayKey == currentDayKey)
             val rawBreakdown = baseBreakdowns[dayKey] ?: emptyMap()
             val dayBreakdown = mutableMapOf<String, Int>()
 
@@ -479,12 +533,15 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                 dayBreakdown[sub] = scaled
             }
 
-            if (isToday) {
-                todaySessions.forEach { s ->
-                    val cur = dayBreakdown[s.courseCode] ?: 0
-                    dayBreakdown[s.courseCode] = cur + s.durationMinutes
-                }
+            val daySessions = filteredSessions.filter { s ->
+                (isToday && s.dateDisplay.equals("Today", ignoreCase = true)) ||
+                    s.dateDisplay.equals(dayKey, ignoreCase = true)
             }
+            daySessions.forEach { s ->
+                val cur = dayBreakdown[s.courseCode] ?: 0
+                dayBreakdown[s.courseCode] = cur + s.durationMinutes
+            }
+
             val totalMins = dayBreakdown.values.sum()
             val sessionCount = maxOf(1, totalMins / 45)
             val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
@@ -495,7 +552,8 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                 totalMinutes = totalMins,
                 sessionCount = sessionCount,
                 primarySubject = topSubject,
-                subjectBreakdown = dayBreakdown
+                subjectBreakdown = dayBreakdown,
+                quickNote = notesMap[dayKey] ?: ""
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -681,13 +739,28 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun quickAddThirtyMinutes(courseCode: String, dateDisplay: String = "Today") {
+        val courseName = courses.value.firstOrNull { it.code == courseCode }?.name ?: "Course $courseCode"
+        val activeTag = _selectedSessionTagFilter.value.takeIf { it != "All" } ?: "Exam Prep"
+        recordStudySession(
+            courseCode = courseCode,
+            subjectName = courseName,
+            durationMinutes = 30,
+            mode = "FOCUS",
+            notes = "Quick Add +30m ($dateDisplay)",
+            tag = activeTag,
+            dateDisplay = dateDisplay
+        )
+    }
+
     fun recordStudySession(
         courseCode: String,
         subjectName: String,
         durationMinutes: Int,
         mode: String,
         notes: String = "",
-        tag: String = "Exam Prep"
+        tag: String = "Exam Prep",
+        dateDisplay: String = "Today"
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             studySessionDao.insertSession(
@@ -696,7 +769,7 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                     subjectName = subjectName,
                     durationMinutes = durationMinutes,
                     timestampMs = System.currentTimeMillis(),
-                    dateDisplay = "Today",
+                    dateDisplay = dateDisplay,
                     mode = mode,
                     notes = notes,
                     tag = tag

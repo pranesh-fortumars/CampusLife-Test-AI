@@ -171,7 +171,8 @@ data class DayStudyTrend(
     val totalMinutes: Int,
     val sessionCount: Int,
     val primarySubject: String,
-    val subjectBreakdown: Map<String, Int> = emptyMap()
+    val subjectBreakdown: Map<String, Int> = emptyMap(),
+    val quickNote: String = ""
 ) {
     val totalHours: Double
         get() = totalMinutes / 60.0
@@ -211,6 +212,14 @@ data class SubjectMasteryEntity(
     val studyHoursInWeek: Double = 4.0,
     val targetMastery: Double = 85.0,
     val recordedTimestampMs: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "weekly_day_notes")
+data class WeeklyDayNoteEntity(
+    @PrimaryKey
+    val dayKey: String, // "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+    val note: String,
+    val updatedTimestampMs: Long = System.currentTimeMillis()
 )
 
 
