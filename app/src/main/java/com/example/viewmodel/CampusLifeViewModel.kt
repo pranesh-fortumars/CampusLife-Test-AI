@@ -57,6 +57,7 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             db.populateInitialData()
             ensureSubjectMasteryData()
             ensureWeeklyDayNotesData()
+            ensureExtendedStudyHistoryData()
         }
     }
 
@@ -401,18 +402,31 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         _selectedSessionTagFilter.value = tag
     }
 
+    private val _selectedDateRange = MutableStateFlow(StudyDateRange.LAST_7_DAYS)
+    val selectedDateRange: StateFlow<StudyDateRange> = _selectedDateRange.asStateFlow()
+
+    fun selectDateRange(range: StudyDateRange) {
+        _selectedDateRange.value = range
+    }
+
     val allStudySessions: StateFlow<List<StudySessionEntity>> = studySessionDao.getAllSessions()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val studyStatsPerSubject: StateFlow<List<SubjectStudyStats>> = combine(
         allStudySessions,
         _selectedSessionTagFilter,
-        courses
-    ) { sessions, tagFilter, courseList ->
+        courses,
+        _selectedDateRange,
+        currentSemester
+    ) { sessions, tagFilter, courseList, dateRange, semester ->
+        val nowMs = System.currentTimeMillis()
+        val filteredByRange = sessions.filter {
+            StudyDateRangeHelper.isSessionInRange(it.timestampMs, dateRange, semester, nowMs)
+        }
         val filtered = if (tagFilter == "All") {
-            sessions
+            filteredByRange
         } else {
-            sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
+            filteredByRange.filter { it.tag.equals(tagFilter, ignoreCase = true) }
         }
         val grouped = filtered.groupBy { it.courseCode }
         val allCodes = (courseList.map { it.code } + grouped.keys).distinct()
@@ -428,12 +442,18 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
 
     val totalFocusMinutes: StateFlow<Int> = combine(
         allStudySessions,
-        _selectedSessionTagFilter
-    ) { sessions, tagFilter ->
+        _selectedSessionTagFilter,
+        _selectedDateRange,
+        currentSemester
+    ) { sessions, tagFilter, dateRange, semester ->
+        val nowMs = System.currentTimeMillis()
+        val filteredByRange = sessions.filter {
+            StudyDateRangeHelper.isSessionInRange(it.timestampMs, dateRange, semester, nowMs)
+        }
         val filtered = if (tagFilter == "All") {
-            sessions
+            filteredByRange
         } else {
-            sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
+            filteredByRange.filter { it.tag.equals(tagFilter, ignoreCase = true) }
         }
         filtered.filter { it.mode == "FOCUS" }.sumOf { it.durationMinutes }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -489,72 +509,109 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    private suspend fun ensureExtendedStudyHistoryData() {
+        val alreadySeeded = analyticsPrefs.getBoolean("seeded_extended_study_history_v1", false)
+        if (!alreadySeeded) {
+            val nowMs = System.currentTimeMillis()
+            val sevenDaysAgo = nowMs - (7L * StudyDateRangeHelper.ONE_DAY_MS)
+            val existing = studySessionDao.getAllSessionsList()
+            val hasHistorical = existing.any { it.timestampMs < sevenDaysAgo }
+            if (!hasHistorical) {
+                studySessionDao.insertAllSessions(AppDatabase.buildExtendedHistoricalStudySessions(nowMs))
+            }
+            analyticsPrefs.edit().putBoolean("seeded_extended_study_history_v1", true).apply()
+        }
+    }
+
     val weeklyStudyTrends: StateFlow<List<DayStudyTrend>> = combine(
         allStudySessions,
         _selectedSessionTagFilter,
-        weeklyDayNotes
-    ) { sessions, tagFilter, notesMap ->
-        val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-        val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-        val currentDayKey = getCurrentDayKey()
-
-        val tagMultiplier = when (tagFilter) {
-            "Exam Prep" -> 0.45
-            "Homework" -> 0.35
-            "Research" -> 0.20
-            "Project" -> 0.25
-            "Revision" -> 0.20
-            else -> 1.0
-        }
-
-        val baseBreakdowns = mapOf(
-            "Mon" to mapOf("CS201" to 90, "MATH204" to 60),      // 150m (2.5h)
-            "Tue" to mapOf("CS310" to 120, "CS201" to 75),       // 195m (3.25h)
-            "Wed" to mapOf("MATH204" to 105, "PHY102" to 60),    // 165m (2.75h)
-            "Thu" to mapOf("CS201" to 120, "CS310" to 90),       // 210m (3.5h)
-            "Fri" to mapOf("PHY102" to 90, "ENG215" to 45),      // 135m (2.25h)
-            "Sat" to mapOf("MATH204" to 60, "CS201" to 30),      // 90m (1.5h)
-            "Sun" to mapOf("ENG215" to 45, "CS310" to 30)        // 75m (1.25h)
-        )
-
-        val filteredSessions = if (tagFilter == "All") {
+        weeklyDayNotes,
+        _selectedDateRange,
+        currentSemester
+    ) { sessions, tagFilter, notesMap, dateRange, semester ->
+        val nowMs = System.currentTimeMillis()
+        val tagFiltered = if (tagFilter == "All") {
             sessions
         } else {
             sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
         }
 
-        days.mapIndexed { index, dayKey ->
-            val isToday = (dayKey == currentDayKey)
-            val rawBreakdown = baseBreakdowns[dayKey] ?: emptyMap()
-            val dayBreakdown = mutableMapOf<String, Int>()
-
-            rawBreakdown.forEach { (sub, mins) ->
-                val scaled = if (tagFilter == "All") mins else maxOf(10, kotlin.math.round(mins * tagMultiplier).toInt())
-                dayBreakdown[sub] = scaled
+        when (dateRange) {
+            StudyDateRange.THIS_MONTH -> {
+                val monthSessions = tagFiltered.filter {
+                    StudyDateRangeHelper.isSessionInRange(it.timestampMs, StudyDateRange.THIS_MONTH, semester, nowMs)
+                }
+                StudyDateRangeHelper.buildMonthlyWeeklyTrends(monthSessions, nowMs)
             }
-
-            val daySessions = filteredSessions.filter { s ->
-                (isToday && s.dateDisplay.equals("Today", ignoreCase = true)) ||
-                    s.dateDisplay.equals(dayKey, ignoreCase = true)
+            StudyDateRange.SEMESTER -> {
+                val semSessions = tagFiltered.filter {
+                    StudyDateRangeHelper.isSessionInRange(it.timestampMs, StudyDateRange.SEMESTER, semester, nowMs)
+                }
+                StudyDateRangeHelper.buildSemesterMonthlyTrends(semSessions, semester, nowMs)
             }
-            daySessions.forEach { s ->
-                val cur = dayBreakdown[s.courseCode] ?: 0
-                dayBreakdown[s.courseCode] = cur + s.durationMinutes
+            StudyDateRange.LAST_7_DAYS -> {
+                val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+                val currentDayKey = getCurrentDayKey()
+
+                val tagMultiplier = when (tagFilter) {
+                    "Exam Prep" -> 0.45
+                    "Homework" -> 0.35
+                    "Research" -> 0.20
+                    "Project" -> 0.25
+                    "Revision" -> 0.20
+                    else -> 1.0
+                }
+
+                val baseBreakdowns = mapOf(
+                    "Mon" to mapOf("CS201" to 90, "MATH204" to 60),      // 150m (2.5h)
+                    "Tue" to mapOf("CS310" to 120, "CS201" to 75),       // 195m (3.25h)
+                    "Wed" to mapOf("MATH204" to 105, "PHY102" to 60),    // 165m (2.75h)
+                    "Thu" to mapOf("CS201" to 120, "CS310" to 90),       // 210m (3.5h)
+                    "Fri" to mapOf("PHY102" to 90, "ENG215" to 45),      // 135m (2.25h)
+                    "Sat" to mapOf("MATH204" to 60, "CS201" to 30),      // 90m (1.5h)
+                    "Sun" to mapOf("ENG215" to 45, "CS310" to 30)        // 75m (1.25h)
+                )
+
+                val recentSessions = tagFiltered.filter {
+                    StudyDateRangeHelper.isSessionInRange(it.timestampMs, StudyDateRange.LAST_7_DAYS, semester, nowMs)
+                }
+
+                days.mapIndexed { index, dayKey ->
+                    val isToday = (dayKey == currentDayKey)
+                    val rawBreakdown = baseBreakdowns[dayKey] ?: emptyMap()
+                    val dayBreakdown = mutableMapOf<String, Int>()
+
+                    rawBreakdown.forEach { (sub, mins) ->
+                        val scaled = if (tagFilter == "All") mins else maxOf(10, kotlin.math.round(mins * tagMultiplier).toInt())
+                        dayBreakdown[sub] = scaled
+                    }
+
+                    val daySessions = recentSessions.filter { s ->
+                        (isToday && s.dateDisplay.equals("Today", ignoreCase = true)) ||
+                            s.dateDisplay.equals(dayKey, ignoreCase = true)
+                    }
+                    daySessions.forEach { s ->
+                        val cur = dayBreakdown[s.courseCode] ?: 0
+                        dayBreakdown[s.courseCode] = cur + s.durationMinutes
+                    }
+
+                    val totalMins = dayBreakdown.values.sum()
+                    val sessionCount = maxOf(1, totalMins / 45)
+                    val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
+
+                    DayStudyTrend(
+                        dayKey = dayKey,
+                        dayLabel = fullDays[index],
+                        totalMinutes = totalMins,
+                        sessionCount = sessionCount,
+                        primarySubject = topSubject,
+                        subjectBreakdown = dayBreakdown,
+                        quickNote = notesMap[dayKey] ?: ""
+                    )
+                }
             }
-
-            val totalMins = dayBreakdown.values.sum()
-            val sessionCount = maxOf(1, totalMins / 45)
-            val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
-
-            DayStudyTrend(
-                dayKey = dayKey,
-                dayLabel = fullDays[index],
-                totalMinutes = totalMins,
-                sessionCount = sessionCount,
-                primarySubject = topSubject,
-                subjectBreakdown = dayBreakdown,
-                quickNote = notesMap[dayKey] ?: ""
-            )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -590,67 +647,129 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
 
     val previousWeeklyStudyTrends: StateFlow<List<DayStudyTrend>> = combine(
         allStudySessions,
-        _selectedSessionTagFilter
-    ) { sessions, tagFilter ->
-        val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-        val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
-
-        val tagMultiplier = when (tagFilter) {
-            "Exam Prep" -> 0.40
-            "Homework" -> 0.35
-            "Research" -> 0.20
-            "Project" -> 0.20
-            "Revision" -> 0.15
-            else -> 1.0
-        }
-
-        // Previous week benchmark baseline (consistent prior baseline)
-        val prevBaseBreakdowns = mapOf(
-            "Mon" to mapOf("CS201" to 60, "MATH204" to 60),      // 120m (2.0h)
-            "Tue" to mapOf("CS310" to 90, "CS201" to 60),        // 150m (2.5h)
-            "Wed" to mapOf("MATH204" to 120, "PHY102" to 60),    // 180m (3.0h)
-            "Thu" to mapOf("CS201" to 90, "CS310" to 75),        // 165m (2.75h)
-            "Fri" to mapOf("PHY102" to 75, "ENG215" to 45),      // 120m (2.0h)
-            "Sat" to mapOf("MATH204" to 30, "CS201" to 30),      // 60m (1.0h)
-            "Sun" to mapOf("ENG215" to 45)                       // 45m (0.75h)
-        )
-
-        // Include any actual sessions from past week (older than 7 days) if recorded
+        _selectedSessionTagFilter,
+        _selectedDateRange,
+        currentSemester
+    ) { sessions, tagFilter, dateRange, semester ->
         val now = System.currentTimeMillis()
-        val sevenDaysAgo = now - (7L * 24 * 3600 * 1000)
-        val fourteenDaysAgo = now - (14L * 24 * 3600 * 1000)
-        val pastSessions = sessions.filter {
-            val matchesTag = (tagFilter == "All" || it.tag.equals(tagFilter, ignoreCase = true))
-            matchesTag && it.timestampMs in fourteenDaysAgo..sevenDaysAgo
+        val tagFiltered = sessions.filter {
+            tagFilter == "All" || it.tag.equals(tagFilter, ignoreCase = true)
         }
 
-        days.mapIndexed { index, dayKey ->
-            val rawBreakdown = prevBaseBreakdowns[dayKey] ?: emptyMap()
-            val dayBreakdown = mutableMapOf<String, Int>()
-
-            rawBreakdown.forEach { (sub, mins) ->
-                val scaled = if (tagFilter == "All") mins else maxOf(10, kotlin.math.round(mins * tagMultiplier).toInt())
-                dayBreakdown[sub] = scaled
+        when (dateRange) {
+            StudyDateRange.THIS_MONTH -> {
+                // Compare against prior 30-day window (31..60 days ago)
+                val priorWindowSessions = tagFiltered.filter {
+                    val ageDays = ((now - it.timestampMs) / StudyDateRangeHelper.ONE_DAY_MS).toInt()
+                    ageDays in 31..60
+                }
+                val priorSpecs = listOf(
+                    Triple("Wk 1", "Prior Month Wk 1", 53..60),
+                    Triple("Wk 2", "Prior Month Wk 2", 46..52),
+                    Triple("Wk 3", "Prior Month Wk 3", 39..45),
+                    Triple("Wk 4", "Prior Month Wk 4", 31..38)
+                )
+                priorSpecs.map { (key, label, range) ->
+                    val bucket = priorWindowSessions.filter {
+                        val ageDays = ((now - it.timestampMs) / StudyDateRangeHelper.ONE_DAY_MS).toInt()
+                        ageDays in range
+                    }
+                    val breakdown = mutableMapOf<String, Int>()
+                    bucket.forEach { s ->
+                        breakdown[s.courseCode] = (breakdown[s.courseCode] ?: 0) + s.durationMinutes
+                    }
+                    val totalMins = breakdown.values.sum()
+                    val topSub = breakdown.maxByOrNull { it.value }?.key ?: "CS201"
+                    DayStudyTrend(
+                        dayKey = key,
+                        dayLabel = label,
+                        totalMinutes = totalMins,
+                        sessionCount = bucket.size,
+                        primarySubject = topSub,
+                        subjectBreakdown = breakdown
+                    )
+                }
             }
-
-            // Merge past sessions if any
-            pastSessions.forEach { s ->
-                val cur = dayBreakdown[s.courseCode] ?: 0
-                dayBreakdown[s.courseCode] = cur + (s.durationMinutes / 7)
+            StudyDateRange.SEMESTER -> {
+                // Benchmark ~85% of current semester buckets for prior-term comparison
+                val currentBuckets = StudyDateRangeHelper.buildSemesterMonthlyTrends(
+                    tagFiltered.filter { StudyDateRangeHelper.isSessionInRange(it.timestampMs, StudyDateRange.SEMESTER, semester, now) },
+                    semester,
+                    now
+                )
+                currentBuckets.map { cur ->
+                    val prevBreakdown = cur.subjectBreakdown.mapValues { (_, mins) ->
+                        kotlin.math.round(mins * 0.85).toInt()
+                    }
+                    val totalMins = prevBreakdown.values.sum()
+                    DayStudyTrend(
+                        dayKey = cur.dayKey,
+                        dayLabel = "Prior ${cur.dayLabel}",
+                        totalMinutes = totalMins,
+                        sessionCount = maxOf(0, cur.sessionCount - 1),
+                        primarySubject = cur.primarySubject,
+                        subjectBreakdown = prevBreakdown
+                    )
+                }
             }
+            StudyDateRange.LAST_7_DAYS -> {
+                val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                val fullDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
-            val totalMins = dayBreakdown.values.sum()
-            val sessionCount = maxOf(1, totalMins / 45)
-            val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
+                val tagMultiplier = when (tagFilter) {
+                    "Exam Prep" -> 0.40
+                    "Homework" -> 0.35
+                    "Research" -> 0.20
+                    "Project" -> 0.20
+                    "Revision" -> 0.15
+                    else -> 1.0
+                }
 
-            DayStudyTrend(
-                dayKey = dayKey,
-                dayLabel = fullDays[index],
-                totalMinutes = totalMins,
-                sessionCount = sessionCount,
-                primarySubject = topSubject,
-                subjectBreakdown = dayBreakdown
-            )
+                // Previous week benchmark baseline (consistent prior baseline)
+                val prevBaseBreakdowns = mapOf(
+                    "Mon" to mapOf("CS201" to 60, "MATH204" to 60),      // 120m (2.0h)
+                    "Tue" to mapOf("CS310" to 90, "CS201" to 60),        // 150m (2.5h)
+                    "Wed" to mapOf("MATH204" to 120, "PHY102" to 60),    // 180m (3.0h)
+                    "Thu" to mapOf("CS201" to 90, "CS310" to 75),        // 165m (2.75h)
+                    "Fri" to mapOf("PHY102" to 75, "ENG215" to 45),      // 120m (2.0h)
+                    "Sat" to mapOf("MATH204" to 30, "CS201" to 30),      // 60m (1.0h)
+                    "Sun" to mapOf("ENG215" to 45)                       // 45m (0.75h)
+                )
+
+                val sevenDaysAgo = now - (7L * 24 * 3600 * 1000)
+                val fourteenDaysAgo = now - (14L * 24 * 3600 * 1000)
+                val pastSessions = tagFiltered.filter {
+                    it.timestampMs in fourteenDaysAgo..sevenDaysAgo
+                }
+
+                days.mapIndexed { index, dayKey ->
+                    val rawBreakdown = prevBaseBreakdowns[dayKey] ?: emptyMap()
+                    val dayBreakdown = mutableMapOf<String, Int>()
+
+                    rawBreakdown.forEach { (sub, mins) ->
+                        val scaled = if (tagFilter == "All") mins else maxOf(10, kotlin.math.round(mins * tagMultiplier).toInt())
+                        dayBreakdown[sub] = scaled
+                    }
+
+                    pastSessions.forEach { s ->
+                        val cur = dayBreakdown[s.courseCode] ?: 0
+                        dayBreakdown[s.courseCode] = cur + (s.durationMinutes / 7)
+                    }
+
+                    val totalMins = dayBreakdown.values.sum()
+                    val sessionCount = maxOf(1, totalMins / 45)
+                    val topSubject = dayBreakdown.maxByOrNull { it.value }?.key ?: "CS201"
+
+                    DayStudyTrend(
+                        dayKey = dayKey,
+                        dayLabel = fullDays[index],
+                        totalMinutes = totalMins,
+                        sessionCount = sessionCount,
+                        primarySubject = topSubject,
+                        subjectBreakdown = dayBreakdown
+                    )
+                }
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

@@ -222,6 +222,144 @@ data class WeeklyDayNoteEntity(
     val updatedTimestampMs: Long = System.currentTimeMillis()
 )
 
+enum class StudyDateRange(
+    val label: String,
+    val shortLabel: String,
+    val goalScaleMultiplier: Double
+) {
+    LAST_7_DAYS("Last 7 Days", "7D", 1.0),
+    THIS_MONTH("This Month", "1M", 2.0),
+    SEMESTER("Semester", "Sem", 3.0)
+}
+
+object StudyDateRangeHelper {
+    const val ONE_DAY_MS: Long = 24L * 60L * 60L * 1000L
+
+    fun isSessionInRange(
+        sessionTimestampMs: Long,
+        range: StudyDateRange,
+        semester: SemesterEntity? = null,
+        nowMs: Long = System.currentTimeMillis()
+    ): Boolean {
+        return when (range) {
+            StudyDateRange.LAST_7_DAYS -> {
+                val startMs = nowMs - (7L * ONE_DAY_MS)
+                sessionTimestampMs >= startMs
+            }
+            StudyDateRange.THIS_MONTH -> {
+                val startMs = nowMs - (30L * ONE_DAY_MS)
+                sessionTimestampMs >= startMs
+            }
+            StudyDateRange.SEMESTER -> {
+                val startMs = semester?.startTimestampMs ?: (nowMs - (120L * ONE_DAY_MS))
+                val endMs = semester?.endTimestampMs ?: (nowMs + ONE_DAY_MS)
+                sessionTimestampMs in startMs..maxOf(endMs, nowMs)
+            }
+        }
+    }
+
+    fun buildMonthlyWeeklyTrends(
+        sessions: List<StudySessionEntity>,
+        nowMs: Long = System.currentTimeMillis()
+    ): List<DayStudyTrend> {
+        val weekSpecs = listOf(
+            Triple("Wk 1", "Week 1 (22–30d ago)", 22..30),
+            Triple("Wk 2", "Week 2 (15–21d ago)", 15..21),
+            Triple("Wk 3", "Week 3 (8–14d ago)", 8..14),
+            Triple("Wk 4", "Week 4 (Last 7d)", 0..7)
+        )
+        return weekSpecs.map { (key, label, dayOffsetRange) ->
+            val bucketSessions = sessions.filter { s ->
+                val ageDays = ((nowMs - s.timestampMs) / ONE_DAY_MS).toInt().coerceAtLeast(0)
+                if (key == "Wk 1") ageDays in dayOffsetRange
+                else if (key == "Wk 4") ageDays in 0..7
+                else ageDays in dayOffsetRange
+            }
+            val breakdown = mutableMapOf<String, Int>()
+            bucketSessions.forEach { s ->
+                breakdown[s.courseCode] = (breakdown[s.courseCode] ?: 0) + s.durationMinutes
+            }
+            val totalMins = breakdown.values.sum()
+            val topSubject = breakdown.maxByOrNull { it.value }?.key ?: "CS201"
+            DayStudyTrend(
+                dayKey = key,
+                dayLabel = label,
+                totalMinutes = totalMins,
+                sessionCount = bucketSessions.size,
+                primarySubject = topSubject,
+                subjectBreakdown = breakdown
+            )
+        }
+    }
+
+    fun buildSemesterMonthlyTrends(
+        sessions: List<StudySessionEntity>,
+        semester: SemesterEntity? = null,
+        nowMs: Long = System.currentTimeMillis()
+    ): List<DayStudyTrend> {
+        val startMs = semester?.startTimestampMs ?: (nowMs - (75L * ONE_DAY_MS))
+        val endMs = semester?.endTimestampMs ?: (nowMs + (40L * ONE_DAY_MS))
+
+        val startCal = java.util.Calendar.getInstance().apply {
+            timeInMillis = startMs
+            set(java.util.Calendar.DAY_OF_MONTH, 1)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val endCal = java.util.Calendar.getInstance().apply {
+            timeInMillis = endMs
+        }
+        val shortFmt = java.text.SimpleDateFormat("MMM", java.util.Locale.US)
+        val fullFmt = java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.US)
+
+        data class MonthBucket(val year: Int, val month: Int, val shortKey: String, val fullLabel: String)
+        val buckets = mutableListOf<MonthBucket>()
+        val iter = startCal.clone() as java.util.Calendar
+        while (
+            iter.get(java.util.Calendar.YEAR) < endCal.get(java.util.Calendar.YEAR) ||
+            (iter.get(java.util.Calendar.YEAR) == endCal.get(java.util.Calendar.YEAR) &&
+                iter.get(java.util.Calendar.MONTH) <= endCal.get(java.util.Calendar.MONTH))
+        ) {
+            buckets.add(
+                MonthBucket(
+                    year = iter.get(java.util.Calendar.YEAR),
+                    month = iter.get(java.util.Calendar.MONTH),
+                    shortKey = shortFmt.format(iter.time),
+                    fullLabel = fullFmt.format(iter.time)
+                )
+            )
+            iter.add(java.util.Calendar.MONTH, 1)
+            if (buckets.size >= 6) break
+        }
+
+        val sessionCal = java.util.Calendar.getInstance()
+        return buckets.map { bucket ->
+            val bucketSessions = sessions.filter { s ->
+                sessionCal.timeInMillis = s.timestampMs
+                sessionCal.get(java.util.Calendar.YEAR) == bucket.year &&
+                    sessionCal.get(java.util.Calendar.MONTH) == bucket.month
+            }
+            val breakdown = mutableMapOf<String, Int>()
+            bucketSessions.forEach { s ->
+                breakdown[s.courseCode] = (breakdown[s.courseCode] ?: 0) + s.durationMinutes
+            }
+            val totalMins = breakdown.values.sum()
+            val topSubject = breakdown.maxByOrNull { it.value }?.key ?: "CS201"
+            DayStudyTrend(
+                dayKey = bucket.shortKey,
+                dayLabel = bucket.fullLabel,
+                totalMinutes = totalMins,
+                sessionCount = bucketSessions.size,
+                primarySubject = topSubject,
+                subjectBreakdown = breakdown
+            )
+        }
+    }
+}
+
+
 
 
 

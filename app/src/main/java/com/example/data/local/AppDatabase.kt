@@ -65,6 +65,244 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         fun getDatabase(context: Context): AppDatabase = getInstance(context)
+
+        fun buildExtendedHistoricalStudySessions(nowMs: Long = System.currentTimeMillis()): List<StudySessionEntity> {
+            val dayMs = 24L * 3600 * 1000
+            return listOf(
+                // Earlier This Month (8-28 days ago)
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 75,
+                    timestampMs = nowMs - (9 * dayMs),
+                    dateDisplay = "9 days ago",
+                    mode = "FOCUS",
+                    notes = "Red-Black tree insertions & rebalancing",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 60,
+                    timestampMs = nowMs - (10 * dayMs),
+                    dateDisplay = "10 days ago",
+                    mode = "FOCUS",
+                    notes = "Generating functions homework",
+                    tag = "Homework"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS310",
+                    subjectName = "Operating Systems",
+                    durationMinutes = 80,
+                    timestampMs = nowMs - (11 * dayMs),
+                    dateDisplay = "11 days ago",
+                    mode = "FOCUS",
+                    notes = "Thread pool & mutex project milestone",
+                    tag = "Project"
+                ),
+                StudySessionEntity(
+                    courseCode = "PHY102",
+                    subjectName = "Applied Electromagnetism",
+                    durationMinutes = 50,
+                    timestampMs = nowMs - (12 * dayMs),
+                    dateDisplay = "12 days ago",
+                    mode = "FOCUS",
+                    notes = "Gauss's law & boundary conditions review",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 90,
+                    timestampMs = nowMs - (16 * dayMs),
+                    dateDisplay = "16 days ago",
+                    mode = "FOCUS",
+                    notes = "Shortest path benchmark suite",
+                    tag = "Project"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS310",
+                    subjectName = "Operating Systems",
+                    durationMinutes = 70,
+                    timestampMs = nowMs - (17 * dayMs),
+                    dateDisplay = "17 days ago",
+                    mode = "FOCUS",
+                    notes = "Page replacement algorithm literature",
+                    tag = "Research"
+                ),
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 75,
+                    timestampMs = nowMs - (19 * dayMs),
+                    dateDisplay = "19 days ago",
+                    mode = "FOCUS",
+                    notes = "Pigeonhole & induction quiz prep",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "ENG215",
+                    subjectName = "Technical Writing",
+                    durationMinutes = 60,
+                    timestampMs = nowMs - (20 * dayMs),
+                    dateDisplay = "20 days ago",
+                    mode = "FOCUS",
+                    notes = "Primary source evaluation",
+                    tag = "Research"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 85,
+                    timestampMs = nowMs - (23 * dayMs),
+                    dateDisplay = "23 days ago",
+                    mode = "FOCUS",
+                    notes = "Hash table collision lab",
+                    tag = "Homework"
+                ),
+                StudySessionEntity(
+                    courseCode = "PHY102",
+                    subjectName = "Applied Electromagnetism",
+                    durationMinutes = 90,
+                    timestampMs = nowMs - (25 * dayMs),
+                    dateDisplay = "25 days ago",
+                    mode = "FOCUS",
+                    notes = "Vector calculus revision problems",
+                    tag = "Revision"
+                ),
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 65,
+                    timestampMs = nowMs - (26 * dayMs),
+                    dateDisplay = "26 days ago",
+                    mode = "FOCUS",
+                    notes = "Mock midterm practice set",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS310",
+                    subjectName = "Operating Systems",
+                    durationMinutes = 70,
+                    timestampMs = nowMs - (27 * dayMs),
+                    dateDisplay = "27 days ago",
+                    mode = "FOCUS",
+                    notes = "Process scheduling simulator homework",
+                    tag = "Homework"
+                ),
+                StudySessionEntity(
+                    courseCode = "ENG215",
+                    subjectName = "Technical Writing",
+                    durationMinutes = 60,
+                    timestampMs = nowMs - (28 * dayMs),
+                    dateDisplay = "28 days ago",
+                    mode = "FOCUS",
+                    notes = "Methodology section revision",
+                    tag = "Revision"
+                ),
+                // Earlier in Fall 2026 Semester (34-68 days ago)
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 110,
+                    timestampMs = nowMs - (34 * dayMs),
+                    dateDisplay = "34 days ago",
+                    mode = "FOCUS",
+                    notes = "Midterm #1 dynamic programming sprint",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 95,
+                    timestampMs = nowMs - (37 * dayMs),
+                    dateDisplay = "37 days ago",
+                    mode = "FOCUS",
+                    notes = "Modular arithmetic assignment",
+                    tag = "Homework"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS310",
+                    subjectName = "Operating Systems",
+                    durationMinutes = 105,
+                    timestampMs = nowMs - (40 * dayMs),
+                    dateDisplay = "40 days ago",
+                    mode = "FOCUS",
+                    notes = "Custom shell fork/exec pipeline",
+                    tag = "Project"
+                ),
+                StudySessionEntity(
+                    courseCode = "PHY102",
+                    subjectName = "Applied Electromagnetism",
+                    durationMinutes = 85,
+                    timestampMs = nowMs - (42 * dayMs),
+                    dateDisplay = "42 days ago",
+                    mode = "FOCUS",
+                    notes = "Magnetostatics experimental notes",
+                    tag = "Research"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 120,
+                    timestampMs = nowMs - (50 * dayMs),
+                    dateDisplay = "50 days ago",
+                    mode = "FOCUS",
+                    notes = "Asymptotic complexity & sorting proofs",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS310",
+                    subjectName = "Operating Systems",
+                    durationMinutes = 110,
+                    timestampMs = nowMs - (54 * dayMs),
+                    dateDisplay = "54 days ago",
+                    mode = "FOCUS",
+                    notes = "POSIX threads lab setup",
+                    tag = "Project"
+                ),
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 100,
+                    timestampMs = nowMs - (58 * dayMs),
+                    dateDisplay = "58 days ago",
+                    mode = "FOCUS",
+                    notes = "Propositional logic & predicates review",
+                    tag = "Revision"
+                ),
+                StudySessionEntity(
+                    courseCode = "PHY102",
+                    subjectName = "Applied Electromagnetism",
+                    durationMinutes = 95,
+                    timestampMs = nowMs - (62 * dayMs),
+                    dateDisplay = "62 days ago",
+                    mode = "FOCUS",
+                    notes = "Coulomb & electric field problem set",
+                    tag = "Homework"
+                ),
+                StudySessionEntity(
+                    courseCode = "ENG215",
+                    subjectName = "Technical Writing",
+                    durationMinutes = 90,
+                    timestampMs = nowMs - (65 * dayMs),
+                    dateDisplay = "65 days ago",
+                    mode = "FOCUS",
+                    notes = "Research proposal outline",
+                    tag = "Research"
+                ),
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 140,
+                    timestampMs = nowMs - (68 * dayMs),
+                    dateDisplay = "68 days ago",
+                    mode = "FOCUS",
+                    notes = "Linked lists & stacks foundation",
+                    tag = "Homework"
+                )
+            )
+        }
     }
 
     suspend fun populateInitialData() {
@@ -543,7 +781,7 @@ abstract class AppDatabase : RoomDatabase() {
                         notes = "IEEE reference formatting and abstract refinement",
                         tag = "Revision"
                     )
-                )
+                ) + buildExtendedHistoricalStudySessions(now)
             )
         }
 

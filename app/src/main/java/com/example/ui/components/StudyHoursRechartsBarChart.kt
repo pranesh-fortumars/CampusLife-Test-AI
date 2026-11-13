@@ -56,10 +56,13 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
+import com.example.data.local.StudyDateRange
 import com.example.data.local.SubjectStudyStats
 import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -83,6 +86,8 @@ fun StudyHoursRechartsBarChart(
     val dailyGoalHours by viewModel.dailyStudyGoalHours.collectAsState()
     val subjectWeeklyGoals by viewModel.subjectWeeklyStudyGoals.collectAsState()
     val selectedSessionTagFilter by viewModel.selectedSessionTagFilter.collectAsState()
+    val selectedDateRange by viewModel.selectedDateRange.collectAsState()
+    val currentSemester by viewModel.currentSemester.collectAsState()
     val tasks by viewModel.tasks.collectAsState()
     val allStudySessions by viewModel.allStudySessions.collectAsState()
     val previousWeeklyTrends by viewModel.previousWeeklyStudyTrends.collectAsState()
@@ -93,6 +98,7 @@ fun StudyHoursRechartsBarChart(
     val weeklyDayNotes by viewModel.weeklyDayNotes.collectAsState()
     val context = LocalContext.current
     val currentDayKey = remember { viewModel.getCurrentDayKey() }
+    val currentMonthKey = remember { SimpleDateFormat("MMM", Locale.US).format(Date()) }
 
     var viewMode by remember { mutableStateOf(ChartViewMode.BY_SUBJECT) }
     var showTargetOverlay by remember { mutableStateOf(true) }
@@ -131,7 +137,19 @@ fun StudyHoursRechartsBarChart(
     }
 
     fun getGoalForCourse(courseCode: String): Double {
-        return subjectWeeklyGoals[courseCode] ?: viewModel.defaultSubjectWeeklyGoals[courseCode] ?: 5.0
+        val weeklyBase = subjectWeeklyGoals[courseCode] ?: viewModel.defaultSubjectWeeklyGoals[courseCode] ?: 5.0
+        return weeklyBase * selectedDateRange.goalScaleMultiplier
+    }
+
+    val periodBucketGoalHours = when (selectedDateRange) {
+        StudyDateRange.LAST_7_DAYS -> dailyGoalHours
+        StudyDateRange.THIS_MONTH -> dailyGoalHours * 3.0
+        StudyDateRange.SEMESTER -> dailyGoalHours * 7.0
+    }
+    val periodGoalUnitLabel = when (selectedDateRange) {
+        StudyDateRange.LAST_7_DAYS -> "h/day"
+        StudyDateRange.THIS_MONTH -> "h/wk"
+        StudyDateRange.SEMESTER -> "h/mo"
     }
 
     val displayedStudyStats = remember(studyStats, onlyHighPriorityFilter, subjectPriorities) {
@@ -152,7 +170,11 @@ fun StudyHoursRechartsBarChart(
         weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
     }
 
-    val quickAddDayKey = activeSelectedDayTrend?.dayKey ?: currentDayKey
+    val quickAddDayKey = if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
+        activeSelectedDayTrend?.dayKey ?: currentDayKey
+    } else {
+        currentDayKey
+    }
     val quickAddCourseCode = if (viewMode == ChartViewMode.BY_SUBJECT) {
         activeSelectedStat?.courseCode
             ?: activeHoveredStat?.courseCode
@@ -165,13 +187,17 @@ fun StudyHoursRechartsBarChart(
             ?: courses.firstOrNull()?.code
             ?: "CS201"
     }
-    val quickAddDateDisplay = if (viewMode == ChartViewMode.BY_SUBJECT || quickAddDayKey == currentDayKey) {
+    val quickAddDateDisplay = if (
+        viewMode == ChartViewMode.BY_SUBJECT ||
+        selectedDateRange != StudyDateRange.LAST_7_DAYS ||
+        quickAddDayKey == currentDayKey
+    ) {
         "Today"
     } else {
         quickAddDayKey
     }
 
-    val subjectsBelow50Pct = remember(displayedStudyStats, subjectWeeklyGoals) {
+    val subjectsBelow50Pct = remember(displayedStudyStats, subjectWeeklyGoals, selectedDateRange) {
         displayedStudyStats.filter { stat ->
             val goal = getGoalForCourse(stat.courseCode)
             stat.totalHours < (goal * 0.5)
@@ -215,7 +241,15 @@ fun StudyHoursRechartsBarChart(
                             }
                         }
                         Text(
-                            text = if (viewMode == ChartViewMode.WEEKLY_TREND) "Weekly Consistency Trend" else "Subject Analytics: Study Hours",
+                            text = if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                                when (selectedDateRange) {
+                                    StudyDateRange.LAST_7_DAYS -> "Weekly Consistency Trend"
+                                    StudyDateRange.THIS_MONTH -> "Monthly Study Trend"
+                                    StudyDateRange.SEMESTER -> "Semester Study Trend"
+                                }
+                            } else {
+                                "Subject Analytics: Study Hours"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -223,9 +257,15 @@ fun StudyHoursRechartsBarChart(
                     }
                     Text(
                         text = if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                            if (selectedSessionTagFilter == "All") "Day-by-day consistency from Room study records" else "Consistency for '$selectedSessionTagFilter' sessions"
+                            val baseDesc = when (selectedDateRange) {
+                                StudyDateRange.LAST_7_DAYS -> "Last 7 Days • Day-by-day consistency"
+                                StudyDateRange.THIS_MONTH -> "This Month (30d) • Weekly breakdown"
+                                StudyDateRange.SEMESTER -> "${currentSemester?.name ?: "Semester"} • Monthly progression"
+                            }
+                            if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc ($selectedSessionTagFilter)"
                         } else {
-                            if (selectedSessionTagFilter == "All") "Recharts-style analytics from Room database" else "Filtered by '$selectedSessionTagFilter' category"
+                            val baseDesc = "${selectedDateRange.label} • Room study analytics"
+                            if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc • '$selectedSessionTagFilter'"
                         },
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -238,7 +278,7 @@ fun StudyHoursRechartsBarChart(
                 ) {
                     Text(
                         text = if (selectedSessionTagFilter == "All") {
-                            "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h Logged"
+                            "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h • ${selectedDateRange.shortLabel}"
                         } else {
                             "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h ($selectedSessionTagFilter)"
                         },
@@ -247,6 +287,99 @@ fun StudyHoursRechartsBarChart(
                         color = EmeraldOnTertiaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
+                }
+            }
+
+            // Date Range Selector ('Last 7 Days', 'This Month', 'Semester')
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarToday,
+                        contentDescription = null,
+                        tint = IndigoPrimary,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = "Date Range:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (selectedDateRange == StudyDateRange.SEMESTER && currentSemester != null) {
+                        Text(
+                            text = "• ${currentSemester!!.name}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = IndigoPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                        .padding(4.dp)
+                        .testTag("date_range_selector"),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    StudyDateRange.values().forEach { range ->
+                        val isSelected = selectedDateRange == range
+                        val rangeIcon = when (range) {
+                            StudyDateRange.LAST_7_DAYS -> Icons.Default.DateRange
+                            StudyDateRange.THIS_MONTH -> Icons.Default.CalendarMonth
+                            StudyDateRange.SEMESTER -> Icons.Default.School
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) IndigoPrimary else Color.Transparent,
+                            shadowElevation = if (isSelected) 2.dp else 0.dp,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 38.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    viewModel.selectDateRange(range)
+                                    selectedStat = null
+                                    hoveredStat = null
+                                    selectedDayTrend = null
+                                }
+                                .testTag("date_range_${range.name.lowercase()}")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 6.dp, vertical = 7.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = rangeIcon,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = range.label,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -289,9 +422,11 @@ fun StudyHoursRechartsBarChart(
                             Text(
                                 text = if (viewMode == ChartViewMode.BY_SUBJECT) {
                                     "Focused Subject: $quickAddCourseCode"
-                                } else {
+                                } else if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
                                     val todayMarker = if (quickAddDayKey == currentDayKey) " (Today)" else ""
                                     "Focused Day: $quickAddDayKey$todayMarker"
+                                } else {
+                                    "Active Range: ${selectedDateRange.label}"
                                 },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -302,10 +437,13 @@ fun StudyHoursRechartsBarChart(
                             Text(
                                 text = if (viewMode == ChartViewMode.BY_SUBJECT) {
                                     val focusedHours = displayedStudyStats.firstOrNull { it.courseCode == quickAddCourseCode }?.totalHours ?: 0.0
-                                    "${String.format(Locale.US, "%.1f", focusedHours)}h logged • Tap +30m to log block"
-                                } else {
+                                    "${String.format(Locale.US, "%.1f", focusedHours)}h in ${selectedDateRange.label} • Tap +30m"
+                                } else if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
                                     val dayHours = weeklyTrends.firstOrNull { it.dayKey == quickAddDayKey }?.totalHours ?: 0.0
                                     "${String.format(Locale.US, "%.1f", dayHours)}h logged • Logs to $quickAddCourseCode"
+                                } else {
+                                    val totalRangeHours = weeklyTrends.sumOf { it.totalMinutes } / 60.0
+                                    "${String.format(Locale.US, "%.1f", totalRangeHours)}h total • Logs +30m to $quickAddCourseCode"
                                 },
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -323,7 +461,7 @@ fun StudyHoursRechartsBarChart(
                                 courseCode = quickAddCourseCode,
                                 dateDisplay = quickAddDateDisplay
                             )
-                            val targetLabel = if (viewMode == ChartViewMode.BY_SUBJECT) {
+                            val targetLabel = if (viewMode == ChartViewMode.BY_SUBJECT || selectedDateRange != StudyDateRange.LAST_7_DAYS) {
                                 quickAddCourseCode
                             } else {
                                 "$quickAddDayKey ($quickAddCourseCode)"
@@ -368,7 +506,7 @@ fun StudyHoursRechartsBarChart(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Segmented Toggle: By Subject vs Weekly Trend
+                    // Segmented Toggle: By Subject vs Trend (Weekly / Monthly / Semester)
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(100))
@@ -378,6 +516,15 @@ fun StudyHoursRechartsBarChart(
                     ) {
                         ChartViewMode.values().forEach { mode ->
                             val isSelected = viewMode == mode
+                            val dynamicModeLabel = if (mode == ChartViewMode.WEEKLY_TREND) {
+                                when (selectedDateRange) {
+                                    StudyDateRange.LAST_7_DAYS -> "Weekly Trend"
+                                    StudyDateRange.THIS_MONTH -> "Monthly Trend"
+                                    StudyDateRange.SEMESTER -> "Semester Trend"
+                                }
+                            } else {
+                                mode.label
+                            }
                             Surface(
                                 shape = RoundedCornerShape(100),
                                 color = if (isSelected) IndigoPrimary else Color.Transparent,
@@ -394,7 +541,7 @@ fun StudyHoursRechartsBarChart(
                                     .testTag("toggle_chart_${mode.name.lowercase()}")
                             ) {
                                 Text(
-                                    text = mode.label,
+                                    text = dynamicModeLabel,
                                     fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -731,11 +878,12 @@ fun StudyHoursRechartsBarChart(
                         label = {
                             Text(
                                 if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                    "Target Goal (${String.format(Locale.US, "%.1f", dailyGoalHours)}h)"
+                                    "Target Goal (${String.format(Locale.US, "%.1f", periodBucketGoalHours)}$periodGoalUnitLabel)"
                                 } else if (activeSelectedStat != null) {
                                     "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(activeSelectedStat.courseCode))}h: ${activeSelectedStat.courseCode})"
                                 } else {
-                                    "Subject Goals"
+                                    if (selectedDateRange == StudyDateRange.LAST_7_DAYS) "Subject Goals"
+                                    else "Goals (${selectedDateRange.goalScaleMultiplier.toInt()}x weekly)"
                                 },
                                 fontSize = 10.sp
                             )
@@ -758,13 +906,18 @@ fun StudyHoursRechartsBarChart(
                             .testTag("toggle_target_overlay")
                     )
 
-                    // Compare Previous Week Toggle
+                    // Compare Previous Period Toggle
                     FilterChip(
                         selected = compareWithPreviousWeek,
                         onClick = { compareWithPreviousWeek = !compareWithPreviousWeek },
                         label = {
+                            val compareLabel = when (selectedDateRange) {
+                                StudyDateRange.LAST_7_DAYS -> if (compareWithPreviousWeek) "vs Previous Week: ON" else "vs Prev Week"
+                                StudyDateRange.THIS_MONTH -> if (compareWithPreviousWeek) "vs Prior Month: ON" else "vs Prior 30d"
+                                StudyDateRange.SEMESTER -> if (compareWithPreviousWeek) "vs Baseline: ON" else "vs Baseline"
+                            }
                             Text(
-                                if (compareWithPreviousWeek) "vs Previous Week: ON" else "vs Prev Week",
+                                compareLabel,
                                 fontSize = 10.sp,
                                 fontWeight = if (compareWithPreviousWeek) FontWeight.Bold else FontWeight.Medium
                             )
@@ -790,7 +943,7 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Comparative Summary Banner (This Week vs Previous Week)
+            // Comparative Summary Banner
             AnimatedVisibility(
                 visible = compareWithPreviousWeek,
                 enter = fadeIn(),
@@ -828,13 +981,17 @@ fun StudyHoursRechartsBarChart(
                             }
                             Column {
                                 Text(
-                                    text = "Week-over-Week Performance",
+                                    text = when (selectedDateRange) {
+                                        StudyDateRange.LAST_7_DAYS -> "Week-over-Week Performance"
+                                        StudyDateRange.THIS_MONTH -> "Month-over-Month Performance"
+                                        StudyDateRange.SEMESTER -> "Semester vs Baseline Performance"
+                                    },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "This Week: ${String.format(Locale.US, "%.1f", weekComparisonSummary.currentWeekTotalHours)}h • Prev Week: ${String.format(Locale.US, "%.1f", weekComparisonSummary.previousWeekTotalHours)}h",
+                                    text = "${selectedDateRange.label}: ${String.format(Locale.US, "%.1f", weekComparisonSummary.currentWeekTotalHours)}h • Prior: ${String.format(Locale.US, "%.1f", weekComparisonSummary.previousWeekTotalHours)}h",
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -952,8 +1109,14 @@ fun StudyHoursRechartsBarChart(
                             .background(if (viewMode == ChartViewMode.WEEKLY_TREND) EmeraldTertiary else IndigoPrimary)
                     )
                     Text(
-                        if (compareWithPreviousWeek) "This Week"
-                        else if (viewMode == ChartViewMode.WEEKLY_TREND) "Daily Study" else "≥50% Goal",
+                        if (compareWithPreviousWeek) selectedDateRange.label
+                        else if (viewMode == ChartViewMode.WEEKLY_TREND) {
+                            when (selectedDateRange) {
+                                StudyDateRange.LAST_7_DAYS -> "Daily Study"
+                                StudyDateRange.THIS_MONTH -> "Weekly Total"
+                                StudyDateRange.SEMESTER -> "Monthly Total"
+                            }
+                        } else "≥50% Goal",
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -973,7 +1136,11 @@ fun StudyHoursRechartsBarChart(
                                 .background(Color(0xFF94A3B8))
                         )
                         Text(
-                            "Previous Week",
+                            when (selectedDateRange) {
+                                StudyDateRange.LAST_7_DAYS -> "Previous Week"
+                                StudyDateRange.THIS_MONTH -> "Prior 30 Days"
+                                StudyDateRange.SEMESTER -> "Term Baseline"
+                            },
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1026,12 +1193,12 @@ fun StudyHoursRechartsBarChart(
                         )
                         Text(
                             if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                "${String.format(Locale.US, "%.1f", dailyGoalHours)}h/day Goal"
+                                "${String.format(Locale.US, "%.1f", periodBucketGoalHours)}$periodGoalUnitLabel Goal"
                             } else if (activeSelectedStat != null) {
                                 val g = getGoalForCourse(activeSelectedStat.courseCode)
                                 "${activeSelectedStat.courseCode} Goal: ${String.format(Locale.US, "%.1f", g)}h (50% @ ${String.format(Locale.US, "%.1f", g * 0.5)}h)"
                             } else {
-                                "Custom Subject Goals (50% threshold)"
+                                "${selectedDateRange.label} Targets (50% threshold)"
                             },
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1368,7 +1535,7 @@ fun StudyHoursRechartsBarChart(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Weekly Target Progress (${String.format(Locale.US, "%.1f", customGoal)}h goal)",
+                                        text = "${selectedDateRange.label} Target Progress (${String.format(Locale.US, "%.1f", customGoal)}h goal)",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1510,7 +1677,7 @@ fun StudyHoursRechartsBarChart(
                 exit = fadeOut()
             ) {
                 activeSelectedDayTrend?.let { day ->
-                    val goalPct = ((day.totalHours / dailyGoalHours) * 100).toInt()
+                    val goalPct = if (periodBucketGoalHours > 0) ((day.totalHours / periodBucketGoalHours) * 100).toInt() else 0
                     val courseTitle = courses.firstOrNull { it.code == day.primarySubject }?.name ?: "Course Study"
 
                     Card(
@@ -1545,7 +1712,7 @@ fun StudyHoursRechartsBarChart(
                                         val deltaDayH = day.totalHours - prevDayH
                                         val isDayInc = deltaDayH >= 0
                                         Text(
-                                            "Prev Week (${day.dayLabel}): ${String.format(Locale.US, "%.1f", prevDayH)}h • Delta: ${if (isDayInc) "+" else ""}${String.format(Locale.US, "%.1f", deltaDayH)}h (${if (isDayInc) "▲" else "▼"})",
+                                            "Prior (${day.dayKey}): ${String.format(Locale.US, "%.1f", prevDayH)}h • Delta: ${if (isDayInc) "+" else ""}${String.format(Locale.US, "%.1f", deltaDayH)}h (${if (isDayInc) "▲" else "▼"})",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = if (isDayInc) EmeraldTertiary else WarningAmber
@@ -1564,7 +1731,7 @@ fun StudyHoursRechartsBarChart(
                                         color = if (goalPct >= 100) EmeraldTertiaryContainer else WarningContainer
                                     ) {
                                         Text(
-                                            text = if (goalPct >= 100) "Goal Reached ($goalPct%)" else "$goalPct% of ${String.format(java.util.Locale.US, "%.1f", dailyGoalHours)}h goal",
+                                            text = if (goalPct >= 100) "Goal Reached ($goalPct%)" else "$goalPct% of ${String.format(java.util.Locale.US, "%.1f", periodBucketGoalHours)}h goal",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = if (goalPct >= 100) EmeraldOnTertiaryContainer else OnWarningContainer,
@@ -2415,9 +2582,9 @@ fun StudyHoursRechartsBarChart(
                         }
                     }
                 } else {
-                // Weekly Trend View: 7 Days (Mon - Sun)
+                // Trend View: Adapts across Last 7 Days (Mon-Sun), This Month (Wk 1-4), and Semester (Months)
                 val maxDailyHours = max(
-                    max(max(4.0, dailyGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
+                    max(max(4.0, periodBucketGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
                     if (compareWithPreviousWeek) (previousWeeklyTrends.maxOfOrNull { it.totalHours } ?: 0.0) + 0.8 else 0.0
                 )
 
@@ -2445,9 +2612,9 @@ fun StudyHoursRechartsBarChart(
                             )
                         }
 
-                        // Daily Goal Target Reference Line (2.0h)
+                        // Period Goal Target Reference Line
                         if (showTargetOverlay) {
-                            val goalY = bottomAxisY - (chartHeight * (dailyGoalHours.toFloat() / maxDailyHours.toFloat()))
+                            val goalY = bottomAxisY - (chartHeight * (periodBucketGoalHours.toFloat() / maxDailyHours.toFloat()))
                             if (goalY in topY..bottomAxisY) {
                                 drawLine(
                                     color = goalLineColor,
@@ -2460,7 +2627,7 @@ fun StudyHoursRechartsBarChart(
                         }
                     }
 
-                    // 7 Daily Bars
+                    // Dynamic Period Bars
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
@@ -2470,8 +2637,12 @@ fun StudyHoursRechartsBarChart(
                     ) {
                         weeklyTrends.forEach { dayTrend ->
                             val isSelected = selectedDayTrend?.dayKey == dayTrend.dayKey
-                            val reachesGoal = dayTrend.totalHours >= dailyGoalHours
-                            val isToday = dayTrend.dayKey == currentDayKey
+                            val reachesGoal = dayTrend.totalHours >= periodBucketGoalHours
+                            val isToday = when (selectedDateRange) {
+                                StudyDateRange.LAST_7_DAYS -> dayTrend.dayKey == currentDayKey
+                                StudyDateRange.THIS_MONTH -> dayTrend.dayKey == "Wk 4"
+                                StudyDateRange.SEMESTER -> dayTrend.dayKey.equals(currentMonthKey, ignoreCase = true)
+                            }
 
                             // Subject filter logic
                             val subjectFilterMins = if (selectedWeeklySubjectFilter != null) {
@@ -2720,9 +2891,9 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Weekly Trend Quick Note Editor Card
+            // Weekly Trend Quick Note Editor Card (shown in Last 7 Days daily view)
             AnimatedVisibility(
-                visible = viewMode == ChartViewMode.WEEKLY_TREND,
+                visible = viewMode == ChartViewMode.WEEKLY_TREND && selectedDateRange == StudyDateRange.LAST_7_DAYS,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
@@ -3297,21 +3468,27 @@ fun StudyHoursRechartsBarChart(
 
             Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 0.8.dp)
 
-            // Bottom Summary Metrics Row: Dynamic based on viewMode
+            // Bottom Summary Metrics Row: Dynamic based on viewMode and selectedDateRange
             if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                val totalWeeklyMins = weeklyTrends.sumOf { it.totalMinutes }
-                val activeDaysCount = weeklyTrends.count { it.totalMinutes > 0 }
-                val consistentDays = weeklyTrends.count { it.totalHours >= dailyGoalHours }
-                val consistencyPct = ((consistentDays / 7.0) * 100).toInt()
+                val totalPeriodMins = weeklyTrends.sumOf { it.totalMinutes }
+                val totalBucketsCount = weeklyTrends.size.coerceAtLeast(1)
+                val activeBucketsCount = weeklyTrends.count { it.totalMinutes > 0 }
+                val consistentBuckets = weeklyTrends.count { it.totalHours >= periodBucketGoalHours }
+                val consistencyPct = ((consistentBuckets.toDouble() / totalBucketsCount.toDouble()) * 100).toInt()
+                val unitPlural = when (selectedDateRange) {
+                    StudyDateRange.LAST_7_DAYS -> "Days"
+                    StudyDateRange.THIS_MONTH -> "Wks"
+                    StudyDateRange.SEMESTER -> "Mos"
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     SummaryMiniCard(
-                        title = "Active Streak",
-                        value = "$activeDaysCount / 7 Days",
-                        subtitle = "consistent streak 🔥",
+                        title = if (selectedDateRange == StudyDateRange.LAST_7_DAYS) "Active Streak" else "Active Periods",
+                        value = "$activeBucketsCount / $totalBucketsCount $unitPlural",
+                        subtitle = if (selectedDateRange == StudyDateRange.LAST_7_DAYS) "consistent streak 🔥" else "with logged study 🔥",
                         icon = Icons.Default.LocalFireDepartment,
                         color = Color(0xFFEF4444),
                         containerColor = Color(0xFFFEE2E2),
@@ -3321,7 +3498,7 @@ fun StudyHoursRechartsBarChart(
                     SummaryMiniCard(
                         title = "Consistency",
                         value = "$consistencyPct%",
-                        subtitle = "met ${String.format(Locale.US, "%.1f", dailyGoalHours)}h/day goal",
+                        subtitle = "met ${String.format(Locale.US, "%.1f", periodBucketGoalHours)}$periodGoalUnitLabel goal",
                         icon = Icons.Default.CheckCircle,
                         color = EmeraldTertiary,
                         containerColor = EmeraldTertiaryContainer,
@@ -3329,9 +3506,17 @@ fun StudyHoursRechartsBarChart(
                     )
 
                     SummaryMiniCard(
-                        title = "Daily Average",
-                        value = "${String.format("%.1f", (totalWeeklyMins / 60.0) / 7.0)}h",
-                        subtitle = "hours / day",
+                        title = when (selectedDateRange) {
+                            StudyDateRange.LAST_7_DAYS -> "Daily Average"
+                            StudyDateRange.THIS_MONTH -> "Weekly Average"
+                            StudyDateRange.SEMESTER -> "Monthly Average"
+                        },
+                        value = "${String.format(Locale.US, "%.1f", (totalPeriodMins / 60.0) / totalBucketsCount.toDouble())}h",
+                        subtitle = when (selectedDateRange) {
+                            StudyDateRange.LAST_7_DAYS -> "hours / day"
+                            StudyDateRange.THIS_MONTH -> "hours / week"
+                            StudyDateRange.SEMESTER -> "hours / month"
+                        },
                         icon = Icons.Default.Timeline,
                         color = IndigoPrimary,
                         containerColor = IndigoPrimaryContainer,
@@ -3427,12 +3612,15 @@ fun StudyHoursRechartsBarChart(
     }
 
     if (showExportDialog) {
+        val scaledGoalsForExport = courses.associate { c -> c.code to getGoalForCourse(c.code) } +
+            subjectWeeklyGoals.mapValues { (_, v) -> v * selectedDateRange.goalScaleMultiplier }
         ExportStudyLogsDialog(
             studyStats = studyStats,
             courses = courses,
-            subjectGoals = subjectWeeklyGoals,
+            subjectGoals = scaledGoalsForExport,
             subjectPriorities = subjectPriorities,
             tagFilter = selectedSessionTagFilter,
+            dateRangeLabel = selectedDateRange.label,
             onDismiss = { showExportDialog = false }
         )
     }
@@ -4561,20 +4749,22 @@ fun ExportStudyLogsDialog(
     subjectGoals: Map<String, Double>,
     subjectPriorities: Map<String, String>,
     tagFilter: String,
+    dateRangeLabel: String = "Last 7 Days",
     onDismiss: () -> Unit
 ) {
     var format by remember { mutableStateOf(ExportFormat.JSON) }
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    val jsonExportText = remember(studyStats, courses, subjectGoals, subjectPriorities, tagFilter) {
+    val jsonExportText = remember(studyStats, courses, subjectGoals, subjectPriorities, tagFilter, dateRangeLabel) {
         val totalMins = studyStats.sumOf { it.totalMinutes }
         val totalHours = totalMins / 60.0
         val totalSessions = studyStats.sumOf { it.sessionCount }
 
         val sb = StringBuilder()
         sb.append("{\n")
-        sb.append("  \"weekSummary\": {\n")
+        sb.append("  \"periodSummary\": {\n")
+        sb.append("    \"dateRange\": \"$dateRangeLabel\",\n")
         sb.append("    \"totalLoggedHours\": ${String.format(Locale.US, "%.1f", totalHours)},\n")
         sb.append("    \"totalSessions\": $totalSessions,\n")
         sb.append("    \"sessionTagFilter\": \"$tagFilter\"\n")
@@ -4600,7 +4790,7 @@ fun ExportStudyLogsDialog(
         sb.toString()
     }
 
-    val csvExportText = remember(studyStats, courses, subjectGoals, subjectPriorities, tagFilter) {
+    val csvExportText = remember(studyStats, courses, subjectGoals, subjectPriorities, tagFilter, dateRangeLabel) {
         val totalMins = studyStats.sumOf { it.totalMinutes }
         val totalHours = totalMins / 60.0
         val totalSessions = studyStats.sumOf { it.sessionCount }
@@ -4615,7 +4805,7 @@ fun ExportStudyLogsDialog(
             val safeName = if (courseName.contains(",")) "\"$courseName\"" else courseName
             sb.append("${stat.courseCode},$safeName,${String.format(Locale.US, "%.1f", stat.totalHours)},${String.format(Locale.US, "%.1f", goal)},$priority,${stat.sessionCount},$pct%\n")
         }
-        sb.append("\nSummary,Total Logged Hours,${String.format(Locale.US, "%.1f", totalHours)},Total Sessions,$totalSessions,Filter,$tagFilter\n")
+        sb.append("\nSummary,Date Range,$dateRangeLabel,Total Logged Hours,${String.format(Locale.US, "%.1f", totalHours)},Total Sessions,$totalSessions,Filter,$tagFilter\n")
         sb.toString()
     }
 

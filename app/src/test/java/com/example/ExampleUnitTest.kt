@@ -580,4 +580,104 @@ class ExampleUnitTest {
         assertEquals("FOCUS", quickSession.mode)
         assertEquals("Today", quickSession.dateDisplay)
     }
+
+    @Test
+    fun `test StudyDateRange goal scaling and session range filtering`() {
+        assertEquals("Last 7 Days", com.example.data.local.StudyDateRange.LAST_7_DAYS.label)
+        assertEquals("This Month", com.example.data.local.StudyDateRange.THIS_MONTH.label)
+        assertEquals("Semester", com.example.data.local.StudyDateRange.SEMESTER.label)
+        assertEquals(1.0, com.example.data.local.StudyDateRange.LAST_7_DAYS.goalScaleMultiplier, 0.001)
+        assertEquals(2.0, com.example.data.local.StudyDateRange.THIS_MONTH.goalScaleMultiplier, 0.001)
+        assertEquals(3.0, com.example.data.local.StudyDateRange.SEMESTER.goalScaleMultiplier, 0.001)
+
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val nowMs = 1_760_000_000_000L // fixed reference timestamp
+        val semester = SemesterEntity(
+            name = "Fall 2026",
+            code = "FA26",
+            startDate = "Aug 2026",
+            endDate = "Dec 2026",
+            startTimestampMs = nowMs - (75L * dayMs),
+            endTimestampMs = nowMs + (40L * dayMs),
+            totalWeeks = 16
+        )
+
+        val ts2DaysAgo = nowMs - (2L * dayMs)
+        val ts15DaysAgo = nowMs - (15L * dayMs)
+        val ts50DaysAgo = nowMs - (50L * dayMs)
+        val ts100DaysAgo = nowMs - (100L * dayMs)
+
+        // LAST_7_DAYS
+        assertTrue(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts2DaysAgo, com.example.data.local.StudyDateRange.LAST_7_DAYS, semester, nowMs))
+        assertFalse(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts15DaysAgo, com.example.data.local.StudyDateRange.LAST_7_DAYS, semester, nowMs))
+
+        // THIS_MONTH (rolling 30d)
+        assertTrue(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts2DaysAgo, com.example.data.local.StudyDateRange.THIS_MONTH, semester, nowMs))
+        assertTrue(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts15DaysAgo, com.example.data.local.StudyDateRange.THIS_MONTH, semester, nowMs))
+        assertFalse(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts50DaysAgo, com.example.data.local.StudyDateRange.THIS_MONTH, semester, nowMs))
+
+        // SEMESTER
+        assertTrue(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts50DaysAgo, com.example.data.local.StudyDateRange.SEMESTER, semester, nowMs))
+        assertFalse(com.example.data.local.StudyDateRangeHelper.isSessionInRange(ts100DaysAgo, com.example.data.local.StudyDateRange.SEMESTER, semester, nowMs))
+    }
+
+    @Test
+    fun `test StudyDateRangeHelper monthly weekly buckets and semester monthly buckets`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val nowMs = 1_760_000_000_000L
+        val semester = SemesterEntity(
+            name = "Fall 2026",
+            code = "FA26",
+            startDate = "Aug 2026",
+            endDate = "Dec 2026",
+            startTimestampMs = nowMs - (75L * dayMs),
+            endTimestampMs = nowMs + (40L * dayMs),
+            totalWeeks = 16
+        )
+
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 60,
+                timestampMs = nowMs - (1L * dayMs),
+                dateDisplay = "Yesterday"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "MATH204",
+                subjectName = "Linear Algebra",
+                durationMinutes = 90,
+                timestampMs = nowMs - (10L * dayMs),
+                dateDisplay = "10d ago"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS310",
+                subjectName = "Operating Systems",
+                durationMinutes = 120,
+                timestampMs = nowMs - (18L * dayMs),
+                dateDisplay = "18d ago"
+            ),
+            com.example.data.local.StudySessionEntity(
+                courseCode = "PHY102",
+                subjectName = "Physics",
+                durationMinutes = 45,
+                timestampMs = nowMs - (25L * dayMs),
+                dateDisplay = "25d ago"
+            )
+        )
+
+        val monthlyTrends = com.example.data.local.StudyDateRangeHelper.buildMonthlyWeeklyTrends(sessions, nowMs)
+        assertEquals(4, monthlyTrends.size)
+        assertEquals(listOf("Wk 1", "Wk 2", "Wk 3", "Wk 4"), monthlyTrends.map { it.dayKey })
+        assertEquals(45, monthlyTrends[0].totalMinutes)
+        assertEquals(120, monthlyTrends[1].totalMinutes)
+        assertEquals(90, monthlyTrends[2].totalMinutes)
+        assertEquals(60, monthlyTrends[3].totalMinutes)
+        assertEquals("CS201", monthlyTrends[3].primarySubject)
+
+        val semesterTrends = com.example.data.local.StudyDateRangeHelper.buildSemesterMonthlyTrends(sessions, semester, nowMs)
+        assertTrue(semesterTrends.isNotEmpty())
+        assertTrue(semesterTrends.size <= 6)
+        assertEquals(315, semesterTrends.sumOf { it.totalMinutes })
+    }
 }
