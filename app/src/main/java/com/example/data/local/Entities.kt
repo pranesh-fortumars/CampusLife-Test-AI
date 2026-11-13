@@ -359,6 +359,173 @@ object StudyDateRangeHelper {
     }
 }
 
+data class SubjectComparisonSnapshot(
+    val courseCode: String,
+    val loggedMinutes: Int,
+    val loggedHours: Double,
+    val goalHours: Double,
+    val goalAttainmentPct: Int,
+    val sessionCount: Int,
+    val avgSessionMinutes: Int,
+    val latestMasteryPct: Double,
+    val masteryGainPct: Double,
+    val masteryPerHour: Double,
+    val efficiencyScore: Double
+)
+
+data class SubjectComparisonBucketPoint(
+    val bucketKey: String,
+    val bucketLabel: String,
+    val subjectAHours: Double,
+    val subjectBHours: Double
+) {
+    val gapHours: Double
+        get() = subjectAHours - subjectBHours
+}
+
+data class SubjectComparisonReport(
+    val subjectA: SubjectComparisonSnapshot,
+    val subjectB: SubjectComparisonSnapshot,
+    val dateRange: StudyDateRange,
+    val bucketPoints: List<SubjectComparisonBucketPoint>,
+    val hoursGap: Double,
+    val attainmentGapPct: Int,
+    val masteryGapPct: Double,
+    val avgSessionGapMins: Int,
+    val efficiencyGapType: String,
+    val laggingCourseCode: String,
+    val leaderCourseCode: String,
+    val efficiencyGapSummary: String
+)
+
+object SubjectComparisonHelper {
+
+    fun buildSubjectSnapshot(
+        courseCode: String,
+        stats: SubjectStudyStats?,
+        goalHours: Double,
+        masteryRecords: List<SubjectMasteryEntity>
+    ): SubjectComparisonSnapshot {
+        val loggedMinutes = stats?.totalMinutes ?: 0
+        val loggedHours = loggedMinutes / 60.0
+        val safeGoal = goalHours.coerceAtLeast(0.5)
+        val attainmentPct = ((loggedHours / safeGoal) * 100.0).toInt()
+        val sessionCount = stats?.sessionCount ?: 0
+        val avgSessionMinutes = if (sessionCount > 0) loggedMinutes / sessionCount else 0
+
+        val sortedMastery = masteryRecords.sortedBy { it.weekNumber }
+        val firstMastery = sortedMastery.firstOrNull()?.masteryPercentage ?: 60.0
+        val latestMastery = sortedMastery.lastOrNull()?.masteryPercentage ?: 75.0
+        val masteryGain = Math.round((latestMastery - firstMastery) * 10.0) / 10.0
+
+        val masteryPerHour = if (loggedHours >= 0.25) {
+            Math.round((latestMastery / loggedHours) * 10.0) / 10.0
+        } else {
+            0.0
+        }
+
+        val goalComponent = attainmentPct.coerceIn(0, 120) * 0.45
+        val masteryComponent = latestMastery.coerceIn(0.0, 100.0) * 0.40
+        val depthComponent = (avgSessionMinutes.coerceIn(0, 60) / 60.0) * 100.0 * 0.15
+        val efficiencyScore = Math.round((goalComponent + masteryComponent + depthComponent) * 10.0) / 10.0
+
+        return SubjectComparisonSnapshot(
+            courseCode = courseCode,
+            loggedMinutes = loggedMinutes,
+            loggedHours = loggedHours,
+            goalHours = safeGoal,
+            goalAttainmentPct = attainmentPct,
+            sessionCount = sessionCount,
+            avgSessionMinutes = avgSessionMinutes,
+            latestMasteryPct = latestMastery,
+            masteryGainPct = masteryGain,
+            masteryPerHour = masteryPerHour,
+            efficiencyScore = efficiencyScore
+        )
+    }
+
+    fun buildComparisonReport(
+        courseCodeA: String,
+        courseCodeB: String,
+        statsList: List<SubjectStudyStats>,
+        trendsList: List<DayStudyTrend>,
+        goalsMap: Map<String, Double>,
+        defaultGoalsMap: Map<String, Double>,
+        masteryMap: Map<String, List<SubjectMasteryEntity>>,
+        defaultMasteryProvider: (String) -> List<SubjectMasteryEntity>,
+        dateRange: StudyDateRange
+    ): SubjectComparisonReport {
+        val statA = statsList.firstOrNull { it.courseCode == courseCodeA }
+        val statB = statsList.firstOrNull { it.courseCode == courseCodeB }
+
+        val goalA = (goalsMap[courseCodeA] ?: defaultGoalsMap[courseCodeA] ?: 5.0) * dateRange.goalScaleMultiplier
+        val goalB = (goalsMap[courseCodeB] ?: defaultGoalsMap[courseCodeB] ?: 5.0) * dateRange.goalScaleMultiplier
+
+        val masteryA = masteryMap[courseCodeA]?.takeIf { it.isNotEmpty() } ?: defaultMasteryProvider(courseCodeA)
+        val masteryB = masteryMap[courseCodeB]?.takeIf { it.isNotEmpty() } ?: defaultMasteryProvider(courseCodeB)
+
+        val snapA = buildSubjectSnapshot(courseCodeA, statA, goalA, masteryA)
+        val snapB = buildSubjectSnapshot(courseCodeB, statB, goalB, masteryB)
+
+        val bucketPoints = trendsList.map { bucket ->
+            val minsA = bucket.subjectBreakdown[courseCodeA] ?: 0
+            val minsB = bucket.subjectBreakdown[courseCodeB] ?: 0
+            SubjectComparisonBucketPoint(
+                bucketKey = bucket.dayKey,
+                bucketLabel = bucket.dayLabel,
+                subjectAHours = minsA / 60.0,
+                subjectBHours = minsB / 60.0
+            )
+        }
+
+        val hoursGap = Math.round(kotlin.math.abs(snapA.loggedHours - snapB.loggedHours) * 10.0) / 10.0
+        val attainmentGap = kotlin.math.abs(snapA.goalAttainmentPct - snapB.goalAttainmentPct)
+        val masteryGap = Math.round(kotlin.math.abs(snapA.latestMasteryPct - snapB.latestMasteryPct) * 10.0) / 10.0
+        val avgSessionGap = kotlin.math.abs(snapA.avgSessionMinutes - snapB.avgSessionMinutes)
+
+        val leader = if (snapA.efficiencyScore >= snapB.efficiencyScore) snapA else snapB
+        val laggard = if (snapA.efficiencyScore >= snapB.efficiencyScore) snapB else snapA
+
+        val gapType: String
+        val summary: String
+        if (attainmentGap >= 20) {
+            gapType = "Study Volume Gap"
+            val hourDiff = String.format(java.util.Locale.US, "%.1f", hoursGap)
+            summary = "${laggard.courseCode} trails ${leader.courseCode} by $attainmentGap% goal attainment ($hourDiff h logged gap in ${dateRange.label}). Adding focused blocks to ${laggard.courseCode} will close the gap."
+        } else if (masteryGap >= 10.0) {
+            gapType = "Mastery Yield Gap"
+            val mGap = String.format(java.util.Locale.US, "%.0f", masteryGap)
+            val lowerMasterySub = if (snapA.latestMasteryPct <= snapB.latestMasteryPct) snapA else snapB
+            val higherMasterySub = if (lowerMasterySub.courseCode == snapA.courseCode) snapB else snapA
+            summary = "${lowerMasterySub.courseCode} has a $mGap% lower mastery score than ${higherMasterySub.courseCode} despite ${dateRange.label} study effort. Shift toward active recall & spaced review."
+        } else if (avgSessionGap >= 12) {
+            gapType = "Focus Depth Gap"
+            val shorterSub = if (snapA.avgSessionMinutes <= snapB.avgSessionMinutes) snapA else snapB
+            val deeperSub = if (shorterSub.courseCode == snapA.courseCode) snapB else snapA
+            summary = "${shorterSub.courseCode} averages ${shorterSub.avgSessionMinutes}m/session vs ${deeperSub.avgSessionMinutes}m for ${deeperSub.courseCode}. Longer uninterrupted blocks can boost retention."
+        } else {
+            gapType = "Balanced Pace"
+            summary = "${snapA.courseCode} and ${snapB.courseCode} are tracking closely in ${dateRange.label} (${attainmentGap}% goal gap, ${String.format(java.util.Locale.US, "%.0f", masteryGap)}% mastery gap)."
+        }
+
+        return SubjectComparisonReport(
+            subjectA = snapA,
+            subjectB = snapB,
+            dateRange = dateRange,
+            bucketPoints = bucketPoints,
+            hoursGap = hoursGap,
+            attainmentGapPct = attainmentGap,
+            masteryGapPct = masteryGap,
+            avgSessionGapMins = avgSessionGap,
+            efficiencyGapType = gapType,
+            laggingCourseCode = laggard.courseCode,
+            leaderCourseCode = leader.courseCode,
+            efficiencyGapSummary = summary
+        )
+    }
+}
+
+
 
 
 

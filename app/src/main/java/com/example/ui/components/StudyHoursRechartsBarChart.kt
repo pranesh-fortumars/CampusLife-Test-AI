@@ -96,6 +96,8 @@ fun StudyHoursRechartsBarChart(
     val subjectPriorities by viewModel.subjectPriorities.collectAsState()
     val subjectMasteryRecords by viewModel.subjectMasteryRecords.collectAsState()
     val weeklyDayNotes by viewModel.weeklyDayNotes.collectAsState()
+    val compareSubjectsEnabled by viewModel.compareSubjectsEnabled.collectAsState()
+    val subjectComparisonReport by viewModel.subjectComparisonReport.collectAsState()
     val context = LocalContext.current
     val currentDayKey = remember { viewModel.getCurrentDayKey() }
     val currentMonthKey = remember { SimpleDateFormat("MMM", Locale.US).format(Date()) }
@@ -940,6 +942,38 @@ fun StudyHoursRechartsBarChart(
                             .heightIn(min = 30.dp)
                             .testTag("toggle_compare_previous_week")
                     )
+
+                    // Compare Subjects Toggle (Subject Analytics View)
+                    if (viewMode == ChartViewMode.BY_SUBJECT) {
+                        FilterChip(
+                            selected = compareSubjectsEnabled,
+                            onClick = { viewModel.toggleCompareSubjects() },
+                            label = {
+                                Text(
+                                    text = if (compareSubjectsEnabled) "Compare Subjects: ON" else "Compare Subjects",
+                                    fontSize = 10.sp,
+                                    fontWeight = if (compareSubjectsEnabled) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Compare,
+                                    contentDescription = "Compare Subjects",
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(100),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = VioletSecondary.copy(alpha = 0.18f),
+                                selectedLabelColor = VioletSecondary,
+                                selectedLeadingIconColor = VioletSecondary
+                            ),
+                            border = if (compareSubjectsEnabled) BorderStroke(1.2.dp, VioletSecondary) else null,
+                            modifier = Modifier
+                                .heightIn(min = 30.dp)
+                                .testTag("toggle_compare_subjects")
+                        )
+                    }
                 }
             }
 
@@ -1091,6 +1125,35 @@ fun StudyHoursRechartsBarChart(
                             )
                         }
                     }
+                }
+            }
+
+            // Dual-Subject Overlay Panel for identifying efficiency gaps
+            AnimatedVisibility(
+                visible = viewMode == ChartViewMode.BY_SUBJECT && compareSubjectsEnabled && subjectComparisonReport != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                subjectComparisonReport?.let { report ->
+                    SubjectComparisonOverlaySection(
+                        report = report,
+                        availableCourses = courses,
+                        studyStats = studyStats,
+                        masteryMap = subjectMasteryRecords,
+                        defaultMasteryProvider = viewModel::getDefaultMasteryForCourse,
+                        dateRange = selectedDateRange,
+                        onSelectSubjectA = viewModel::selectCompareSubjectA,
+                        onSelectSubjectB = viewModel::selectCompareSubjectB,
+                        onSwapSubjects = viewModel::swapCompareSubjects,
+                        onBoostLaggingSubject = { laggingCode ->
+                            viewModel.quickAddThirtyMinutes(laggingCode, "Today")
+                            Toast.makeText(
+                                context,
+                                "+30m added to $laggingCode to close efficiency gap",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    )
                 }
             }
 
@@ -2277,19 +2340,46 @@ fun StudyHoursRechartsBarChart(
 
                                     Spacer(modifier = Modifier.height(2.dp))
 
-                                    // Course Code with Conditional Alert Dot
+                                    val compareBadgeTag = if (viewMode == ChartViewMode.BY_SUBJECT && compareSubjectsEnabled && subjectComparisonReport != null) {
+                                        when (stat.courseCode) {
+                                            subjectComparisonReport?.subjectA?.courseCode -> "A"
+                                            subjectComparisonReport?.subjectB?.courseCode -> "B"
+                                            else -> null
+                                        }
+                                    } else null
+
+                                    // Course Code with Conditional Alert Dot or Compare Badge
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                                         modifier = Modifier.testTag("label_subject_${stat.courseCode}")
                                     ) {
+                                        if (compareBadgeTag != null) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = if (compareBadgeTag == "A") CompareSubjectAColor else CompareSubjectBColor,
+                                                modifier = Modifier.testTag("compare_badge_${compareBadgeTag}_${stat.courseCode}")
+                                            ) {
+                                                Text(
+                                                    text = compareBadgeTag,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = Color.White,
+                                                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                                )
+                                            }
+                                        }
                                         Text(
                                             text = stat.courseCode,
                                             fontSize = 11.sp,
-                                            fontWeight = if (isHighlighted || isBelow50) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                            color = if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            fontWeight = if (isHighlighted || isBelow50 || compareBadgeTag != null) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                            color = if (compareBadgeTag == "A") CompareSubjectAColor
+                                            else if (compareBadgeTag == "B") CompareSubjectBColor
+                                            else if (isBelow50) ErrorRed
+                                            else if (isHighlighted) IndigoPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        if (isBelow50) {
+                                        if (isBelow50 && compareBadgeTag == null) {
                                             Box(
                                                 modifier = Modifier
                                                     .size(5.dp)

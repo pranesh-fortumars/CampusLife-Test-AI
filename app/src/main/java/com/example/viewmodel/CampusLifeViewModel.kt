@@ -1077,7 +1077,97 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             themePrefs.edit().putBoolean("is_dark_mode", dark).apply()
         }
     }
+
+    // Compare Subjects overlay state within Subject Analytics
+    private val _compareSubjectsEnabled = MutableStateFlow(false)
+    val compareSubjectsEnabled: StateFlow<Boolean> = _compareSubjectsEnabled.asStateFlow()
+
+    private val _compareSubjectA = MutableStateFlow("CS201")
+    val compareSubjectA: StateFlow<String> = _compareSubjectA.asStateFlow()
+
+    private val _compareSubjectB = MutableStateFlow("MATH204")
+    val compareSubjectB: StateFlow<String> = _compareSubjectB.asStateFlow()
+
+    fun toggleCompareSubjects(enabled: Boolean? = null) {
+        val next = enabled ?: !_compareSubjectsEnabled.value
+        _compareSubjectsEnabled.value = next
+        if (next) {
+            ensureDistinctCompareSubjects()
+        }
+    }
+
+    fun selectCompareSubjectA(courseCode: String) {
+        if (courseCode == _compareSubjectB.value) {
+            _compareSubjectB.value = _compareSubjectA.value
+        }
+        _compareSubjectA.value = courseCode
+    }
+
+    fun selectCompareSubjectB(courseCode: String) {
+        if (courseCode == _compareSubjectA.value) {
+            _compareSubjectA.value = _compareSubjectB.value
+        }
+        _compareSubjectB.value = courseCode
+    }
+
+    fun swapCompareSubjects() {
+        val prevA = _compareSubjectA.value
+        val prevB = _compareSubjectB.value
+        _compareSubjectA.value = prevB
+        _compareSubjectB.value = prevA
+    }
+
+    private fun ensureDistinctCompareSubjects() {
+        val available = studyStatsPerSubject.value.map { it.courseCode }
+            .ifEmpty { courses.value.map { it.code } }
+            .ifEmpty { listOf("CS201", "MATH204", "CS310", "PHY102", "ENG215") }
+        if (available.size >= 2) {
+            if (_compareSubjectA.value !in available) {
+                _compareSubjectA.value = available[0]
+            }
+            if (_compareSubjectB.value !in available || _compareSubjectB.value == _compareSubjectA.value) {
+                _compareSubjectB.value = available.first { it != _compareSubjectA.value }
+            }
+        }
+    }
+
+    val subjectComparisonReport: StateFlow<SubjectComparisonReport?> = combine(
+        combine(studyStatsPerSubject, weeklyStudyTrends, _selectedDateRange) { stats, trends, range ->
+            Triple(stats, trends, range)
+        },
+        combine(_subjectWeeklyStudyGoals, subjectMasteryRecords, _compareSubjectA, _compareSubjectB) { goals, mastery, subA, subB ->
+            listOf(goals, mastery, subA, subB)
+        }
+    ) { (stats, trends, range), config ->
+        @Suppress("UNCHECKED_CAST")
+        val goals = config[0] as Map<String, Double>
+        @Suppress("UNCHECKED_CAST")
+        val mastery = config[1] as Map<String, List<SubjectMasteryEntity>>
+        val rawA = config[2] as String
+        val rawB = config[3] as String
+
+        val availableCodes = stats.map { it.courseCode }
+            .ifEmpty { defaultSubjectWeeklyGoals.keys.toList() }
+        if (availableCodes.size < 2) {
+            null
+        } else {
+            val codeA = if (rawA in availableCodes) rawA else availableCodes[0]
+            val codeB = if (rawB in availableCodes && rawB != codeA) rawB else availableCodes.first { it != codeA }
+            SubjectComparisonHelper.buildComparisonReport(
+                courseCodeA = codeA,
+                courseCodeB = codeB,
+                statsList = stats,
+                trendsList = trends,
+                goalsMap = goals,
+                defaultGoalsMap = defaultSubjectWeeklyGoals,
+                masteryMap = mastery,
+                defaultMasteryProvider = ::getDefaultMasteryForCourse,
+                dateRange = range
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 }
+
 
 
 

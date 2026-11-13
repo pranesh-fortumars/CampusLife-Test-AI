@@ -680,4 +680,107 @@ class ExampleUnitTest {
         assertTrue(semesterTrends.size <= 6)
         assertEquals(315, semesterTrends.sumOf { it.totalMinutes })
     }
+
+    @Test
+    fun `test SubjectComparisonHelper identifies Study Volume Gap across same period`() {
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", totalMinutes = 270, sessionCount = 6), // 4.5h / 5.0h = 90%
+            com.example.data.local.SubjectStudyStats("PHY102", totalMinutes = 60, sessionCount = 2)  // 1.0h / 4.0h = 25%
+        )
+        val trends = listOf(
+            com.example.data.local.DayStudyTrend("Mon", "Monday", 90, 2, "CS201", mapOf("CS201" to 90)),
+            com.example.data.local.DayStudyTrend("Tue", "Tuesday", 90, 2, "CS201", mapOf("CS201" to 60, "PHY102" to 30)),
+            com.example.data.local.DayStudyTrend("Thu", "Thursday", 150, 3, "CS201", mapOf("CS201" to 120, "PHY102" to 30))
+        )
+        val goals = mapOf("CS201" to 5.0, "PHY102" to 4.0)
+        val mastery = mapOf(
+            "CS201" to listOf(
+                com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 1, weekLabel = "W1", masteryPercentage = 64.0),
+                com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 4, weekLabel = "W4", masteryPercentage = 92.0)
+            ),
+            "PHY102" to listOf(
+                com.example.data.local.SubjectMasteryEntity(courseCode = "PHY102", weekNumber = 1, weekLabel = "W1", masteryPercentage = 45.0),
+                com.example.data.local.SubjectMasteryEntity(courseCode = "PHY102", weekNumber = 4, weekLabel = "W4", masteryPercentage = 70.0)
+            )
+        )
+
+        val report = com.example.data.local.SubjectComparisonHelper.buildComparisonReport(
+            courseCodeA = "CS201",
+            courseCodeB = "PHY102",
+            statsList = stats,
+            trendsList = trends,
+            goalsMap = goals,
+            defaultGoalsMap = goals,
+            masteryMap = mastery,
+            defaultMasteryProvider = { emptyList() },
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS
+        )
+
+        assertEquals("CS201", report.subjectA.courseCode)
+        assertEquals("PHY102", report.subjectB.courseCode)
+        assertEquals(90, report.subjectA.goalAttainmentPct)
+        assertEquals(25, report.subjectB.goalAttainmentPct)
+        assertEquals(65, report.attainmentGapPct)
+        assertEquals(3.5, report.hoursGap, 0.001)
+        assertEquals(22.0, report.masteryGapPct, 0.001)
+        assertEquals("Study Volume Gap", report.efficiencyGapType)
+        assertEquals("PHY102", report.laggingCourseCode)
+        assertEquals("CS201", report.leaderCourseCode)
+        assertEquals(3, report.bucketPoints.size)
+        assertEquals(2.0, report.bucketPoints[2].subjectAHours, 0.001)
+        assertEquals(0.5, report.bucketPoints[2].subjectBHours, 0.001)
+        assertEquals(1.5, report.bucketPoints[2].gapHours, 0.001)
+    }
+
+    @Test
+    fun `test SubjectComparisonHelper identifies Mastery Yield Gap and Focus Depth Gap`() {
+        val goals = mapOf("CS201" to 5.0, "MATH204" to 5.0)
+        // Same logged hours (4.0h / 80% each), same avg session (40m), but 18% mastery gap
+        val sameHoursStats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", totalMinutes = 240, sessionCount = 6),
+            com.example.data.local.SubjectStudyStats("MATH204", totalMinutes = 240, sessionCount = 6)
+        )
+        val masteryYieldGap = mapOf(
+            "CS201" to listOf(com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 4, weekLabel = "W4", masteryPercentage = 92.0)),
+            "MATH204" to listOf(com.example.data.local.SubjectMasteryEntity(courseCode = "MATH204", weekNumber = 4, weekLabel = "W4", masteryPercentage = 74.0))
+        )
+        val masteryReport = com.example.data.local.SubjectComparisonHelper.buildComparisonReport(
+            courseCodeA = "CS201",
+            courseCodeB = "MATH204",
+            statsList = sameHoursStats,
+            trendsList = emptyList(),
+            goalsMap = goals,
+            defaultGoalsMap = goals,
+            masteryMap = masteryYieldGap,
+            defaultMasteryProvider = { emptyList() },
+            dateRange = com.example.data.local.StudyDateRange.THIS_MONTH
+        )
+        assertEquals("Mastery Yield Gap", masteryReport.efficiencyGapType)
+        assertEquals(10.0, masteryReport.subjectA.goalHours, 0.001) // THIS_MONTH 2x scaling
+        assertEquals(0, masteryReport.attainmentGapPct)
+        assertEquals(18.0, masteryReport.masteryGapPct, 0.001)
+
+        // Focus Depth Gap: similar hours & mastery, but 50m/session vs 25m/session
+        val depthStats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", totalMinutes = 250, sessionCount = 5),  // 50m avg
+            com.example.data.local.SubjectStudyStats("MATH204", totalMinutes = 250, sessionCount = 10) // 25m avg
+        )
+        val closeMastery = mapOf(
+            "CS201" to listOf(com.example.data.local.SubjectMasteryEntity(courseCode = "CS201", weekNumber = 4, weekLabel = "W4", masteryPercentage = 86.0)),
+            "MATH204" to listOf(com.example.data.local.SubjectMasteryEntity(courseCode = "MATH204", weekNumber = 4, weekLabel = "W4", masteryPercentage = 84.0))
+        )
+        val depthReport = com.example.data.local.SubjectComparisonHelper.buildComparisonReport(
+            courseCodeA = "CS201",
+            courseCodeB = "MATH204",
+            statsList = depthStats,
+            trendsList = emptyList(),
+            goalsMap = goals,
+            defaultGoalsMap = goals,
+            masteryMap = closeMastery,
+            defaultMasteryProvider = { emptyList() },
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS
+        )
+        assertEquals("Focus Depth Gap", depthReport.efficiencyGapType)
+        assertEquals(25, depthReport.avgSessionGapMins)
+    }
 }
