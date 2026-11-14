@@ -1195,9 +1195,54 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
         SharingStarted.WhileSubscribed(5000),
         MonthlyTrendHelper.buildFourWeekReport(emptyList())
     )
+
+    // Subject Analytics Push Notification Alert state (alerts when falling behind custom weekly goals)
+    private val _subjectGoalAlertsEnabled = MutableStateFlow(
+        com.example.worker.SubjectGoalNotificationHelper.isAlertsEnabled(getApplication())
+    )
+    val subjectGoalAlertsEnabled: StateFlow<Boolean> = _subjectGoalAlertsEnabled.asStateFlow()
+
+    val subjectGoalAlertReport: StateFlow<SubjectGoalAlertReport> = combine(
+        courses,
+        allStudySessions,
+        _subjectWeeklyStudyGoals
+    ) { courseList, sessions, goals ->
+        SubjectGoalAlertHelper.evaluateWeeklySubjectGoals(
+            courses = courseList,
+            sessions = sessions,
+            goalsMap = goals,
+            defaultGoalsMap = defaultSubjectWeeklyGoals,
+            nowMs = System.currentTimeMillis()
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        SubjectGoalAlertHelper.evaluateWeeklySubjectGoals(
+            courses = emptyList(),
+            sessions = emptyList(),
+            goalsMap = defaultSubjectWeeklyGoals,
+            defaultGoalsMap = defaultSubjectWeeklyGoals
+        )
+    )
+
+    fun setSubjectGoalAlertsEnabled(enabled: Boolean, triggerImmediateCheck: Boolean = true) {
+        _subjectGoalAlertsEnabled.value = enabled
+        val appContext = getApplication<Application>()
+        com.example.worker.SubjectGoalNotificationHelper.setAlertsEnabled(appContext, enabled)
+        if (enabled && triggerImmediateCheck) {
+            com.example.worker.SubjectGoalNotificationHelper.triggerImmediateGoalCheck(
+                appContext,
+                forceNotify = true
+            )
+        }
+    }
+
+    fun sendSubjectGoalAlertCheckNow() {
+        val appContext = getApplication<Application>()
+        com.example.worker.SubjectGoalNotificationHelper.createNotificationChannel(appContext)
+        com.example.worker.SubjectGoalNotificationHelper.triggerImmediateGoalCheck(
+            appContext,
+            forceNotify = true
+        )
+    }
 }
-
-
-
-
-

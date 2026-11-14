@@ -101,6 +101,8 @@ fun StudyHoursRechartsBarChart(
     val subjectComparisonReport by viewModel.subjectComparisonReport.collectAsState()
     val monthlyTrendReport by viewModel.monthlyTrendReport.collectAsState()
     val monthlySubjectFilter by viewModel.monthlySubjectFilter.collectAsState()
+    val subjectGoalAlertsEnabled by viewModel.subjectGoalAlertsEnabled.collectAsState()
+    val subjectGoalAlertReport by viewModel.subjectGoalAlertReport.collectAsState()
     val context = LocalContext.current
     val currentDayKey = remember { viewModel.getCurrentDayKey() }
     val currentMonthKey = remember { SimpleDateFormat("MMM", Locale.US).format(Date()) }
@@ -1190,6 +1192,20 @@ fun StudyHoursRechartsBarChart(
                         }
                     }
                 }
+            }
+
+            // Push Notification Toggle specifically for Subject Analytics view
+            AnimatedVisibility(
+                visible = viewMode == ChartViewMode.BY_SUBJECT,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                SubjectGoalAlertToggleCard(
+                    alertsEnabled = subjectGoalAlertsEnabled,
+                    alertReport = subjectGoalAlertReport,
+                    onSetAlertsEnabled = viewModel::setSubjectGoalAlertsEnabled,
+                    onSendCheckNow = viewModel::sendSubjectGoalAlertCheckNow
+                )
             }
 
             // Dual-Subject Overlay Panel for identifying efficiency gaps

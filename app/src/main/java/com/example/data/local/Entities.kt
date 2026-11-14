@@ -634,10 +634,123 @@ object MonthlyTrendHelper {
     }
 }
 
+data class SubjectWeeklyGoalStatus(
+    val courseCode: String,
+    val courseName: String,
+    val loggedMinutes: Int,
+    val loggedHours: Double,
+    val weeklyGoalHours: Double,
+    val deficitHours: Double,
+    val attainmentPct: Int,
+    val isCriticallyBehind: Boolean,
+    val isBehindGoal: Boolean
+)
 
+data class SubjectGoalAlertReport(
+    val statuses: List<SubjectWeeklyGoalStatus>,
+    val laggingSubjects: List<SubjectWeeklyGoalStatus>,
+    val criticallyBehindCount: Int,
+    val laggingThresholdPct: Int
+) {
+    val hasLaggingSubjects: Boolean
+        get() = laggingSubjects.isNotEmpty()
+}
 
+object SubjectGoalAlertHelper {
 
+    const val DEFAULT_LAGGING_THRESHOLD_PCT = 75
 
+    fun evaluateWeeklySubjectGoals(
+        courses: List<CourseEntity>,
+        sessions: List<StudySessionEntity>,
+        goalsMap: Map<String, Double>,
+        defaultGoalsMap: Map<String, Double>,
+        nowMs: Long = System.currentTimeMillis(),
+        laggingThresholdPct: Int = DEFAULT_LAGGING_THRESHOLD_PCT
+    ): SubjectGoalAlertReport {
+        val recentFocusSessions = sessions.filter { session ->
+            StudyDateRangeHelper.isSessionInRange(
+                sessionTimestampMs = session.timestampMs,
+                range = StudyDateRange.LAST_7_DAYS,
+                semester = null,
+                nowMs = nowMs
+            )
+        }
 
+        val minutesByCourse = recentFocusSessions
+            .groupBy { it.courseCode }
+            .mapValues { (_, list) -> list.sumOf { it.durationMinutes } }
 
+        val courseNames = courses.associate { it.code to it.name }
+        val allCodes = (courses.map { it.code } + goalsMap.keys + minutesByCourse.keys).distinct()
 
+        val statuses = allCodes.map { code ->
+            val loggedMinutes = minutesByCourse[code] ?: 0
+            val loggedHours = Math.round((loggedMinutes / 60.0) * 100.0) / 100.0
+            val weeklyGoal = (goalsMap[code] ?: defaultGoalsMap[code] ?: 5.0).coerceAtLeast(0.5)
+            val deficitHours = Math.round(maxOf(0.0, weeklyGoal - loggedHours) * 10.0) / 10.0
+            val attainmentPct = kotlin.math.round((loggedHours / weeklyGoal) * 100.0).toInt()
+            val isCritical = attainmentPct < 50
+            val isBehind = attainmentPct < laggingThresholdPct && loggedHours < weeklyGoal
+
+            SubjectWeeklyGoalStatus(
+                courseCode = code,
+                courseName = courseNames[code] ?: code,
+                loggedMinutes = loggedMinutes,
+                loggedHours = loggedHours,
+                weeklyGoalHours = weeklyGoal,
+                deficitHours = deficitHours,
+                attainmentPct = attainmentPct,
+                isCriticallyBehind = isCritical,
+                isBehindGoal = isBehind
+            )
+        }.sortedWith(
+            compareByDescending<SubjectWeeklyGoalStatus> { it.isCriticallyBehind }
+                .thenBy { it.attainmentPct }
+                .thenByDescending { it.deficitHours }
+        )
+
+        val lagging = statuses.filter { it.isBehindGoal }
+        val criticalCount = lagging.count { it.isCriticallyBehind }
+
+        return SubjectGoalAlertReport(
+            statuses = statuses,
+            laggingSubjects = lagging,
+            criticallyBehindCount = criticalCount,
+            laggingThresholdPct = laggingThresholdPct
+        )
+    }
+
+    fun formatAlertNotificationContent(report: SubjectGoalAlertReport): Pair<String, String> {
+        val lagging = report.laggingSubjects
+        if (lagging.isEmpty()) {
+            return "All Subject Weekly Goals On Track" to "You're keeping pace with your custom weekly study targets across all subjects."
+        }
+        val top = lagging.first()
+        val loggedStr = String.format(java.util.Locale.US, "%.1f", top.loggedHours)
+        val goalStr = String.format(java.util.Locale.US, "%.1f", top.weeklyGoalHours)
+        val deficitStr = String.format(java.util.Locale.US, "%.1f", top.deficitHours)
+
+        val title = if (lagging.size == 1) {
+            "Behind Weekly Goal: ${top.courseCode} (${top.attainmentPct}%)"
+        } else {
+            "${lagging.size} Subjects Behind Weekly Goal"
+        }
+
+        val detailLines = lagging.take(3).joinToString("\n") { sub ->
+            val subLogged = String.format(java.util.Locale.US, "%.1f", sub.loggedHours)
+            val subGoal = String.format(java.util.Locale.US, "%.1f", sub.weeklyGoalHours)
+            val subDeficit = String.format(java.util.Locale.US, "%.1f", sub.deficitHours)
+            val tag = if (sub.isCriticallyBehind) "Critical (<50%)" else "${sub.attainmentPct}%"
+            "• ${sub.courseCode}: ${subLogged}h / ${subGoal}h ($tag, -${subDeficit}h needed)"
+        }
+
+        val summaryLine = if (lagging.size == 1) {
+            "You logged ${loggedStr}h of your ${goalStr}h goal for ${top.courseCode} (-${deficitStr}h behind)."
+        } else {
+            "$detailLines\nTap to review Subject Analytics."
+        }
+
+        return title to summaryLine
+    }
+}

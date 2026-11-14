@@ -833,4 +833,83 @@ class ExampleUnitTest {
         assertEquals(1.0, cs201Report.weeks[0].totalHours, 0.001)
         assertEquals(3.0, cs201Report.weeks[3].totalHours, 0.001)
     }
+
+    @Test
+    fun `test SubjectGoalAlertHelper identifies lagging subjects against custom weekly goals`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val nowMs = 1_760_000_000_000L
+        val courses = listOf(
+            CourseEntity(code = "CS201", name = "Data Structures", instructor = "Prof. A", room = "R1", dayOfWeek = "Mon", timeSlot = "10:00"),
+            CourseEntity(code = "MATH204", name = "Linear Algebra", instructor = "Prof. B", room = "R2", dayOfWeek = "Tue", timeSlot = "11:00"),
+            CourseEntity(code = "PHY102", name = "Physics", instructor = "Prof. C", room = "R3", dayOfWeek = "Wed", timeSlot = "12:00")
+        )
+        val customGoals = mapOf(
+            "CS201" to 5.0,    // 4.0h logged -> 80% (on track, >=75%)
+            "MATH204" to 6.0,  // 3.6h logged -> 60% (behind, not critical)
+            "PHY102" to 4.0    // 1.0h logged -> 25% (critically behind <50%)
+        )
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 240, timestampMs = nowMs - (1L * dayMs), dateDisplay = "Yesterday"),
+            com.example.data.local.StudySessionEntity(courseCode = "MATH204", subjectName = "Linear Algebra", durationMinutes = 216, timestampMs = nowMs - (2L * dayMs), dateDisplay = "2d ago"),
+            com.example.data.local.StudySessionEntity(courseCode = "PHY102", subjectName = "Physics", durationMinutes = 60, timestampMs = nowMs - (3L * dayMs), dateDisplay = "3d ago"),
+            // Old session outside 7-day window should be excluded
+            com.example.data.local.StudySessionEntity(courseCode = "PHY102", subjectName = "Physics", durationMinutes = 300, timestampMs = nowMs - (14L * dayMs), dateDisplay = "14d ago")
+        )
+
+        val report = com.example.data.local.SubjectGoalAlertHelper.evaluateWeeklySubjectGoals(
+            courses = courses,
+            sessions = sessions,
+            goalsMap = customGoals,
+            defaultGoalsMap = customGoals,
+            nowMs = nowMs
+        )
+
+        assertTrue(report.hasLaggingSubjects)
+        assertEquals(2, report.laggingSubjects.size)
+        assertEquals(1, report.criticallyBehindCount)
+
+        // Sorted with critically behind PHY102 first, then MATH204
+        assertEquals("PHY102", report.laggingSubjects[0].courseCode)
+        assertTrue(report.laggingSubjects[0].isCriticallyBehind)
+        assertEquals(25, report.laggingSubjects[0].attainmentPct)
+        assertEquals(3.0, report.laggingSubjects[0].deficitHours, 0.001)
+
+        assertEquals("MATH204", report.laggingSubjects[1].courseCode)
+        assertFalse(report.laggingSubjects[1].isCriticallyBehind)
+        assertEquals(60, report.laggingSubjects[1].attainmentPct)
+        assertEquals(2.4, report.laggingSubjects[1].deficitHours, 0.001)
+
+        val (title, body) = com.example.data.local.SubjectGoalAlertHelper.formatAlertNotificationContent(report)
+        assertTrue(title.contains("2 Subjects Behind"))
+        assertTrue(body.contains("PHY102"))
+        assertTrue(body.contains("MATH204"))
+    }
+
+    @Test
+    fun `test SubjectGoalAlertHelper reports no alerts when all weekly goals are on track`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val nowMs = 1_760_000_000_000L
+        val courses = listOf(
+            CourseEntity(code = "CS201", name = "Data Structures", instructor = "Prof. A", room = "R1", dayOfWeek = "Mon", timeSlot = "10:00")
+        )
+        val goals = mapOf("CS201" to 4.0)
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 240, timestampMs = nowMs - (1L * dayMs), dateDisplay = "Yesterday")
+        )
+
+        val report = com.example.data.local.SubjectGoalAlertHelper.evaluateWeeklySubjectGoals(
+            courses = courses,
+            sessions = sessions,
+            goalsMap = goals,
+            defaultGoalsMap = goals,
+            nowMs = nowMs
+        )
+
+        assertFalse(report.hasLaggingSubjects)
+        assertEquals(0, report.laggingSubjects.size)
+        assertEquals(0, report.criticallyBehindCount)
+        val (title, _) = com.example.data.local.SubjectGoalAlertHelper.formatAlertNotificationContent(report)
+        assertTrue(title.contains("On Track"))
+    }
 }
+

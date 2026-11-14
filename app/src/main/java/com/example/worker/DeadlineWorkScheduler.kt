@@ -137,4 +137,26 @@ object DeadlineWorkScheduler {
     fun cancelPomodoroReminders(context: Context) {
         PomodoroGoalNotificationHelper.cancelPeriodicGoalReminders(context)
     }
+
+    /**
+     * Schedules periodic Subject Analytics weekly goal pace alerts if enabled.
+     */
+    fun scheduleSubjectGoalAlerts(context: Context) {
+        SubjectGoalNotificationHelper.createNotificationChannel(context)
+        if (SubjectGoalNotificationHelper.isAlertsEnabled(context)) {
+            SubjectGoalNotificationHelper.schedulePeriodicGoalAlerts(context)
+        }
+    }
+
+    /**
+     * Triggers an immediate Subject Analytics goal alert evaluation.
+     */
+    fun triggerImmediateSubjectGoalAlert(context: Context, forceNotify: Boolean = true) {
+        SubjectGoalNotificationHelper.triggerImmediateGoalCheck(context, forceNotify = forceNotify)
+    }
+
+    fun cancelSubjectGoalAlerts(context: Context) {
+        SubjectGoalNotificationHelper.cancelPeriodicGoalAlerts(context)
+    }
 }
+

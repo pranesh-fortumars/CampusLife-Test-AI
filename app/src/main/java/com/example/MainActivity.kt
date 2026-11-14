@@ -39,14 +39,18 @@ class MainActivity : ComponentActivity() {
         TaskNotificationHelper.createNotificationChannel(this)
         ProjectAssignment24hNotificationHelper.createNotificationChannel(this)
         com.example.worker.PomodoroGoalNotificationHelper.createNotificationChannel(this)
+        com.example.worker.SubjectGoalNotificationHelper.createNotificationChannel(this)
         DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(this)
         DeadlineWorkScheduler.schedule24HourPeriodicChecks(this)
         DeadlineWorkScheduler.schedulePeriodicPomodoroReminders(this)
+        DeadlineWorkScheduler.scheduleSubjectGoalAlerts(this)
 
         // Prime the 24-hour background deadline service scan from Room database
         ProjectAssignmentDeadlineService.startDeadlineScan(this)
 
-        val navigateToTasks = intent?.getStringExtra("EXTRA_NAVIGATE_TO") == "TASKS"
+        val navigateTo = intent?.getStringExtra("EXTRA_NAVIGATE_TO")
+        val navigateToTasks = navigateTo == "TASKS"
+        val navigateToSchedule = navigateTo == "SCHEDULE"
         val startPomodoro = intent?.getBooleanExtra("EXTRA_START_POMODORO", false) == true
 
         setContent {
@@ -67,6 +71,7 @@ class MainActivity : ComponentActivity() {
                         DeadlineWorkScheduler.schedulePeriodicDeadlineChecks(context)
                         DeadlineWorkScheduler.schedule24HourPeriodicChecks(context)
                         DeadlineWorkScheduler.schedulePeriodicPomodoroReminders(context)
+                        DeadlineWorkScheduler.scheduleSubjectGoalAlerts(context)
                         ProjectAssignmentDeadlineService.startDeadlineScan(context)
                     }
                 }
@@ -74,6 +79,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     if (navigateToTasks) {
                         viewModel.navigateTo(AppDestination.SEARCH)
+                    } else if (navigateToSchedule) {
+                        viewModel.navigateTo(AppDestination.SCHEDULE)
                     } else if (startPomodoro) {
                         viewModel.navigateTo(AppDestination.HOME)
                     }
