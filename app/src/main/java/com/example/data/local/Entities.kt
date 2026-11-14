@@ -525,6 +525,116 @@ object SubjectComparisonHelper {
     }
 }
 
+data class MonthlyWeekPoint(
+    val weekKey: String,
+    val weekLabel: String,
+    val shortSubtitle: String,
+    val totalMinutes: Int,
+    val totalHours: Double,
+    val sessionCount: Int,
+    val primarySubject: String,
+    val subjectBreakdown: Map<String, Int>,
+    val deltaFromPrevWeekHours: Double? = null
+)
+
+data class MonthlyTrendReport(
+    val weeks: List<MonthlyWeekPoint>,
+    val totalMonthMinutes: Int,
+    val totalSessionCount: Int,
+    val weeklyAverageHours: Double,
+    val peakWeek: MonthlyWeekPoint?,
+    val w1ToW4GrowthHours: Double,
+    val w1ToW4GrowthPct: Int,
+    val momentumLabel: String,
+    val patternInsight: String,
+    val activeSubjectFilter: String? = null
+) {
+    val totalMonthHours: Double
+        get() = totalMonthMinutes / 60.0
+}
+
+object MonthlyTrendHelper {
+
+    fun buildFourWeekReport(
+        sessions: List<StudySessionEntity>,
+        subjectFilter: String? = null,
+        nowMs: Long = System.currentTimeMillis()
+    ): MonthlyTrendReport {
+        val monthWindowSessions = sessions.filter { s ->
+            StudyDateRangeHelper.isSessionInRange(s.timestampMs, StudyDateRange.THIS_MONTH, nowMs = nowMs) &&
+                (subjectFilter == null || s.courseCode.equals(subjectFilter, ignoreCase = true))
+        }
+        val rawTrends = StudyDateRangeHelper.buildMonthlyWeeklyTrends(monthWindowSessions, nowMs)
+        val subtitles = listOf("3w ago", "2w ago", "Last wk", "This wk")
+
+        var prevHours: Double? = null
+        val weekPoints = rawTrends.mapIndexed { index, trend ->
+            val hours = trend.totalMinutes / 60.0
+            val delta = prevHours?.let { Math.round((hours - it) * 10.0) / 10.0 }
+            prevHours = hours
+            MonthlyWeekPoint(
+                weekKey = trend.dayKey,
+                weekLabel = trend.dayLabel,
+                shortSubtitle = subtitles.getOrElse(index) { trend.dayKey },
+                totalMinutes = trend.totalMinutes,
+                totalHours = hours,
+                sessionCount = trend.sessionCount,
+                primarySubject = trend.primarySubject,
+                subjectBreakdown = trend.subjectBreakdown,
+                deltaFromPrevWeekHours = delta
+            )
+        }
+
+        val totalMinutes = weekPoints.sumOf { it.totalMinutes }
+        val totalSessions = weekPoints.sumOf { it.sessionCount }
+        val weeklyAvgHours = if (weekPoints.isNotEmpty()) (totalMinutes / 60.0) / weekPoints.size.toDouble() else 0.0
+        val peakWeek = weekPoints.maxByOrNull { it.totalMinutes }?.takeIf { it.totalMinutes > 0 }
+
+        val w1Hours = weekPoints.firstOrNull()?.totalHours ?: 0.0
+        val w4Hours = weekPoints.lastOrNull()?.totalHours ?: 0.0
+        val growthHours = Math.round((w4Hours - w1Hours) * 10.0) / 10.0
+        val growthPct = if (w1Hours > 0.0) {
+            kotlin.math.round(((w4Hours - w1Hours) / w1Hours) * 100.0).toInt()
+        } else if (w4Hours > 0.0) {
+            100
+        } else {
+            0
+        }
+
+        val momentum = when {
+            growthHours >= 0.5 -> "Upward Momentum"
+            growthHours <= -0.5 -> "Easing Off"
+            else -> "Steady Pace"
+        }
+
+        val scopeLabel = subjectFilter ?: "All Subjects"
+        val insight = when {
+            totalMinutes == 0 -> "No study blocks logged in the past 4 weeks for $scopeLabel yet. Start a session to track long-term momentum."
+            growthHours >= 0.5 && peakWeek != null ->
+                "$scopeLabel study time rose ${String.format(java.util.Locale.US, "%.1f", growthHours)}h (+$growthPct%) from Wk 1 to Wk 4, peaking in ${peakWeek.weekKey} (${String.format(java.util.Locale.US, "%.1f", peakWeek.totalHours)}h)."
+            growthHours <= -0.5 && peakWeek != null ->
+                "$scopeLabel dipped ${String.format(java.util.Locale.US, "%.1f", kotlin.math.abs(growthHours))}h since Wk 1 after peaking in ${peakWeek.weekKey} (${String.format(java.util.Locale.US, "%.1f", peakWeek.totalHours)}h). Aim to rebuild consistency."
+            peakWeek != null ->
+                "$scopeLabel maintained a steady ~${String.format(java.util.Locale.US, "%.1f", weeklyAvgHours)}h/wk pace across 4 weeks, peaking in ${peakWeek.weekKey} (${String.format(java.util.Locale.US, "%.1f", peakWeek.totalHours)}h)."
+            else -> "$scopeLabel averaged ${String.format(java.util.Locale.US, "%.1f", weeklyAvgHours)}h/wk over the past 4 weeks."
+        }
+
+        return MonthlyTrendReport(
+            weeks = weekPoints,
+            totalMonthMinutes = totalMinutes,
+            totalSessionCount = totalSessions,
+            weeklyAverageHours = weeklyAvgHours,
+            peakWeek = peakWeek,
+            w1ToW4GrowthHours = growthHours,
+            w1ToW4GrowthPct = growthPct,
+            momentumLabel = momentum,
+            patternInsight = insight,
+            activeSubjectFilter = subjectFilter
+        )
+    }
+}
+
+
 
 
 

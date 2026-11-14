@@ -783,4 +783,54 @@ class ExampleUnitTest {
         assertEquals("Focus Depth Gap", depthReport.efficiencyGapType)
         assertEquals(25, depthReport.avgSessionGapMins)
     }
+
+    @Test
+    fun `test MonthlyTrendHelper aggregates 4-week trend line and growth metrics`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val nowMs = 1_760_000_000_000L
+        val sessions = listOf(
+            // Wk 1 (22-30d ago): 2.0h (120m)
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 60, timestampMs = nowMs - (25L * dayMs), dateDisplay = "25d ago"),
+            com.example.data.local.StudySessionEntity(courseCode = "MATH204", subjectName = "Linear Algebra", durationMinutes = 60, timestampMs = nowMs - (24L * dayMs), dateDisplay = "24d ago"),
+            // Wk 2 (15-21d ago): 3.0h (180m)
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 120, timestampMs = nowMs - (18L * dayMs), dateDisplay = "18d ago"),
+            com.example.data.local.StudySessionEntity(courseCode = "PHY102", subjectName = "Physics", durationMinutes = 60, timestampMs = nowMs - (17L * dayMs), dateDisplay = "17d ago"),
+            // Wk 3 (8-14d ago): 2.5h (150m)
+            com.example.data.local.StudySessionEntity(courseCode = "MATH204", subjectName = "Linear Algebra", durationMinutes = 90, timestampMs = nowMs - (10L * dayMs), dateDisplay = "10d ago"),
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 60, timestampMs = nowMs - (9L * dayMs), dateDisplay = "9d ago"),
+            // Wk 4 (0-7d ago): 4.0h (240m)
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 180, timestampMs = nowMs - (2L * dayMs), dateDisplay = "2d ago"),
+            com.example.data.local.StudySessionEntity(courseCode = "CS310", subjectName = "OS", durationMinutes = 60, timestampMs = nowMs - (1L * dayMs), dateDisplay = "Yesterday"),
+            // Outside 30d window (excluded from 4-week monthly view)
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 120, timestampMs = nowMs - (45L * dayMs), dateDisplay = "45d ago")
+        )
+
+        val report = com.example.data.local.MonthlyTrendHelper.buildFourWeekReport(sessions, subjectFilter = null, nowMs = nowMs)
+        assertEquals(4, report.weeks.size)
+        assertEquals(listOf("Wk 1", "Wk 2", "Wk 3", "Wk 4"), report.weeks.map { it.weekKey })
+        assertEquals(2.0, report.weeks[0].totalHours, 0.001)
+        assertEquals(3.0, report.weeks[1].totalHours, 0.001)
+        assertEquals(2.5, report.weeks[2].totalHours, 0.001)
+        assertEquals(4.0, report.weeks[3].totalHours, 0.001)
+
+        // Week-over-week deltas
+        assertEquals(null, report.weeks[0].deltaFromPrevWeekHours)
+        assertEquals(1.0, report.weeks[1].deltaFromPrevWeekHours!!, 0.001)
+        assertEquals(-0.5, report.weeks[2].deltaFromPrevWeekHours!!, 0.001)
+        assertEquals(1.5, report.weeks[3].deltaFromPrevWeekHours!!, 0.001)
+
+        assertEquals(11.5, report.totalMonthHours, 0.001)
+        assertEquals(2.875, report.weeklyAverageHours, 0.001)
+        assertEquals("Wk 4", report.peakWeek?.weekKey)
+        assertEquals(2.0, report.w1ToW4GrowthHours, 0.001)
+        assertEquals(100, report.w1ToW4GrowthPct)
+        assertEquals("Upward Momentum", report.momentumLabel)
+
+        // Filter by CS201 only -> 1.0h, 2.0h, 1.0h, 3.0h (Total 7.0h)
+        val cs201Report = com.example.data.local.MonthlyTrendHelper.buildFourWeekReport(sessions, subjectFilter = "CS201", nowMs = nowMs)
+        assertEquals("CS201", cs201Report.activeSubjectFilter)
+        assertEquals(7.0, cs201Report.totalMonthHours, 0.001)
+        assertEquals(1.0, cs201Report.weeks[0].totalHours, 0.001)
+        assertEquals(3.0, cs201Report.weeks[3].totalHours, 0.001)
+    }
 }

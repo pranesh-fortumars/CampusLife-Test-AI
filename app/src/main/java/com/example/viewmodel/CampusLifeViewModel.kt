@@ -1166,7 +1166,37 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    // Monthly 4-Week Trend Line view mode state
+    private val _monthlySubjectFilter = MutableStateFlow<String?>(null)
+    val monthlySubjectFilter: StateFlow<String?> = _monthlySubjectFilter.asStateFlow()
+
+    fun selectMonthlySubjectFilter(courseCode: String?) {
+        _monthlySubjectFilter.value = courseCode
+    }
+
+    val monthlyTrendReport: StateFlow<MonthlyTrendReport> = combine(
+        allStudySessions,
+        _selectedSessionTagFilter,
+        _monthlySubjectFilter
+    ) { sessions, tagFilter, subjectFilter ->
+        val tagFiltered = if (tagFilter == "All") {
+            sessions
+        } else {
+            sessions.filter { it.tag.equals(tagFilter, ignoreCase = true) }
+        }
+        MonthlyTrendHelper.buildFourWeekReport(
+            sessions = tagFiltered,
+            subjectFilter = subjectFilter,
+            nowMs = System.currentTimeMillis()
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        MonthlyTrendHelper.buildFourWeekReport(emptyList())
+    )
 }
+
 
 
 

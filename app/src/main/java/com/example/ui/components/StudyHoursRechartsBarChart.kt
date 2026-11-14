@@ -69,7 +69,8 @@ import kotlin.math.roundToInt
 
 enum class ChartViewMode(val label: String) {
     BY_SUBJECT("By Subject"),
-    WEEKLY_TREND("Weekly Trend")
+    WEEKLY_TREND("Weekly Trend"),
+    MONTHLY("Monthly")
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -98,6 +99,8 @@ fun StudyHoursRechartsBarChart(
     val weeklyDayNotes by viewModel.weeklyDayNotes.collectAsState()
     val compareSubjectsEnabled by viewModel.compareSubjectsEnabled.collectAsState()
     val subjectComparisonReport by viewModel.subjectComparisonReport.collectAsState()
+    val monthlyTrendReport by viewModel.monthlyTrendReport.collectAsState()
+    val monthlySubjectFilter by viewModel.monthlySubjectFilter.collectAsState()
     val context = LocalContext.current
     val currentDayKey = remember { viewModel.getCurrentDayKey() }
     val currentMonthKey = remember { SimpleDateFormat("MMM", Locale.US).format(Date()) }
@@ -172,25 +175,41 @@ fun StudyHoursRechartsBarChart(
         weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
     }
 
+    val monthlyWeeklyGoalHours = if (monthlySubjectFilter != null) {
+        subjectWeeklyGoals[monthlySubjectFilter] ?: viewModel.defaultSubjectWeeklyGoals[monthlySubjectFilter] ?: 5.0
+    } else {
+        dailyGoalHours * 3.0
+    }
+
     val quickAddDayKey = if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
         activeSelectedDayTrend?.dayKey ?: currentDayKey
     } else {
         currentDayKey
     }
-    val quickAddCourseCode = if (viewMode == ChartViewMode.BY_SUBJECT) {
-        activeSelectedStat?.courseCode
-            ?: activeHoveredStat?.courseCode
-            ?: displayedStudyStats.firstOrNull()?.courseCode
-            ?: courses.firstOrNull()?.code
-            ?: "CS201"
-    } else {
-        selectedWeeklySubjectFilter
-            ?: activeSelectedDayTrend?.primarySubject?.takeIf { it.isNotBlank() && it != "General" }
-            ?: courses.firstOrNull()?.code
-            ?: "CS201"
+    val quickAddCourseCode = when (viewMode) {
+        ChartViewMode.BY_SUBJECT -> {
+            activeSelectedStat?.courseCode
+                ?: activeHoveredStat?.courseCode
+                ?: displayedStudyStats.firstOrNull()?.courseCode
+                ?: courses.firstOrNull()?.code
+                ?: "CS201"
+        }
+        ChartViewMode.MONTHLY -> {
+            monthlySubjectFilter
+                ?: monthlyTrendReport.weeks.lastOrNull()?.primarySubject?.takeIf { it.isNotBlank() && it != "General" }
+                ?: courses.firstOrNull()?.code
+                ?: "CS201"
+        }
+        ChartViewMode.WEEKLY_TREND -> {
+            selectedWeeklySubjectFilter
+                ?: activeSelectedDayTrend?.primarySubject?.takeIf { it.isNotBlank() && it != "General" }
+                ?: courses.firstOrNull()?.code
+                ?: "CS201"
+        }
     }
     val quickAddDateDisplay = if (
         viewMode == ChartViewMode.BY_SUBJECT ||
+        viewMode == ChartViewMode.MONTHLY ||
         selectedDateRange != StudyDateRange.LAST_7_DAYS ||
         quickAddDayKey == currentDayKey
     ) {
@@ -235,7 +254,11 @@ fun StudyHoursRechartsBarChart(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    if (viewMode == ChartViewMode.WEEKLY_TREND) Icons.Default.TrendingUp else Icons.Default.BarChart,
+                                    when (viewMode) {
+                                        ChartViewMode.WEEKLY_TREND -> Icons.Default.TrendingUp
+                                        ChartViewMode.MONTHLY -> Icons.Default.ShowChart
+                                        ChartViewMode.BY_SUBJECT -> Icons.Default.BarChart
+                                    },
                                     contentDescription = null,
                                     tint = IndigoPrimary,
                                     modifier = Modifier.size(20.dp)
@@ -243,14 +266,14 @@ fun StudyHoursRechartsBarChart(
                             }
                         }
                         Text(
-                            text = if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                when (selectedDateRange) {
+                            text = when (viewMode) {
+                                ChartViewMode.WEEKLY_TREND -> when (selectedDateRange) {
                                     StudyDateRange.LAST_7_DAYS -> "Weekly Consistency Trend"
                                     StudyDateRange.THIS_MONTH -> "Monthly Study Trend"
                                     StudyDateRange.SEMESTER -> "Semester Study Trend"
                                 }
-                            } else {
-                                "Subject Analytics: Study Hours"
+                                ChartViewMode.MONTHLY -> "Monthly 4-Week Trend"
+                                ChartViewMode.BY_SUBJECT -> "Subject Analytics: Study Hours"
                             },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
@@ -258,16 +281,24 @@ fun StudyHoursRechartsBarChart(
                         )
                     }
                     Text(
-                        text = if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                            val baseDesc = when (selectedDateRange) {
-                                StudyDateRange.LAST_7_DAYS -> "Last 7 Days • Day-by-day consistency"
-                                StudyDateRange.THIS_MONTH -> "This Month (30d) • Weekly breakdown"
-                                StudyDateRange.SEMESTER -> "${currentSemester?.name ?: "Semester"} • Monthly progression"
+                        text = when (viewMode) {
+                            ChartViewMode.WEEKLY_TREND -> {
+                                val baseDesc = when (selectedDateRange) {
+                                    StudyDateRange.LAST_7_DAYS -> "Last 7 Days • Day-by-day consistency"
+                                    StudyDateRange.THIS_MONTH -> "This Month (30d) • Weekly breakdown"
+                                    StudyDateRange.SEMESTER -> "${currentSemester?.name ?: "Semester"} • Monthly progression"
+                                }
+                                if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc ($selectedSessionTagFilter)"
                             }
-                            if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc ($selectedSessionTagFilter)"
-                        } else {
-                            val baseDesc = "${selectedDateRange.label} • Room study analytics"
-                            if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc • '$selectedSessionTagFilter'"
+                            ChartViewMode.MONTHLY -> {
+                                val subjectPart = monthlySubjectFilter?.let { "$it • " } ?: ""
+                                val baseDesc = "${subjectPart}Wk 1–Wk 4 weekly totals • Long-term trend"
+                                if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc ($selectedSessionTagFilter)"
+                            }
+                            ChartViewMode.BY_SUBJECT -> {
+                                val baseDesc = "${selectedDateRange.label} • Room study analytics"
+                                if (selectedSessionTagFilter == "All") baseDesc else "$baseDesc • '$selectedSessionTagFilter'"
+                            }
                         },
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -279,7 +310,9 @@ fun StudyHoursRechartsBarChart(
                     color = EmeraldTertiaryContainer
                 ) {
                     Text(
-                        text = if (selectedSessionTagFilter == "All") {
+                        text = if (viewMode == ChartViewMode.MONTHLY) {
+                            "${String.format(Locale.US, "%.1f", monthlyTrendReport.totalMonthHours)}h • 4W"
+                        } else if (selectedSessionTagFilter == "All") {
                             "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h • ${selectedDateRange.shortLabel}"
                         } else {
                             "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h ($selectedSessionTagFilter)"
@@ -293,6 +326,11 @@ fun StudyHoursRechartsBarChart(
             }
 
             // Date Range Selector ('Last 7 Days', 'This Month', 'Semester')
+            AnimatedVisibility(
+                visible = viewMode != ChartViewMode.MONTHLY,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -384,6 +422,7 @@ fun StudyHoursRechartsBarChart(
                     }
                 }
             }
+            }
 
             // Quick Add +30m Header Action Bar
             Surface(
@@ -422,13 +461,15 @@ fun StudyHoursRechartsBarChart(
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                             Text(
-                                text = if (viewMode == ChartViewMode.BY_SUBJECT) {
-                                    "Focused Subject: $quickAddCourseCode"
-                                } else if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
-                                    val todayMarker = if (quickAddDayKey == currentDayKey) " (Today)" else ""
-                                    "Focused Day: $quickAddDayKey$todayMarker"
-                                } else {
-                                    "Active Range: ${selectedDateRange.label}"
+                                text = when (viewMode) {
+                                    ChartViewMode.BY_SUBJECT -> "Focused Subject: $quickAddCourseCode"
+                                    ChartViewMode.MONTHLY -> "4-Week Trend (Wk 4): $quickAddCourseCode"
+                                    ChartViewMode.WEEKLY_TREND -> if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
+                                        val todayMarker = if (quickAddDayKey == currentDayKey) " (Today)" else ""
+                                        "Focused Day: $quickAddDayKey$todayMarker"
+                                    } else {
+                                        "Active Range: ${selectedDateRange.label}"
+                                    }
                                 },
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -437,15 +478,22 @@ fun StudyHoursRechartsBarChart(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = if (viewMode == ChartViewMode.BY_SUBJECT) {
-                                    val focusedHours = displayedStudyStats.firstOrNull { it.courseCode == quickAddCourseCode }?.totalHours ?: 0.0
-                                    "${String.format(Locale.US, "%.1f", focusedHours)}h in ${selectedDateRange.label} • Tap +30m"
-                                } else if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
-                                    val dayHours = weeklyTrends.firstOrNull { it.dayKey == quickAddDayKey }?.totalHours ?: 0.0
-                                    "${String.format(Locale.US, "%.1f", dayHours)}h logged • Logs to $quickAddCourseCode"
-                                } else {
-                                    val totalRangeHours = weeklyTrends.sumOf { it.totalMinutes } / 60.0
-                                    "${String.format(Locale.US, "%.1f", totalRangeHours)}h total • Logs +30m to $quickAddCourseCode"
+                                text = when (viewMode) {
+                                    ChartViewMode.BY_SUBJECT -> {
+                                        val focusedHours = displayedStudyStats.firstOrNull { it.courseCode == quickAddCourseCode }?.totalHours ?: 0.0
+                                        "${String.format(Locale.US, "%.1f", focusedHours)}h in ${selectedDateRange.label} • Tap +30m"
+                                    }
+                                    ChartViewMode.MONTHLY -> {
+                                        val w4Hours = monthlyTrendReport.weeks.lastOrNull()?.totalHours ?: 0.0
+                                        "Wk 4: ${String.format(Locale.US, "%.1f", w4Hours)}h • Logs +30m to $quickAddCourseCode"
+                                    }
+                                    ChartViewMode.WEEKLY_TREND -> if (selectedDateRange == StudyDateRange.LAST_7_DAYS) {
+                                        val dayHours = weeklyTrends.firstOrNull { it.dayKey == quickAddDayKey }?.totalHours ?: 0.0
+                                        "${String.format(Locale.US, "%.1f", dayHours)}h logged • Logs to $quickAddCourseCode"
+                                    } else {
+                                        val totalRangeHours = weeklyTrends.sumOf { it.totalMinutes } / 60.0
+                                        "${String.format(Locale.US, "%.1f", totalRangeHours)}h total • Logs +30m to $quickAddCourseCode"
+                                    }
                                 },
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -463,7 +511,7 @@ fun StudyHoursRechartsBarChart(
                                 courseCode = quickAddCourseCode,
                                 dateDisplay = quickAddDateDisplay
                             )
-                            val targetLabel = if (viewMode == ChartViewMode.BY_SUBJECT || selectedDateRange != StudyDateRange.LAST_7_DAYS) {
+                            val targetLabel = if (viewMode != ChartViewMode.WEEKLY_TREND || selectedDateRange != StudyDateRange.LAST_7_DAYS) {
                                 quickAddCourseCode
                             } else {
                                 "$quickAddDayKey ($quickAddCourseCode)"
@@ -503,40 +551,43 @@ fun StudyHoursRechartsBarChart(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
+                // 3-Mode View Switcher: By Subject | Weekly Trend | Monthly
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Segmented Toggle: By Subject vs Trend (Weekly / Monthly / Semester)
                     Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(100))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                            .padding(3.dp),
+                            .padding(3.dp)
+                            .testTag("chart_view_mode_switcher"),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         ChartViewMode.values().forEach { mode ->
                             val isSelected = viewMode == mode
-                            val dynamicModeLabel = if (mode == ChartViewMode.WEEKLY_TREND) {
-                                when (selectedDateRange) {
+                            val dynamicModeLabel = when (mode) {
+                                ChartViewMode.WEEKLY_TREND -> when (selectedDateRange) {
                                     StudyDateRange.LAST_7_DAYS -> "Weekly Trend"
                                     StudyDateRange.THIS_MONTH -> "Monthly Trend"
                                     StudyDateRange.SEMESTER -> "Semester Trend"
                                 }
-                            } else {
-                                mode.label
+                                ChartViewMode.MONTHLY -> "Monthly"
+                                ChartViewMode.BY_SUBJECT -> mode.label
                             }
                             Surface(
                                 shape = RoundedCornerShape(100),
                                 color = if (isSelected) IndigoPrimary else Color.Transparent,
+                                shadowElevation = if (isSelected) 2.dp else 0.dp,
                                 modifier = Modifier
+                                    .weight(1f)
                                     .clip(RoundedCornerShape(100))
                                     .clickable {
                                         viewMode = mode
                                         selectedStat = null
                                         selectedDayTrend = null
-                                        if (mode == ChartViewMode.BY_SUBJECT) {
+                                        if (mode != ChartViewMode.WEEKLY_TREND) {
                                             selectedWeeklySubjectFilter = null
                                         }
                                     }
@@ -547,91 +598,100 @@ fun StudyHoursRechartsBarChart(
                                     fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp)
                                 )
                             }
                         }
                     }
 
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        // Button to open Goal Customization Modal (Daily Goal for Weekly View, Subject Goals for By Subject View)
-                        FilledTonalIconButton(
-                            onClick = {
-                                if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                    showGoalSettingsModal = true
-                                } else {
-                                    preselectedSubjectForGoalModal = selectedStat?.courseCode
-                                    showSubjectGoalsModal = true
-                                }
-                            },
-                            modifier = Modifier
-                                .size(32.dp)
-                                .testTag("btn_open_goal_settings_modal")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = if (viewMode == ChartViewMode.WEEKLY_TREND) "Customize daily study goal" else "Customize subject study goals",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-
-                        if (viewMode == ChartViewMode.BY_SUBJECT) {
-                            Button(
+                            // Button to open Goal Customization Modal
+                            FilledTonalIconButton(
                                 onClick = {
-                                    preselectedSubjectForGoalModal = selectedStat?.courseCode
-                                    showSubjectGoalsModal = true
+                                    if (viewMode == ChartViewMode.WEEKLY_TREND || viewMode == ChartViewMode.MONTHLY) {
+                                        showGoalSettingsModal = true
+                                    } else {
+                                        preselectedSubjectForGoalModal = selectedStat?.courseCode
+                                        showSubjectGoalsModal = true
+                                    }
                                 },
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(100),
-                                colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
                                 modifier = Modifier
-                                    .heightIn(min = 32.dp)
-                                    .testTag("btn_edit_goals")
-                                    .testTag("btn_open_subject_goals_modal")
+                                    .size(32.dp)
+                                    .testTag("btn_open_goal_settings_modal")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit Goals",
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = if (viewMode == ChartViewMode.BY_SUBJECT) "Customize subject study goals" else "Customize daily study goal",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+
+                            if (viewMode == ChartViewMode.BY_SUBJECT) {
+                                Button(
+                                    onClick = {
+                                        preselectedSubjectForGoalModal = selectedStat?.courseCode
+                                        showSubjectGoalsModal = true
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                    shape = RoundedCornerShape(100),
+                                    colors = ButtonDefaults.buttonColors(containerColor = IndigoPrimary),
+                                    modifier = Modifier
+                                        .heightIn(min = 32.dp)
+                                        .testTag("btn_edit_goals")
+                                        .testTag("btn_open_subject_goals_modal")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Goals",
+                                        modifier = Modifier.size(13.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "Edit Goals",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            // Export Study Logs Button (Available across all views)
+                            Button(
+                                onClick = { showExportDialog = true },
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(100),
+                                colors = ButtonDefaults.buttonColors(containerColor = EmeraldTertiary),
+                                modifier = Modifier
+                                    .heightIn(min = 32.dp)
+                                    .testTag("btn_export_study_logs")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Export Study Logs",
                                     modifier = Modifier.size(13.dp),
                                     tint = Color.White
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "Edit Goals",
+                                    text = "Export",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
                             }
-                        }
-
-                        // Export Study Logs Button (Available in both views)
-                        Button(
-                            onClick = { showExportDialog = true },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                            shape = RoundedCornerShape(100),
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldTertiary),
-                            modifier = Modifier
-                                .heightIn(min = 32.dp)
-                                .testTag("btn_export_study_logs")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Export Study Logs",
-                                modifier = Modifier.size(13.dp),
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "Export",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
                         }
                     }
                 }
@@ -879,13 +939,15 @@ fun StudyHoursRechartsBarChart(
                         onClick = { showTargetOverlay = !showTargetOverlay },
                         label = {
                             Text(
-                                if (viewMode == ChartViewMode.WEEKLY_TREND) {
-                                    "Target Goal (${String.format(Locale.US, "%.1f", periodBucketGoalHours)}$periodGoalUnitLabel)"
-                                } else if (activeSelectedStat != null) {
-                                    "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(activeSelectedStat.courseCode))}h: ${activeSelectedStat.courseCode})"
-                                } else {
-                                    if (selectedDateRange == StudyDateRange.LAST_7_DAYS) "Subject Goals"
-                                    else "Goals (${selectedDateRange.goalScaleMultiplier.toInt()}x weekly)"
+                                when (viewMode) {
+                                    ChartViewMode.WEEKLY_TREND -> "Target Goal (${String.format(Locale.US, "%.1f", periodBucketGoalHours)}$periodGoalUnitLabel)"
+                                    ChartViewMode.MONTHLY -> "Weekly Goal (${String.format(Locale.US, "%.1f", monthlyWeeklyGoalHours)}h/wk)"
+                                    ChartViewMode.BY_SUBJECT -> if (activeSelectedStat != null) {
+                                        "Goal (${String.format(Locale.US, "%.1f", getGoalForCourse(activeSelectedStat.courseCode))}h: ${activeSelectedStat.courseCode})"
+                                    } else {
+                                        if (selectedDateRange == StudyDateRange.LAST_7_DAYS) "Subject Goals"
+                                        else "Goals (${selectedDateRange.goalScaleMultiplier.toInt()}x weekly)"
+                                    }
                                 },
                                 fontSize = 10.sp
                             )
@@ -908,40 +970,42 @@ fun StudyHoursRechartsBarChart(
                             .testTag("toggle_target_overlay")
                     )
 
-                    // Compare Previous Period Toggle
-                    FilterChip(
-                        selected = compareWithPreviousWeek,
-                        onClick = { compareWithPreviousWeek = !compareWithPreviousWeek },
-                        label = {
-                            val compareLabel = when (selectedDateRange) {
-                                StudyDateRange.LAST_7_DAYS -> if (compareWithPreviousWeek) "vs Previous Week: ON" else "vs Prev Week"
-                                StudyDateRange.THIS_MONTH -> if (compareWithPreviousWeek) "vs Prior Month: ON" else "vs Prior 30d"
-                                StudyDateRange.SEMESTER -> if (compareWithPreviousWeek) "vs Baseline: ON" else "vs Baseline"
-                            }
-                            Text(
-                                compareLabel,
-                                fontSize = 10.sp,
-                                fontWeight = if (compareWithPreviousWeek) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                if (compareWithPreviousWeek) Icons.Default.CompareArrows else Icons.Default.History,
-                                contentDescription = null,
-                                modifier = Modifier.size(13.dp)
-                            )
-                        },
-                        shape = RoundedCornerShape(100),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFF0284C7).copy(alpha = 0.18f),
-                            selectedLabelColor = Color(0xFF0284C7),
-                            selectedLeadingIconColor = Color(0xFF0284C7)
-                        ),
-                        border = if (compareWithPreviousWeek) BorderStroke(1.2.dp, Color(0xFF0284C7)) else null,
-                        modifier = Modifier
-                            .heightIn(min = 30.dp)
-                            .testTag("toggle_compare_previous_week")
-                    )
+                    // Compare Previous Period Toggle (By Subject & Weekly Trend)
+                    if (viewMode != ChartViewMode.MONTHLY) {
+                        FilterChip(
+                            selected = compareWithPreviousWeek,
+                            onClick = { compareWithPreviousWeek = !compareWithPreviousWeek },
+                            label = {
+                                val compareLabel = when (selectedDateRange) {
+                                    StudyDateRange.LAST_7_DAYS -> if (compareWithPreviousWeek) "vs Previous Week: ON" else "vs Prev Week"
+                                    StudyDateRange.THIS_MONTH -> if (compareWithPreviousWeek) "vs Prior Month: ON" else "vs Prior 30d"
+                                    StudyDateRange.SEMESTER -> if (compareWithPreviousWeek) "vs Baseline: ON" else "vs Baseline"
+                                }
+                                Text(
+                                    compareLabel,
+                                    fontSize = 10.sp,
+                                    fontWeight = if (compareWithPreviousWeek) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (compareWithPreviousWeek) Icons.Default.CompareArrows else Icons.Default.History,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(100),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF0284C7).copy(alpha = 0.18f),
+                                selectedLabelColor = Color(0xFF0284C7),
+                                selectedLeadingIconColor = Color(0xFF0284C7)
+                            ),
+                            border = if (compareWithPreviousWeek) BorderStroke(1.2.dp, Color(0xFF0284C7)) else null,
+                            modifier = Modifier
+                                .heightIn(min = 30.dp)
+                                .testTag("toggle_compare_previous_week")
+                        )
+                    }
 
                     // Compare Subjects Toggle (Subject Analytics View)
                     if (viewMode == ChartViewMode.BY_SUBJECT) {
@@ -979,7 +1043,7 @@ fun StudyHoursRechartsBarChart(
 
             // Comparative Summary Banner
             AnimatedVisibility(
-                visible = compareWithPreviousWeek,
+                visible = compareWithPreviousWeek && viewMode != ChartViewMode.MONTHLY,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
@@ -1157,7 +1221,8 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Legend Row with Conditional Alert Indicator
+            // Legend Row with Conditional Alert Indicator (By Subject & Weekly Trend)
+            if (viewMode != ChartViewMode.MONTHLY) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1268,6 +1333,7 @@ fun StudyHoursRechartsBarChart(
                         )
                     }
                 }
+            }
             }
 
             // Detailed Breakdown Card for Subject Mode (Revealed on subject selection/tap)
@@ -1881,11 +1947,21 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Main Bar Chart Viewport
+            // Main Chart Viewport
             val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             val goalLineColor = WarningAmber.copy(alpha = 0.85f)
 
-            if (viewMode == ChartViewMode.BY_SUBJECT) {
+            if (viewMode == ChartViewMode.MONTHLY) {
+                MonthlyTrendLineChartSection(
+                    report = monthlyTrendReport,
+                    courses = courses,
+                    weeklyGoalHours = monthlyWeeklyGoalHours,
+                    showTargetOverlay = showTargetOverlay,
+                    selectedSubjectFilter = monthlySubjectFilter,
+                    onSelectSubjectFilter = viewModel::selectMonthlySubjectFilter,
+                    subjectColorProvider = ::getSubjectColor
+                )
+            } else if (viewMode == ChartViewMode.BY_SUBJECT) {
                 // By Subject View
                 if (displayedStudyStats.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
@@ -3559,7 +3635,43 @@ fun StudyHoursRechartsBarChart(
             Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 0.8.dp)
 
             // Bottom Summary Metrics Row: Dynamic based on viewMode and selectedDateRange
-            if (viewMode == ChartViewMode.WEEKLY_TREND) {
+            if (viewMode == ChartViewMode.MONTHLY) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SummaryMiniCard(
+                        title = "4-Week Total",
+                        value = "${String.format(Locale.US, "%.1f", monthlyTrendReport.totalMonthHours)}h",
+                        subtitle = "${monthlyTrendReport.totalSessionCount} focus blocks",
+                        icon = Icons.Default.CheckCircle,
+                        color = EmeraldTertiary,
+                        containerColor = EmeraldTertiaryContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    SummaryMiniCard(
+                        title = "Weekly Average",
+                        value = "${String.format(Locale.US, "%.1f", monthlyTrendReport.weeklyAverageHours)}h",
+                        subtitle = "hours / week (4w)",
+                        icon = Icons.Default.Timeline,
+                        color = IndigoPrimary,
+                        containerColor = IndigoPrimaryContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    val peakWk = monthlyTrendReport.peakWeek
+                    SummaryMiniCard(
+                        title = "Peak Week",
+                        value = peakWk?.weekKey ?: "None",
+                        subtitle = if (peakWk != null) "${String.format(Locale.US, "%.1f", peakWk.totalHours)}h logged 🔥" else "-",
+                        icon = Icons.Default.EmojiEvents,
+                        color = WarningAmber,
+                        containerColor = WarningContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else if (viewMode == ChartViewMode.WEEKLY_TREND) {
                 val totalPeriodMins = weeklyTrends.sumOf { it.totalMinutes }
                 val totalBucketsCount = weeklyTrends.size.coerceAtLeast(1)
                 val activeBucketsCount = weeklyTrends.count { it.totalMinutes > 0 }
