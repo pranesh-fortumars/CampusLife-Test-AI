@@ -911,5 +911,67 @@ class ExampleUnitTest {
         val (title, _) = com.example.data.local.SubjectGoalAlertHelper.formatAlertNotificationContent(report)
         assertTrue(title.contains("On Track"))
     }
-}
 
+    @Test
+    fun `test FocusScoreHelper computes focused vs total ratio and detects shallow studying`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val nowMs = 1_760_000_000_000L
+        val courses = listOf(
+            CourseEntity(code = "CS201", name = "Data Structures", instructor = "Prof. A", room = "R1", dayOfWeek = "Mon", timeSlot = "10:00"),
+            CourseEntity(code = "MATH204", name = "Linear Algebra", instructor = "Prof. B", room = "R2", dayOfWeek = "Tue", timeSlot = "11:00"),
+            CourseEntity(code = "PHY102", name = "Physics", instructor = "Prof. C", room = "R3", dayOfWeek = "Wed", timeSlot = "12:00"),
+            CourseEntity(code = "ENG215", name = "Technical Writing", instructor = "Prof. D", room = "R4", dayOfWeek = "Thu", timeSlot = "13:00")
+        )
+        val sessions = listOf(
+            // CS201: 90m FOCUS + 10m SHORT_BREAK = 90/100 -> 90% Deep Focus
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 90, timestampMs = nowMs - dayMs, dateDisplay = "Yesterday", mode = "FOCUS"),
+            com.example.data.local.StudySessionEntity(courseCode = "CS201", subjectName = "Data Structures", durationMinutes = 10, timestampMs = nowMs - dayMs, dateDisplay = "Yesterday", mode = "SHORT_BREAK"),
+            // MATH204: 70m FOCUS + 30m SHALLOW = 70/100 -> 70% Moderate Focus
+            com.example.data.local.StudySessionEntity(courseCode = "MATH204", subjectName = "Linear Algebra", durationMinutes = 70, timestampMs = nowMs - (2L * dayMs), dateDisplay = "2d ago", mode = "FOCUS"),
+            com.example.data.local.StudySessionEntity(courseCode = "MATH204", subjectName = "Linear Algebra", durationMinutes = 30, timestampMs = nowMs - (2L * dayMs), dateDisplay = "2d ago", mode = "SHALLOW"),
+            // PHY102: 40m FOCUS + 40m SHALLOW + 20m LONG_BREAK = 40/100 -> 40% Shallow Studying
+            com.example.data.local.StudySessionEntity(courseCode = "PHY102", subjectName = "Physics", durationMinutes = 40, timestampMs = nowMs - (3L * dayMs), dateDisplay = "3d ago", mode = "FOCUS"),
+            com.example.data.local.StudySessionEntity(courseCode = "PHY102", subjectName = "Physics", durationMinutes = 40, timestampMs = nowMs - (3L * dayMs), dateDisplay = "3d ago", mode = "SHALLOW"),
+            com.example.data.local.StudySessionEntity(courseCode = "PHY102", subjectName = "Physics", durationMinutes = 20, timestampMs = nowMs - (3L * dayMs), dateDisplay = "3d ago", mode = "LONG_BREAK"),
+            // Session outside 7-day window (20 days ago) should be excluded in LAST_7_DAYS
+            com.example.data.local.StudySessionEntity(courseCode = "ENG215", subjectName = "Technical Writing", durationMinutes = 60, timestampMs = nowMs - (20L * dayMs), dateDisplay = "20d ago", mode = "FOCUS")
+        )
+
+        val report7d = com.example.data.local.FocusScoreHelper.buildFocusScoreReport(
+            courses = courses,
+            sessions = sessions,
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS,
+            nowMs = nowMs
+        )
+
+        // Overall 7d: 200m focused / 300m total = 67% Moderate
+        assertEquals(200, report7d.overallFocusedMinutes)
+        assertEquals(70, report7d.overallShallowMinutes)
+        assertEquals(30, report7d.overallBreakMinutes)
+        assertEquals(300, report7d.overallTotalLoggedMinutes)
+        assertEquals(67, report7d.overallFocusScorePct)
+        assertEquals(com.example.data.local.FocusQualityTier.MODERATE, report7d.overallTier)
+        assertEquals(1, report7d.shallowStudyingCount)
+        assertEquals(1, report7d.deepFocusCount)
+        assertEquals("PHY102", report7d.topShallowSubject?.courseCode)
+        assertEquals("CS201", report7d.bestFocusSubject?.courseCode)
+
+        // Sorted lowest active focus score first, then no-data last
+        assertEquals(listOf("PHY102", "MATH204", "CS201", "ENG215"), report7d.subjects.map { it.courseCode })
+        assertEquals(com.example.data.local.FocusQualityTier.SHALLOW, report7d.subjects[0].tier)
+        assertTrue(report7d.subjects[0].isShallowStudying)
+        assertTrue(report7d.subjects[0].recommendedStrategies.isNotEmpty())
+        assertEquals(com.example.data.local.FocusQualityTier.NO_DATA, report7d.subjects[3].tier)
+
+        // When switched to THIS_MONTH, ENG215's 20d-ago 60m focus session is included
+        val reportMonth = com.example.data.local.FocusScoreHelper.buildFocusScoreReport(
+            courses = courses,
+            sessions = sessions,
+            dateRange = com.example.data.local.StudyDateRange.THIS_MONTH,
+            nowMs = nowMs
+        )
+        assertEquals(260, reportMonth.overallFocusedMinutes)
+        assertEquals(360, reportMonth.overallTotalLoggedMinutes)
+        assertEquals(2, reportMonth.deepFocusCount)
+    }
+}

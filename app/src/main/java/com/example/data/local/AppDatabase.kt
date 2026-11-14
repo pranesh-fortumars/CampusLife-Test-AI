@@ -303,6 +303,97 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             )
         }
+
+        fun buildFocusQualityBaselineSessions(nowMs: Long = System.currentTimeMillis()): List<StudySessionEntity> {
+            val hourMs = 3600L * 1000L
+            return listOf(
+                // CS201: 120m focus + 15m short break -> ~89% Deep Focus
+                StudySessionEntity(
+                    courseCode = "CS201",
+                    subjectName = "Data Structures & Algorithms",
+                    durationMinutes = 15,
+                    timestampMs = nowMs - (3 * hourMs),
+                    dateDisplay = "Today",
+                    mode = "SHORT_BREAK",
+                    notes = "Post-sprint stretch & hydration",
+                    tag = "Exam Prep"
+                ),
+                // CS310: 95m focus + 20m short break -> ~83% Deep Focus
+                StudySessionEntity(
+                    courseCode = "CS310",
+                    subjectName = "Operating Systems",
+                    durationMinutes = 20,
+                    timestampMs = nowMs - (53 * hourMs),
+                    dateDisplay = "2 days ago",
+                    mode = "SHORT_BREAK",
+                    notes = "Pomodoro break between lab runs",
+                    tag = "Project"
+                ),
+                // MATH204: 115m focus + 45m shallow + 15m break -> ~66% Moderate Focus
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 45,
+                    timestampMs = nowMs - (38 * hourMs),
+                    dateDisplay = "Yesterday",
+                    mode = "SHALLOW",
+                    notes = "Passive lecture slide skimming with notifications on",
+                    tag = "Revision"
+                ),
+                StudySessionEntity(
+                    courseCode = "MATH204",
+                    subjectName = "Discrete Mathematics",
+                    durationMinutes = 15,
+                    timestampMs = nowMs - (40 * hourMs),
+                    dateDisplay = "Yesterday",
+                    mode = "SHORT_BREAK",
+                    notes = "Quick coffee break",
+                    tag = "Homework"
+                ),
+                // PHY102: 85m focus + 60m shallow + 45m long break -> ~45% Shallow Studying
+                StudySessionEntity(
+                    courseCode = "PHY102",
+                    subjectName = "Applied Electromagnetism",
+                    durationMinutes = 60,
+                    timestampMs = nowMs - (70 * hourMs),
+                    dateDisplay = "3 days ago",
+                    mode = "SHALLOW",
+                    notes = "Multitasking while re-watching recorded lecture",
+                    tag = "Exam Prep"
+                ),
+                StudySessionEntity(
+                    courseCode = "PHY102",
+                    subjectName = "Applied Electromagnetism",
+                    durationMinutes = 45,
+                    timestampMs = nowMs - (74 * hourMs),
+                    dateDisplay = "3 days ago",
+                    mode = "LONG_BREAK",
+                    notes = "Extended mid-problem break drift",
+                    tag = "Homework"
+                ),
+                // ENG215: 65m focus + 55m shallow + 30m long break -> ~43% Shallow Studying
+                StudySessionEntity(
+                    courseCode = "ENG215",
+                    subjectName = "Technical Writing",
+                    durationMinutes = 55,
+                    timestampMs = nowMs - (82 * hourMs),
+                    dateDisplay = "3 days ago",
+                    mode = "SHALLOW",
+                    notes = "Passive reading & tab-switching during outline",
+                    tag = "Research"
+                ),
+                StudySessionEntity(
+                    courseCode = "ENG215",
+                    subjectName = "Technical Writing",
+                    durationMinutes = 30,
+                    timestampMs = nowMs - (94 * hourMs),
+                    dateDisplay = "4 days ago",
+                    mode = "LONG_BREAK",
+                    notes = "Unscheduled break between paragraphs",
+                    tag = "Revision"
+                )
+            )
+        }
     }
 
     suspend fun populateInitialData() {
@@ -781,7 +872,7 @@ abstract class AppDatabase : RoomDatabase() {
                         notes = "IEEE reference formatting and abstract refinement",
                         tag = "Revision"
                     )
-                ) + buildExtendedHistoricalStudySessions(now)
+                ) + buildExtendedHistoricalStudySessions(now) + buildFocusQualityBaselineSessions(now)
             )
         }
 

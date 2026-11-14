@@ -58,6 +58,7 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             ensureSubjectMasteryData()
             ensureWeeklyDayNotesData()
             ensureExtendedStudyHistoryData()
+            ensureFocusScoreBaselineSessions()
         }
     }
 
@@ -421,7 +422,8 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     ) { sessions, tagFilter, courseList, dateRange, semester ->
         val nowMs = System.currentTimeMillis()
         val filteredByRange = sessions.filter {
-            StudyDateRangeHelper.isSessionInRange(it.timestampMs, dateRange, semester, nowMs)
+            FocusScoreHelper.isFocusedSessionMode(it.mode) &&
+                StudyDateRangeHelper.isSessionInRange(it.timestampMs, dateRange, semester, nowMs)
         }
         val filtered = if (tagFilter == "All") {
             filteredByRange
@@ -520,6 +522,19 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                 studySessionDao.insertAllSessions(AppDatabase.buildExtendedHistoricalStudySessions(nowMs))
             }
             analyticsPrefs.edit().putBoolean("seeded_extended_study_history_v1", true).apply()
+        }
+    }
+
+    private suspend fun ensureFocusScoreBaselineSessions() {
+        val alreadySeeded = analyticsPrefs.getBoolean("seeded_focus_quality_sessions_v1", false)
+        if (!alreadySeeded) {
+            val nowMs = System.currentTimeMillis()
+            val existing = studySessionDao.getAllSessionsList()
+            val hasNonFocusLogs = existing.any { !FocusScoreHelper.isFocusedSessionMode(it.mode) }
+            if (!hasNonFocusLogs) {
+                studySessionDao.insertAllSessions(AppDatabase.buildFocusQualityBaselineSessions(nowMs))
+            }
+            analyticsPrefs.edit().putBoolean("seeded_focus_quality_sessions_v1", true).apply()
         }
     }
 
@@ -894,13 +909,15 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
                     tag = tag
                 )
             )
-            // Dynamically boost current week's mastery based on study logging
-            val currentList = subjectMasteryDao.getAllMasteryRecordsList().filter { it.courseCode == courseCode }
-            val w4 = currentList.firstOrNull { it.weekNumber == 4 }
-            if (w4 != null) {
-                val newHours = w4.studyHoursInWeek + (durationMinutes / 60.0)
-                val newMastery = (w4.masteryPercentage + (durationMinutes / 50.0 * 1.5)).coerceAtMost(99.0)
-                subjectMasteryDao.updateMasteryScore(courseCode, 4, Math.round(newMastery * 10.0) / 10.0, Math.round(newHours * 10.0) / 10.0)
+            // Dynamically boost current week's mastery based on focused study logging
+            if (FocusScoreHelper.isFocusedSessionMode(mode)) {
+                val currentList = subjectMasteryDao.getAllMasteryRecordsList().filter { it.courseCode == courseCode }
+                val w4 = currentList.firstOrNull { it.weekNumber == 4 }
+                if (w4 != null) {
+                    val newHours = w4.studyHoursInWeek + (durationMinutes / 60.0)
+                    val newMastery = (w4.masteryPercentage + (durationMinutes / 50.0 * 1.5)).coerceAtMost(99.0)
+                    subjectMasteryDao.updateMasteryScore(courseCode, 4, Math.round(newMastery * 10.0) / 10.0, Math.round(newHours * 10.0) / 10.0)
+                }
             }
         }
     }
@@ -1245,4 +1262,28 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             forceNotify = true
         )
     }
+
+    // Focus Score Dashboard: Focused study time vs total logged time per subject
+    val focusScoreReport: StateFlow<FocusScoreDashboardReport> = combine(
+        courses,
+        allStudySessions,
+        _selectedDateRange,
+        currentSemester
+    ) { courseList, sessions, dateRange, semester ->
+        FocusScoreHelper.buildFocusScoreReport(
+            courses = courseList,
+            sessions = sessions,
+            dateRange = dateRange,
+            semester = semester,
+            nowMs = System.currentTimeMillis()
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        FocusScoreHelper.buildFocusScoreReport(
+            courses = emptyList(),
+            sessions = emptyList()
+        )
+    )
 }
+

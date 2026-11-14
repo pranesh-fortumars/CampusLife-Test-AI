@@ -365,6 +365,14 @@ fun HomeScreen(
             )
         }
 
+        // Focus Score Dashboard (Focused vs Total Logged Time per Subject)
+        item {
+            com.example.ui.components.FocusScoreDashboardCard(
+                viewModel = viewModel,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
+        }
+
         // Today's Timetable Section
         item {
 

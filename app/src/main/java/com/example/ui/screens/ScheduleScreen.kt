@@ -118,6 +118,12 @@ fun ScheduleScreen(viewModel: CampusLifeViewModel) {
                     com.example.ui.components.StudyHoursRechartsBarChart(
                         viewModel = viewModel
                     )
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+                item {
+                    com.example.ui.components.FocusScoreDashboardCard(
+                        viewModel = viewModel
+                    )
                 }
             }
         } else if (selectedTab == 1) {

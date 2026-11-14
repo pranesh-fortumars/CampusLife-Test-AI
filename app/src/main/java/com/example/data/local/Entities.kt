@@ -669,12 +669,13 @@ object SubjectGoalAlertHelper {
         laggingThresholdPct: Int = DEFAULT_LAGGING_THRESHOLD_PCT
     ): SubjectGoalAlertReport {
         val recentFocusSessions = sessions.filter { session ->
-            StudyDateRangeHelper.isSessionInRange(
-                sessionTimestampMs = session.timestampMs,
-                range = StudyDateRange.LAST_7_DAYS,
-                semester = null,
-                nowMs = nowMs
-            )
+            FocusScoreHelper.isFocusedSessionMode(session.mode) &&
+                StudyDateRangeHelper.isSessionInRange(
+                    sessionTimestampMs = session.timestampMs,
+                    range = StudyDateRange.LAST_7_DAYS,
+                    semester = null,
+                    nowMs = nowMs
+                )
         }
 
         val minutesByCourse = recentFocusSessions
@@ -754,3 +755,274 @@ object SubjectGoalAlertHelper {
         return title to summaryLine
     }
 }
+
+enum class FocusQualityTier(val label: String) {
+    DEEP_FOCUS("Deep Focus"),
+    MODERATE("Moderate Focus"),
+    SHALLOW("Shallow Studying"),
+    NO_DATA("No Logs")
+}
+
+data class SubjectFocusScore(
+    val courseCode: String,
+    val courseName: String,
+    val focusedMinutes: Int,
+    val shallowMinutes: Int,
+    val breakMinutes: Int,
+    val totalLoggedMinutes: Int,
+    val focusSessionCount: Int,
+    val totalSessionCount: Int,
+    val focusRatio: Double,
+    val focusScorePct: Int,
+    val tier: FocusQualityTier,
+    val diagnosis: String,
+    val recommendedStrategies: List<String>
+) {
+    val isShallowStudying: Boolean
+        get() = tier == FocusQualityTier.SHALLOW
+
+    val nonFocusMinutes: Int
+        get() = maxOf(0, totalLoggedMinutes - focusedMinutes)
+
+    val focusedHours: Double
+        get() = focusedMinutes / 60.0
+
+    val nonFocusHours: Double
+        get() = nonFocusMinutes / 60.0
+
+    val totalLoggedHours: Double
+        get() = totalLoggedMinutes / 60.0
+}
+
+data class FocusScoreDashboardReport(
+    val subjects: List<SubjectFocusScore>,
+    val overallFocusedMinutes: Int,
+    val overallShallowMinutes: Int,
+    val overallBreakMinutes: Int,
+    val overallTotalLoggedMinutes: Int,
+    val overallFocusScorePct: Int,
+    val overallTier: FocusQualityTier,
+    val shallowStudyingCount: Int,
+    val deepFocusCount: Int,
+    val topShallowSubject: SubjectFocusScore?,
+    val bestFocusSubject: SubjectFocusScore?,
+    val dateRange: StudyDateRange
+) {
+    val overallNonFocusMinutes: Int
+        get() = maxOf(0, overallTotalLoggedMinutes - overallFocusedMinutes)
+
+    val overallFocusedHours: Double
+        get() = overallFocusedMinutes / 60.0
+
+    val overallNonFocusHours: Double
+        get() = overallNonFocusMinutes / 60.0
+
+    val overallTotalLoggedHours: Double
+        get() = overallTotalLoggedMinutes / 60.0
+}
+
+object FocusScoreHelper {
+
+    const val DEEP_FOCUS_THRESHOLD_PCT = 80
+    const val SHALLOW_STUDY_THRESHOLD_PCT = 60
+
+    fun isFocusedSessionMode(mode: String): Boolean {
+        val normalized = mode.trim().uppercase(java.util.Locale.US)
+        return normalized == "FOCUS" || normalized == "DEEP_WORK" || normalized == "DEEP_FOCUS"
+    }
+
+    fun isBreakSessionMode(mode: String): Boolean {
+        val normalized = mode.trim().uppercase(java.util.Locale.US)
+        return normalized == "SHORT_BREAK" || normalized == "LONG_BREAK" || normalized == "BREAK"
+    }
+
+    fun tierForScore(scorePct: Int, totalMinutes: Int): FocusQualityTier {
+        if (totalMinutes <= 0) return FocusQualityTier.NO_DATA
+        return when {
+            scorePct >= DEEP_FOCUS_THRESHOLD_PCT -> FocusQualityTier.DEEP_FOCUS
+            scorePct >= SHALLOW_STUDY_THRESHOLD_PCT -> FocusQualityTier.MODERATE
+            else -> FocusQualityTier.SHALLOW
+        }
+    }
+
+    fun buildFocusScoreReport(
+        courses: List<CourseEntity>,
+        sessions: List<StudySessionEntity>,
+        dateRange: StudyDateRange = StudyDateRange.LAST_7_DAYS,
+        semester: SemesterEntity? = null,
+        nowMs: Long = System.currentTimeMillis()
+    ): FocusScoreDashboardReport {
+        val rangeSessions = sessions.filter { s ->
+            StudyDateRangeHelper.isSessionInRange(
+                sessionTimestampMs = s.timestampMs,
+                range = dateRange,
+                semester = semester,
+                nowMs = nowMs
+            )
+        }
+
+        val grouped = rangeSessions.groupBy { it.courseCode }
+        val courseNameMap = courses.associate { it.code to it.name }
+        val allCodes = (courses.map { it.code } + grouped.keys).distinct()
+
+        val subjectScores = allCodes.map { code ->
+            val subjectSessions = grouped[code].orEmpty()
+            val courseName = courseNameMap[code]
+                ?: subjectSessions.firstOrNull()?.subjectName
+                ?: code
+
+            var focusedMins = 0
+            var shallowMins = 0
+            var breakMins = 0
+            var focusCount = 0
+
+            subjectSessions.forEach { s ->
+                val mins = maxOf(0, s.durationMinutes)
+                when {
+                    isFocusedSessionMode(s.mode) -> {
+                        focusedMins += mins
+                        focusCount += 1
+                    }
+                    isBreakSessionMode(s.mode) -> {
+                        breakMins += mins
+                    }
+                    else -> {
+                        shallowMins += mins
+                    }
+                }
+            }
+
+            val totalMins = focusedMins + shallowMins + breakMins
+            val ratio = if (totalMins > 0) focusedMins.toDouble() / totalMins.toDouble() else 0.0
+            val scorePct = if (totalMins > 0) {
+                kotlin.math.round(ratio * 100.0).toInt().coerceIn(0, 100)
+            } else {
+                0
+            }
+            val tier = tierForScore(scorePct, totalMins)
+            val diagnosis = buildDiagnosis(
+                courseCode = code,
+                scorePct = scorePct,
+                focusedMins = focusedMins,
+                shallowMins = shallowMins,
+                breakMins = breakMins,
+                totalMins = totalMins,
+                tier = tier
+            )
+            val strategies = buildStrategies(
+                tier = tier,
+                shallowMins = shallowMins,
+                breakMins = breakMins
+            )
+
+            SubjectFocusScore(
+                courseCode = code,
+                courseName = courseName,
+                focusedMinutes = focusedMins,
+                shallowMinutes = shallowMins,
+                breakMinutes = breakMins,
+                totalLoggedMinutes = totalMins,
+                focusSessionCount = focusCount,
+                totalSessionCount = subjectSessions.size,
+                focusRatio = ratio,
+                focusScorePct = scorePct,
+                tier = tier,
+                diagnosis = diagnosis,
+                recommendedStrategies = strategies
+            )
+        }.sortedWith(
+            compareBy<SubjectFocusScore> { it.totalLoggedMinutes == 0 }
+                .thenBy { it.focusScorePct }
+                .thenByDescending { it.nonFocusMinutes }
+        )
+
+        val overallFocused = subjectScores.sumOf { it.focusedMinutes }
+        val overallShallow = subjectScores.sumOf { it.shallowMinutes }
+        val overallBreak = subjectScores.sumOf { it.breakMinutes }
+        val overallTotal = overallFocused + overallShallow + overallBreak
+        val overallScorePct = if (overallTotal > 0) {
+            kotlin.math.round((overallFocused.toDouble() / overallTotal.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+        } else {
+            0
+        }
+        val overallTier = tierForScore(overallScorePct, overallTotal)
+        val shallowList = subjectScores.filter { it.isShallowStudying }
+        val deepList = subjectScores.filter { it.tier == FocusQualityTier.DEEP_FOCUS }
+
+        return FocusScoreDashboardReport(
+            subjects = subjectScores,
+            overallFocusedMinutes = overallFocused,
+            overallShallowMinutes = overallShallow,
+            overallBreakMinutes = overallBreak,
+            overallTotalLoggedMinutes = overallTotal,
+            overallFocusScorePct = overallScorePct,
+            overallTier = overallTier,
+            shallowStudyingCount = shallowList.size,
+            deepFocusCount = deepList.size,
+            topShallowSubject = shallowList.minByOrNull { it.focusScorePct },
+            bestFocusSubject = subjectScores.filter { it.totalLoggedMinutes > 0 }.maxByOrNull { it.focusScorePct },
+            dateRange = dateRange
+        )
+    }
+
+    private fun buildDiagnosis(
+        courseCode: String,
+        scorePct: Int,
+        focusedMins: Int,
+        shallowMins: Int,
+        breakMins: Int,
+        totalMins: Int,
+        tier: FocusQualityTier
+    ): String {
+        if (totalMins == 0) {
+            return "No study or break sessions logged for $courseCode in this window yet."
+        }
+        val shallowPct = kotlin.math.round((shallowMins.toDouble() / totalMins) * 100.0).toInt()
+        val breakPct = kotlin.math.round((breakMins.toDouble() / totalMins) * 100.0).toInt()
+        return when (tier) {
+            FocusQualityTier.DEEP_FOCUS ->
+                "$scorePct% of $courseCode logged time (${focusedMins}m of ${totalMins}m) is high-concentration deep focus with controlled break overhead."
+            FocusQualityTier.MODERATE ->
+                "$courseCode sits at $scorePct% focus ratio. ${shallowMins}m passive/shallow time ($shallowPct%) and ${breakMins}m breaks ($breakPct%) are diluting retention."
+            FocusQualityTier.SHALLOW -> {
+                val mainDriver = if (shallowMins >= breakMins) {
+                    "${shallowMins}m of passive or distracted studying ($shallowPct%)"
+                } else {
+                    "${breakMins}m of frequent break drift ($breakPct%)"
+                }
+                "Shallow studying detected in $courseCode ($scorePct% focus): $mainDriver outweighs sustained deep work (${focusedMins}m)."
+            }
+            FocusQualityTier.NO_DATA -> "No sessions logged for $courseCode."
+        }
+    }
+
+    private fun buildStrategies(
+        tier: FocusQualityTier,
+        shallowMins: Int,
+        breakMins: Int
+    ): List<String> {
+        return when (tier) {
+            FocusQualityTier.DEEP_FOCUS -> listOf(
+                "Maintain your current 25m/50m deep work blocks and protect distraction-free hours.",
+                "Pair each deep focus sprint with end-of-session active recall summaries.",
+                "Keep break ratios under 20% to preserve high cognitive momentum."
+            )
+            FocusQualityTier.MODERATE -> listOf(
+                "Silence notifications and place your phone out of reach before starting a block.",
+                "Replace passive note re-reading with timed practice problems or self-quizzing.",
+                if (breakMins > shallowMins) "Use strict 5-minute break timers so pauses don't stretch."
+                else "Define a single concrete output goal before opening study materials."
+            )
+            FocusQualityTier.SHALLOW -> listOf(
+                "Switch to strict 25m Deep Focus Pomodoro sprints — log passive review separately.",
+                "Use active recall (Feynman explanations or problem sets) instead of highlighting or skimming.",
+                if (breakMins > shallowMins) "Batch breaks strictly after completed focus blocks rather than mid-task."
+                else "Eliminate tab-switching and study one topic per uninterrupted 25-minute block."
+            )
+            FocusQualityTier.NO_DATA -> listOf(
+                "Start a 25m Focus session to establish your Focus Score baseline."
+            )
+        }
+    }
+}
+

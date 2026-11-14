@@ -108,6 +108,14 @@ fun PomodoroStudyTimerComponent(
                     durationMinutes = selectedMode.defaultMinutes
                 )
             } else {
+                viewModel.recordStudySession(
+                    courseCode = courseCode,
+                    subjectName = subjectName,
+                    durationMinutes = selectedMode.defaultMinutes,
+                    mode = if (selectedMode == TimerMode.SHORT_BREAK) "SHORT_BREAK" else "LONG_BREAK",
+                    notes = "${selectedMode.title} break completed",
+                    tag = selectedTag
+                )
                 TaskNotificationHelper.showBreakFinishedNotification(context)
             }
 
