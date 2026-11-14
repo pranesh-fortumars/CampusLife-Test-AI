@@ -57,6 +57,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.StudyDateRange
+import com.example.data.local.SubjectColorHelper
 import com.example.data.local.SubjectStudyStats
 import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
@@ -122,21 +123,15 @@ fun StudyHoursRechartsBarChart(
     var hoveredStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
 
+    val subjectColorMap = remember(courses, studyStats) {
+        val allCodes = (courses.map { it.code } + studyStats.map { it.courseCode }).distinct()
+        SubjectColorHelper.assignUniqueColors(allCodes)
+    }
+
     fun getSubjectColor(courseCode: String): Color {
-        return when (courseCode) {
-            "CS201" -> IndigoPrimary
-            "CS310" -> VioletSecondary
-            "MATH204" -> EmeraldTertiary
-            "PHY102" -> Color(0xFF0284C7)
-            "ENG215" -> Color(0xFFEA580C)
-            else -> when (Math.abs(courseCode.hashCode()) % 5) {
-                0 -> IndigoPrimary
-                1 -> VioletSecondary
-                2 -> EmeraldTertiary
-                3 -> Color(0xFF0284C7)
-                else -> Color(0xFFEA580C)
-            }
-        }
+        val argb = subjectColorMap[courseCode]
+            ?: SubjectColorHelper.colorArgbForCourse(courseCode, subjectColorMap.keys.toList())
+        return Color(argb)
     }
 
     fun getPriorityForCourse(courseCode: String): String {
@@ -1237,21 +1232,95 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
+            // Subject Color Indicators Legend Strip (BY_SUBJECT mode)
+            if (viewMode == ChartViewMode.BY_SUBJECT && displayedStudyStats.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .testTag("subject_color_legend_row"),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    displayedStudyStats.forEach { stat ->
+                        val subjectColor = getSubjectColor(stat.courseCode)
+                        val isSelectedChip = activeSelectedStat?.courseCode == stat.courseCode
+                        val courseTitle = courses.firstOrNull { it.code == stat.courseCode }?.name ?: stat.courseCode
+
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = if (isSelectedChip) subjectColor.copy(alpha = 0.16f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                            border = BorderStroke(
+                                width = if (isSelectedChip) 1.3.dp else 0.8.dp,
+                                color = if (isSelectedChip) subjectColor else subjectColor.copy(alpha = 0.38f)
+                            ),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100))
+                                .clickable {
+                                    selectedStat = if (selectedStat?.courseCode == stat.courseCode) null else stat
+                                }
+                                .testTag("subject_color_indicator_${stat.courseCode}")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(9.dp)
+                                        .clip(CircleShape)
+                                        .background(subjectColor)
+                                )
+                                Text(
+                                    text = stat.courseCode,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelectedChip) subjectColor else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Legend Row with Conditional Alert Indicator (By Subject & Weekly Trend)
             if (viewMode != ChartViewMode.MONTHLY) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Primary Bar Legend
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(if (viewMode == ChartViewMode.WEEKLY_TREND) EmeraldTertiary else IndigoPrimary)
-                    )
+                    if (viewMode == ChartViewMode.BY_SUBJECT) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            listOf(IndigoPrimary, EmeraldTertiary, Color(0xFFEA580C)).forEach { swatch ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(swatch)
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(EmeraldTertiary)
+                        )
+                    }
                     Text(
                         if (compareWithPreviousWeek) selectedDateRange.label
                         else if (viewMode == ChartViewMode.WEEKLY_TREND) {
@@ -1260,7 +1329,7 @@ fun StudyHoursRechartsBarChart(
                                 StudyDateRange.THIS_MONTH -> "Weekly Total"
                                 StudyDateRange.SEMESTER -> "Monthly Total"
                             }
-                        } else "≥50% Goal",
+                        } else "Subject Colors",
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1299,10 +1368,11 @@ fun StudyHoursRechartsBarChart(
                             modifier = Modifier
                                 .size(10.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(Brush.verticalGradient(listOf(Color(0xFFFB923C), ErrorRed)))
+                                .border(1.5.dp, ErrorRed, RoundedCornerShape(3.dp))
+                                .background(ErrorContainer)
                         )
                         Text(
-                            "<50% Alert ⚠️",
+                            "<50% Alert",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = ErrorRed
@@ -1315,7 +1385,7 @@ fun StudyHoursRechartsBarChart(
                                 .width(16.dp)
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(100))
-                                .background(Brush.horizontalGradient(listOf(Color(0xFF818CF8), IndigoPrimary)))
+                                .background(MaterialTheme.colorScheme.primary)
                         )
                         Text(
                             "Goal Progress",
@@ -1377,18 +1447,15 @@ fun StudyHoursRechartsBarChart(
                     val courseTasks = tasks.filter { it.courseCode == stat.courseCode }
                     val pendingAssignments = courseTasks.filter { !it.isCompleted }
 
+                    val tooltipSubjectColor = getSubjectColor(stat.courseCode)
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("recharts_subject_tooltip"),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)),
-                        border = BorderStroke(
-                            1.5.dp,
-                            if (isGoalMet) EmeraldTertiary.copy(alpha = 0.8f)
-                            else if (isBelow50) ErrorRed.copy(alpha = 0.7f)
-                            else IndigoPrimary.copy(alpha = 0.6f)
-                        )
+                        border = BorderStroke(1.5.dp, tooltipSubjectColor.copy(alpha = 0.75f))
                     ) {
                         Column(
                             modifier = Modifier
@@ -1409,7 +1476,7 @@ fun StudyHoursRechartsBarChart(
                                 ) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
+                                        color = tooltipSubjectColor
                                     ) {
                                         Text(
                                             stat.courseCode,
@@ -2066,6 +2133,7 @@ fun StudyHoursRechartsBarChart(
                             verticalAlignment = Alignment.Bottom
                         ) {
                             displayedStudyStats.forEach { stat ->
+                                val barSubjectColor = getSubjectColor(stat.courseCode)
                                 val isHovered = hoveredStat?.courseCode == stat.courseCode
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
                                 val isHighlighted = isHovered || isSelected
@@ -2137,7 +2205,7 @@ fun StudyHoursRechartsBarChart(
                                     if (isHovered) {
                                         Surface(
                                             shape = RoundedCornerShape(100),
-                                            color = IndigoPrimary,
+                                            color = barSubjectColor,
                                             modifier = Modifier
                                                 .padding(bottom = 2.dp)
                                                 .testTag("hover_badge_${stat.courseCode}")
@@ -2296,17 +2364,17 @@ fun StudyHoursRechartsBarChart(
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
                                                         Brush.verticalGradient(
-                                                            if (isHovered) listOf(Color(0xFF818CF8), IndigoPrimary)
-                                                            else if (isSelected) listOf(VioletSecondary, IndigoPrimary)
-                                                            else if (isGoalMet) listOf(Color(0xFF34D399), EmeraldTertiary)
-                                                            else if (isBelow50) listOf(Color(0xFFFB923C), ErrorRed)
-                                                            else listOf(IndigoPrimary, Color(0xFF6366F1))
+                                                            if (isHovered || isSelected) {
+                                                                listOf(barSubjectColor.copy(alpha = 0.88f), barSubjectColor)
+                                                            } else {
+                                                                listOf(barSubjectColor.copy(alpha = 0.68f), barSubjectColor)
+                                                            }
                                                         )
                                                     )
                                                     .then(
-                                                        if (isHovered) Modifier.border(2.dp, IndigoPrimary, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                                                        else if (isSelected) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                                                        else if (isBelow50) Modifier.border(1.dp, ErrorRed.copy(alpha = 0.5f), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        if (isHovered) Modifier.border(2.dp, barSubjectColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        else if (isSelected) Modifier.border(1.5.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        else if (isBelow50) Modifier.border(1.2.dp, ErrorRed.copy(alpha = 0.75f), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                         else Modifier
                                                     )
                                                     .testTag("bar_subject_curr_${stat.courseCode}")
@@ -2340,31 +2408,25 @@ fun StudyHoursRechartsBarChart(
                                                 .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                                 .background(
                                                     Brush.verticalGradient(
-                                                        if (isHovered) {
-                                                            listOf(Color(0xFF818CF8), IndigoPrimary)
-                                                        } else if (isSelected) {
-                                                            listOf(VioletSecondary, IndigoPrimary)
-                                                        } else if (isGoalMet) {
-                                                            listOf(Color(0xFF34D399), EmeraldTertiary)
-                                                        } else if (isBelow50) {
-                                                            listOf(Color(0xFFFB923C), ErrorRed)
+                                                        if (isHovered || isSelected) {
+                                                            listOf(barSubjectColor.copy(alpha = 0.90f), barSubjectColor)
                                                         } else {
-                                                            listOf(IndigoPrimary, Color(0xFF6366F1))
+                                                            listOf(barSubjectColor.copy(alpha = 0.68f), barSubjectColor)
                                                         }
                                                     )
                                                 )
                                                 .then(
                                                     if (isHovered) Modifier.border(
                                                         2.5.dp,
-                                                        IndigoPrimary,
+                                                        barSubjectColor,
                                                         RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                     ) else if (isSelected) Modifier.border(
                                                         2.dp,
-                                                        if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else MaterialTheme.colorScheme.primary,
+                                                        MaterialTheme.colorScheme.onSurface,
                                                         RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                     ) else if (isBelow50) Modifier.border(
-                                                        1.dp,
-                                                        ErrorRed.copy(alpha = 0.5f),
+                                                        1.4.dp,
+                                                        ErrorRed.copy(alpha = 0.8f),
                                                         RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                     ) else Modifier
                                                 )
@@ -2381,7 +2443,7 @@ fun StudyHoursRechartsBarChart(
                                             .clip(RoundedCornerShape(100))
                                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
                                             .then(
-                                                if (isHighlighted) Modifier.border(1.dp, IndigoPrimary, RoundedCornerShape(100))
+                                                if (isHighlighted) Modifier.border(1.dp, barSubjectColor, RoundedCornerShape(100))
                                                 else if (isBelow50) Modifier.border(0.8.dp, ErrorRed.copy(alpha = 0.4f), RoundedCornerShape(100))
                                                 else Modifier
                                             )
@@ -2394,9 +2456,7 @@ fun StudyHoursRechartsBarChart(
                                                 .clip(RoundedCornerShape(100))
                                                 .background(
                                                     Brush.horizontalGradient(
-                                                        if (isGoalMet) listOf(Color(0xFF34D399), EmeraldTertiary)
-                                                        else if (isBelow50) listOf(Color(0xFFFB923C), ErrorRed)
-                                                        else listOf(Color(0xFF818CF8), IndigoPrimary)
+                                                        listOf(barSubjectColor.copy(alpha = 0.7f), barSubjectColor)
                                                     )
                                                 )
                                                 .testTag("progress_bar_fill_${stat.courseCode}")
@@ -2410,7 +2470,7 @@ fun StudyHoursRechartsBarChart(
                                         text = "$pctOfGoal%",
                                         fontSize = 8.5.sp,
                                         fontWeight = FontWeight.ExtraBold,
-                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) barSubjectColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.testTag("progress_percent_label_${stat.courseCode}")
                                     )
 
@@ -2419,7 +2479,6 @@ fun StudyHoursRechartsBarChart(
                                     // Small line chart visualizing 4-week mastery trend from Room database
                                     val masteryTrend = subjectMasteryRecords[stat.courseCode]
                                         ?: viewModel.getDefaultMasteryForCourse(stat.courseCode)
-                                    val barSubjectColor = getSubjectColor(stat.courseCode)
 
                                     SubjectMasteryMiniLineChart(
                                         masteryRecords = masteryTrend,
@@ -2440,10 +2499,10 @@ fun StudyHoursRechartsBarChart(
                                         }
                                     } else null
 
-                                    // Course Code with Conditional Alert Dot or Compare Badge
+                                    // Course Code with Unique Subject Color Dot & Conditional Alert / Compare Badge
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
                                         modifier = Modifier.testTag("label_subject_${stat.courseCode}")
                                     ) {
                                         if (compareBadgeTag != null) {
@@ -2460,6 +2519,14 @@ fun StudyHoursRechartsBarChart(
                                                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                                                 )
                                             }
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(7.dp)
+                                                    .clip(CircleShape)
+                                                    .background(barSubjectColor)
+                                                    .testTag("bar_color_dot_${stat.courseCode}")
+                                            )
                                         }
                                         Text(
                                             text = stat.courseCode,
@@ -2467,9 +2534,8 @@ fun StudyHoursRechartsBarChart(
                                             fontWeight = if (isHighlighted || isBelow50 || compareBadgeTag != null) FontWeight.ExtraBold else FontWeight.SemiBold,
                                             color = if (compareBadgeTag == "A") CompareSubjectAColor
                                             else if (compareBadgeTag == "B") CompareSubjectBColor
-                                            else if (isBelow50) ErrorRed
-                                            else if (isHighlighted) IndigoPrimary
-                                            else MaterialTheme.colorScheme.onSurfaceVariant
+                                            else if (isHighlighted) barSubjectColor
+                                            else MaterialTheme.colorScheme.onSurface
                                         )
                                         if (isBelow50 && compareBadgeTag == null) {
                                             Box(

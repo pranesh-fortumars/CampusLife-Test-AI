@@ -974,4 +974,30 @@ class ExampleUnitTest {
         assertEquals(360, reportMonth.overallTotalLoggedMinutes)
         assertEquals(2, reportMonth.deepFocusCount)
     }
+
+    @Test
+    fun `test SubjectColorHelper assigns unique collision-free colors across all subjects`() {
+        val coreAndCustomCourses = listOf(
+            "CS201", "CS310", "MATH204", "PHY102", "ENG215",
+            "BIO101", "CHEM220", "ECON305", "HIST110", "STAT401",
+            "ART105", "PHIL210", "PSY101", "LAW300", "MUS120"
+        )
+        val colorMap = com.example.data.local.SubjectColorHelper.assignUniqueColors(coreAndCustomCourses)
+
+        assertEquals(coreAndCustomCourses.size, colorMap.size)
+        // Every subject receives a strictly unique ARGB color with zero duplicates
+        assertEquals(coreAndCustomCourses.size, colorMap.values.toSet().size)
+
+        // Core courses preserve their signature colors
+        assertEquals(0xFF4F46E5L, colorMap["CS201"])
+        assertEquals(0xFF7C3AEDL, colorMap["CS310"])
+        assertEquals(0xFF059669L, colorMap["MATH204"])
+        assertEquals(0xFF0284C7L, colorMap["PHY102"])
+        assertEquals(0xFFEA580CL, colorMap["ENG215"])
+
+        // Deterministic lookup
+        val bioColor = com.example.data.local.SubjectColorHelper.colorArgbForCourse("BIO101", coreAndCustomCourses)
+        assertEquals(colorMap["BIO101"], bioColor)
+    }
 }
+

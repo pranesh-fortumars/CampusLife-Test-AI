@@ -1026,3 +1026,86 @@ object FocusScoreHelper {
     }
 }
 
+object SubjectColorHelper {
+
+    val PALETTE_ARGB: List<Long> = listOf(
+        0xFF4F46E5L, // Indigo
+        0xFF7C3AEDL, // Violet
+        0xFF059669L, // Emerald
+        0xFF0284C7L, // Sky Blue
+        0xFFEA580CL, // Tangerine Orange
+        0xFFE11D48L, // Rose
+        0xFF0D9488L, // Teal
+        0xFFC026D3L, // Fuchsia
+        0xFFD97706L, // Amber Gold
+        0xFF2563EBL, // Cobalt
+        0xFF65A30DL, // Olive Lime
+        0xFFF43F5EL  // Coral Crimson
+    )
+
+    val PREFERRED_COURSE_COLORS: Map<String, Long> = mapOf(
+        "CS201" to 0xFF4F46E5L,   // Indigo
+        "CS310" to 0xFF7C3AEDL,   // Violet
+        "MATH204" to 0xFF059669L, // Emerald
+        "PHY102" to 0xFF0284C7L,  // Sky Blue
+        "ENG215" to 0xFFEA580CL   // Tangerine
+    )
+
+    fun assignUniqueColors(courseCodes: List<String>): Map<String, Long> {
+        val uniqueCodes = courseCodes.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        val assigned = LinkedHashMap<String, Long>()
+        val usedColors = mutableSetOf<Long>()
+
+        // Pass 1: lock preferred colors for known subjects
+        uniqueCodes.forEach { code ->
+            val key = code.uppercase(java.util.Locale.US)
+            val preferred = PREFERRED_COURSE_COLORS[key]
+            if (preferred != null && usedColors.add(preferred)) {
+                assigned[code] = preferred
+            }
+        }
+
+        // Pass 2: assign remaining subjects unused palette colors (or golden-angle HSL if > palette size)
+        var extraIndex = 0
+        uniqueCodes.forEach { code ->
+            if (!assigned.containsKey(code)) {
+                val unused = PALETTE_ARGB.firstOrNull { it !in usedColors }
+                val picked = if (unused != null) {
+                    usedColors.add(unused)
+                    unused
+                } else {
+                    val hue = ((extraIndex * 137.508f) + 25f) % 360f
+                    extraIndex++
+                    hslToArgb(hue, 0.72f, 0.46f)
+                }
+                assigned[code] = picked
+            }
+        }
+        return assigned
+    }
+
+    fun colorArgbForCourse(courseCode: String, allCourseCodes: List<String> = emptyList()): Long {
+        val map = assignUniqueColors((allCourseCodes + courseCode).distinct())
+        return map[courseCode.trim()] ?: PREFERRED_COURSE_COLORS[courseCode.trim().uppercase(java.util.Locale.US)] ?: PALETTE_ARGB.first()
+    }
+
+    private fun hslToArgb(hueDeg: Float, saturation: Float, lightness: Float): Long {
+        val c = (1f - kotlin.math.abs(2f * lightness - 1f)) * saturation
+        val x = c * (1f - kotlin.math.abs(((hueDeg / 60f) % 2f) - 1f))
+        val m = lightness - c / 2f
+        val (r1, g1, b1) = when {
+            hueDeg < 60f -> Triple(c, x, 0f)
+            hueDeg < 120f -> Triple(x, c, 0f)
+            hueDeg < 180f -> Triple(0f, c, x)
+            hueDeg < 240f -> Triple(0f, x, c)
+            hueDeg < 300f -> Triple(x, 0f, c)
+            else -> Triple(c, 0f, x)
+        }
+        val r = ((r1 + m) * 255f).toInt().coerceIn(0, 255)
+        val g = ((g1 + m) * 255f).toInt().coerceIn(0, 255)
+        val b = ((b1 + m) * 255f).toInt().coerceIn(0, 255)
+        return (0xFFL shl 24) or (r.toLong() shl 16) or (g.toLong() shl 8) or b.toLong()
+    }
+}
+
+
