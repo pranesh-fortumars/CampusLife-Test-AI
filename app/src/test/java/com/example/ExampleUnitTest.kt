@@ -999,5 +999,153 @@ class ExampleUnitTest {
         val bioColor = com.example.data.local.SubjectColorHelper.colorArgbForCourse("BIO101", coreAndCustomCourses)
         assertEquals(colorMap["BIO101"], bioColor)
     }
-}
 
+    @Test
+    fun `test SubjectHoverTooltipHelper formats duration and resolves latest study date in range`() {
+        assertEquals("0m", com.example.data.local.SubjectHoverTooltipHelper.formatDurationShort(0))
+        assertEquals("45m", com.example.data.local.SubjectHoverTooltipHelper.formatDurationShort(45))
+        assertEquals("1h 0m", com.example.data.local.SubjectHoverTooltipHelper.formatDurationShort(60))
+        assertEquals("2h 5m", com.example.data.local.SubjectHoverTooltipHelper.formatDurationShort(125))
+
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        // Fixed timestamp: Nov 13, 2026 in UTC-safe noon local calculation
+        val cal = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.NOVEMBER, 13, 12, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val nowMs = cal.timeInMillis
+        val twoDaysAgoMs = nowMs - (2L * dayMs)
+        val yesterdayMs = nowMs - (1L * dayMs)
+        val twentyDaysAgoMs = nowMs - (20L * dayMs)
+
+        val expectedShortDate = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+            .format(java.util.Date(yesterdayMs))
+        val expectedFullDate = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.US)
+            .format(java.util.Date(yesterdayMs))
+
+        val sessions = listOf(
+            // Older focus session in range
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 40,
+                timestampMs = twoDaysAgoMs,
+                dateDisplay = "2d ago",
+                mode = "FOCUS"
+            ),
+            // Latest focus session in range (yesterday -> 55m)
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 55,
+                timestampMs = yesterdayMs,
+                dateDisplay = "Yesterday",
+                mode = "FOCUS"
+            ),
+            // Non-focused break today should be ignored for latest focused date
+            com.example.data.local.StudySessionEntity(
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 10,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "SHORT_BREAK"
+            ),
+            // Out-of-range session should be ignored in LAST_7_DAYS
+            com.example.data.local.StudySessionEntity(
+                courseCode = "MATH204",
+                subjectName = "Linear Algebra",
+                durationMinutes = 120,
+                timestampMs = twentyDaysAgoMs,
+                dateDisplay = "20d ago",
+                mode = "FOCUS"
+            )
+        )
+
+        val csMeta = com.example.data.local.SubjectHoverTooltipHelper.buildSubjectHoverDateDuration(
+            courseCode = "CS201",
+            totalMinutes = 95,
+            sessions = sessions,
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS,
+            nowMs = nowMs
+        )
+        assertEquals(expectedFullDate, csMeta.specificDateLabel)
+        assertEquals(expectedShortDate, csMeta.shortDateLabel)
+        assertEquals("1h 35m", csMeta.durationLabel)
+        assertEquals(55, csMeta.latestSessionMinutes)
+        assertEquals("55m", csMeta.latestSessionDurationLabel)
+
+        val emptyRangeMeta = com.example.data.local.SubjectHoverTooltipHelper.buildSubjectHoverDateDuration(
+            courseCode = "MATH204",
+            totalMinutes = 0,
+            sessions = sessions,
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS,
+            nowMs = nowMs
+        )
+        assertEquals("—", emptyRangeMeta.shortDateLabel)
+        assertEquals("0m", emptyRangeMeta.durationLabel)
+        assertEquals(0, emptyRangeMeta.latestSessionMinutes)
+    }
+
+    @Test
+    fun `test SubjectGoalVisibilityHelper hides and counts subjects that met their weekly goal`() {
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", totalMinutes = 300, sessionCount = 6),  // 5.0h (goal 5.0h -> met)
+            com.example.data.local.SubjectStudyStats("MATH204", totalMinutes = 360, sessionCount = 7), // 6.0h (goal 4.0h -> exceeded)
+            com.example.data.local.SubjectStudyStats("PHY102", totalMinutes = 120, sessionCount = 3),  // 2.0h (goal 4.0h -> incomplete)
+            com.example.data.local.SubjectStudyStats("ENG215", totalMinutes = 90, sessionCount = 2)    // 1.5h (goal 3.0h -> incomplete)
+        )
+        val goals = mapOf(
+            "CS201" to 5.0,
+            "MATH204" to 4.0,
+            "PHY102" to 4.0,
+            "ENG215" to 3.0
+        )
+        val priorities = mapOf(
+            "CS201" to "High",
+            "MATH204" to "Medium",
+            "PHY102" to "High",
+            "ENG215" to "Low"
+        )
+
+        val metCountAll = com.example.data.local.SubjectGoalVisibilityHelper.countGoalMetSubjects(
+            stats = stats,
+            goalForCourse = { goals[it] ?: 5.0 }
+        )
+        assertEquals(2, metCountAll)
+
+        // When hideGoalMet = false, all 4 subjects are shown
+        val allVisible = com.example.data.local.SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+            stats = stats,
+            hideGoalMet = false,
+            goalForCourse = { goals[it] ?: 5.0 }
+        )
+        assertEquals(listOf("CS201", "MATH204", "PHY102", "ENG215"), allVisible.map { it.courseCode })
+
+        // When hideGoalMet = true, CS201 (== goal) and MATH204 (> goal) are hidden
+        val onlyIncomplete = com.example.data.local.SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+            stats = stats,
+            hideGoalMet = true,
+            goalForCourse = { goals[it] ?: 5.0 }
+        )
+        assertEquals(listOf("PHY102", "ENG215"), onlyIncomplete.map { it.courseCode })
+
+        // Combined with High Priority filter: only PHY102 remains, and metCountHighPriority is 1 (CS201)
+        val metCountHigh = com.example.data.local.SubjectGoalVisibilityHelper.countGoalMetSubjects(
+            stats = stats,
+            goalForCourse = { goals[it] ?: 5.0 },
+            onlyHighPriority = true,
+            priorityForCourse = { priorities[it] ?: "Medium" }
+        )
+        assertEquals(1, metCountHigh)
+
+        val highAndIncomplete = com.example.data.local.SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+            stats = stats,
+            hideGoalMet = true,
+            goalForCourse = { goals[it] ?: 5.0 },
+            onlyHighPriority = true,
+            priorityForCourse = { priorities[it] ?: "Medium" }
+        )
+        assertEquals(listOf("PHY102"), highAndIncomplete.map { it.courseCode })
+    }
+}

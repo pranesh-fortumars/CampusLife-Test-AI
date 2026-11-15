@@ -54,10 +54,15 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.StudyDateRange
 import com.example.data.local.SubjectColorHelper
+import com.example.data.local.SubjectGoalVisibilityHelper
+import com.example.data.local.SubjectHoverTooltipHelper
 import com.example.data.local.SubjectStudyStats
 import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
@@ -114,6 +119,7 @@ fun StudyHoursRechartsBarChart(
     var selectedWeeklySubjectFilter by remember { mutableStateOf<String?>(null) }
     var compareWithPreviousWeek by remember { mutableStateOf(false) }
     var onlyHighPriorityFilter by remember { mutableStateOf(false) }
+    var hideGoalMetSubjects by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
     var showSubjectGoalsModal by remember { mutableStateOf(false) }
@@ -154,19 +160,43 @@ fun StudyHoursRechartsBarChart(
         StudyDateRange.SEMESTER -> "h/mo"
     }
 
-    val displayedStudyStats = remember(studyStats, onlyHighPriorityFilter, subjectPriorities) {
-        if (onlyHighPriorityFilter) {
-            studyStats.filter { getPriorityForCourse(it.courseCode).equals("High", ignoreCase = true) }
-        } else {
-            studyStats
-        }
+    val goalMetCount = remember(
+        studyStats,
+        onlyHighPriorityFilter,
+        subjectPriorities,
+        subjectWeeklyGoals,
+        selectedDateRange
+    ) {
+        SubjectGoalVisibilityHelper.countGoalMetSubjects(
+            stats = studyStats,
+            goalForCourse = ::getGoalForCourse,
+            onlyHighPriority = onlyHighPriorityFilter,
+            priorityForCourse = ::getPriorityForCourse
+        )
+    }
+
+    val displayedStudyStats = remember(
+        studyStats,
+        onlyHighPriorityFilter,
+        hideGoalMetSubjects,
+        subjectPriorities,
+        subjectWeeklyGoals,
+        selectedDateRange
+    ) {
+        SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+            stats = studyStats,
+            hideGoalMet = hideGoalMetSubjects,
+            goalForCourse = ::getGoalForCourse,
+            onlyHighPriority = onlyHighPriorityFilter,
+            priorityForCourse = ::getPriorityForCourse
+        )
     }
 
     val activeSelectedStat = selectedStat?.let { sel ->
-        displayedStudyStats.firstOrNull { it.courseCode == sel.courseCode } ?: sel
+        displayedStudyStats.firstOrNull { it.courseCode == sel.courseCode }
     }
     val activeHoveredStat = hoveredStat?.let { hov ->
-        displayedStudyStats.firstOrNull { it.courseCode == hov.courseCode } ?: hov
+        displayedStudyStats.firstOrNull { it.courseCode == hov.courseCode }
     }
     val activeSelectedDayTrend = selectedDayTrend?.let { sel ->
         weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
@@ -236,13 +266,18 @@ fun StudyHoursRechartsBarChart(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header Row: Title & Badge
+            // Header Row: Title, Hours Badge & Top-Right Hide Goal-Met Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Surface(
                             shape = CircleShape,
@@ -302,23 +337,110 @@ fun StudyHoursRechartsBarChart(
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(100),
-                    color = EmeraldTertiaryContainer
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = if (viewMode == ChartViewMode.MONTHLY) {
-                            "${String.format(Locale.US, "%.1f", monthlyTrendReport.totalMonthHours)}h • 4W"
-                        } else if (selectedSessionTagFilter == "All") {
-                            "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h • ${selectedDateRange.shortLabel}"
-                        } else {
-                            "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h ($selectedSessionTagFilter)"
-                        },
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = EmeraldOnTertiaryContainer,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(100),
+                        color = EmeraldTertiaryContainer
+                    ) {
+                        Text(
+                            text = if (viewMode == ChartViewMode.MONTHLY) {
+                                "${String.format(Locale.US, "%.1f", monthlyTrendReport.totalMonthHours)}h • 4W"
+                            } else if (selectedSessionTagFilter == "All") {
+                                "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h • ${selectedDateRange.shortLabel}"
+                            } else {
+                                "${String.format(Locale.US, "%.1f", totalFocusMinutes / 60.0)}h ($selectedSessionTagFilter)"
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = EmeraldOnTertiaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    if (viewMode == ChartViewMode.BY_SUBJECT) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (hideGoalMetSubjects) {
+                                IndigoPrimaryContainer.copy(alpha = 0.85f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            },
+                            border = BorderStroke(
+                                width = if (hideGoalMetSubjects) 1.2.dp else 0.8.dp,
+                                color = if (hideGoalMetSubjects) {
+                                    IndigoPrimary.copy(alpha = 0.7f)
+                                } else {
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                }
+                            ),
+                            modifier = Modifier
+                                .heightIn(min = 36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .toggleable(
+                                    value = hideGoalMetSubjects,
+                                    role = Role.Checkbox,
+                                    onValueChange = { checked ->
+                                        hideGoalMetSubjects = checked
+                                        if (checked) {
+                                            selectedStat?.let { sel ->
+                                                if (sel.totalHours >= getGoalForCourse(sel.courseCode)) {
+                                                    selectedStat = null
+                                                }
+                                            }
+                                            hoveredStat?.let { hov ->
+                                                if (hov.totalHours >= getGoalForCourse(hov.courseCode)) {
+                                                    hoveredStat = null
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                                .testTag("toggle_hide_goal_met_subjects")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (hideGoalMetSubjects) {
+                                        Icons.Default.CheckBox
+                                    } else {
+                                        Icons.Default.CheckBoxOutlineBlank
+                                    },
+                                    contentDescription = if (hideGoalMetSubjects) {
+                                        "Show subjects that met their weekly goal"
+                                    } else {
+                                        "Hide subjects that met their weekly goal"
+                                    },
+                                    tint = if (hideGoalMetSubjects) {
+                                        IndigoPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = if (goalMetCount > 0) {
+                                        "Hide Goal Met ($goalMetCount)"
+                                    } else {
+                                        "Hide Goal Met"
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = if (hideGoalMetSubjects) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (hideGoalMetSubjects) {
+                                        IndigoOnPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2047,18 +2169,43 @@ fun StudyHoursRechartsBarChart(
             } else if (viewMode == ChartViewMode.BY_SUBJECT) {
                 // By Subject View
                 if (displayedStudyStats.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (onlyHighPriorityFilter && studyStats.isNotEmpty()) {
-                                "No High Priority subjects to display. You can set subject priority levels in 'Edit Goals'!"
-                            } else {
-                                "No study sessions logged yet. Complete a Pomodoro block to populate your chart!"
-                            },
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .testTag("empty_subject_chart_state"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.padding(16.dp)
-                        )
+                        ) {
+                            Text(
+                                text = if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
+                                    "All visible subjects have already met their study goal! Uncheck 'Hide Goal Met' to view completed subjects."
+                                } else if (onlyHighPriorityFilter && studyStats.isNotEmpty()) {
+                                    "No High Priority subjects to display. You can set subject priority levels in 'Edit Goals'!"
+                                } else {
+                                    "No study sessions logged yet. Complete a Pomodoro block to populate your chart!"
+                                },
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
+                                TextButton(
+                                    onClick = { hideGoalMetSubjects = false },
+                                    modifier = Modifier.testTag("btn_show_goal_met_subjects")
+                                ) {
+                                    Text(
+                                        text = "Show Goal Met ($goalMetCount)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 } else {
                     val maxSubjectGoal = displayedStudyStats.maxOfOrNull { getGoalForCourse(it.courseCode) } ?: 5.0
@@ -2132,6 +2279,9 @@ fun StudyHoursRechartsBarChart(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.Bottom
                         ) {
+                            val hoverLiftPx = with(LocalDensity.current) { 3.dp.toPx() }
+                            val isAnyBarHovered = activeHoveredStat != null
+
                             displayedStudyStats.forEach { stat ->
                                 val barSubjectColor = getSubjectColor(stat.courseCode)
                                 val isHovered = hoveredStat?.courseCode == stat.courseCode
@@ -2142,6 +2292,21 @@ fun StudyHoursRechartsBarChart(
                                 val isBelow50 = stat.totalHours < targetThreshold50Pct
                                 val isGoalMet = stat.totalHours >= subjectGoal
                                 val pctOfGoal = ((stat.totalHours / subjectGoal) * 100).toInt()
+                                val hoverMeta = remember(
+                                    stat.courseCode,
+                                    stat.totalMinutes,
+                                    allStudySessions,
+                                    selectedDateRange,
+                                    currentSemester
+                                ) {
+                                    SubjectHoverTooltipHelper.buildSubjectHoverDateDuration(
+                                        courseCode = stat.courseCode,
+                                        totalMinutes = stat.totalMinutes,
+                                        sessions = allStudySessions,
+                                        dateRange = selectedDateRange,
+                                        semester = currentSemester
+                                    )
+                                }
                                 val goalProgressFraction = (stat.totalHours / subjectGoal).toFloat().coerceIn(0f, 1f)
                                 val animatedGoalProgress by animateFloatAsState(
                                     targetValue = goalProgressFraction,
@@ -2156,8 +2321,18 @@ fun StudyHoursRechartsBarChart(
                                 )
                                 val animatedScale by animateFloatAsState(
                                     targetValue = if (isHovered) 1.06f else if (isSelected) 1.03f else 1.0f,
-                                    animationSpec = tween(durationMillis = 150),
+                                    animationSpec = tween(durationMillis = 160),
                                     label = "scale_${stat.courseCode}"
+                                )
+                                val animatedLiftY by animateFloatAsState(
+                                    targetValue = if (isHovered) -hoverLiftPx else 0f,
+                                    animationSpec = tween(durationMillis = 160),
+                                    label = "lift_${stat.courseCode}"
+                                )
+                                val animatedBarAlpha by animateFloatAsState(
+                                    targetValue = if (isAnyBarHovered && !isHovered) 0.72f else 1f,
+                                    animationSpec = tween(durationMillis = 160),
+                                    label = "alpha_${stat.courseCode}"
                                 )
 
                                 val interactionSource = remember(stat.courseCode) { MutableInteractionSource() }
@@ -2178,6 +2353,7 @@ fun StudyHoursRechartsBarChart(
                                         .fillMaxHeight()
                                         .weight(1f)
                                         .padding(horizontal = 4.dp)
+                                        .zIndex(if (isHovered) 10f else 0f)
                                         .hoverable(interactionSource = interactionSource)
                                         .pointerInput(stat.courseCode) {
                                             awaitPointerEventScope {
@@ -2201,32 +2377,51 @@ fun StudyHoursRechartsBarChart(
                                         }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
-                                    // Mini Hover Indicator Pill
+                                    // Tooltip-like hover label showing specific date and study duration
                                     if (isHovered) {
-                                        Surface(
-                                            shape = RoundedCornerShape(100),
-                                            color = barSubjectColor,
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
                                             modifier = Modifier
                                                 .padding(bottom = 2.dp)
                                                 .testTag("hover_badge_${stat.courseCode}")
+                                                .testTag("hover_tooltip_label_${stat.courseCode}")
                                         ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Color(0xFF0F172A),
+                                                shadowElevation = 4.dp,
+                                                border = BorderStroke(1.dp, barSubjectColor.copy(alpha = 0.9f))
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Visibility,
-                                                    contentDescription = null,
-                                                    tint = Color.White,
-                                                    modifier = Modifier.size(8.dp)
-                                                )
-                                                Text(
-                                                    text = "Details",
-                                                    fontSize = 8.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White
-                                                )
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text(
+                                                        text = hoverMeta.shortDateLabel,
+                                                        fontSize = 7.5.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = Color(0xFFCBD5E1),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    Text(
+                                                        text = hoverMeta.durationLabel,
+                                                        fontSize = 8.5.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Color.White,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                            Canvas(modifier = Modifier.size(width = 8.dp, height = 4.dp)) {
+                                                val trianglePath = Path().apply {
+                                                    moveTo(0f, 0f)
+                                                    lineTo(size.width, 0f)
+                                                    lineTo(size.width / 2f, size.height)
+                                                    close()
+                                                }
+                                                drawPath(path = trianglePath, color = Color(0xFF0F172A))
                                             }
                                         }
                                     } else if (isGoalMet) {
@@ -2360,19 +2555,21 @@ fun StudyHoursRechartsBarChart(
                                                     .graphicsLayer {
                                                         scaleX = animatedScale
                                                         scaleY = animatedScale
+                                                        translationY = animatedLiftY
+                                                        alpha = animatedBarAlpha
                                                     }
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
                                                         Brush.verticalGradient(
                                                             if (isHovered || isSelected) {
-                                                                listOf(barSubjectColor.copy(alpha = 0.88f), barSubjectColor)
+                                                                listOf(barSubjectColor.copy(alpha = 0.94f), barSubjectColor)
                                                             } else {
                                                                 listOf(barSubjectColor.copy(alpha = 0.68f), barSubjectColor)
                                                             }
                                                         )
                                                     )
                                                     .then(
-                                                        if (isHovered) Modifier.border(2.dp, barSubjectColor, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                                        if (isHovered) Modifier.border(2.dp, Color.White.copy(alpha = 0.85f), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                         else if (isSelected) Modifier.border(1.5.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                         else if (isBelow50) Modifier.border(1.2.dp, ErrorRed.copy(alpha = 0.75f), RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                         else Modifier
@@ -2387,6 +2584,9 @@ fun StudyHoursRechartsBarChart(
                                                 modifier = Modifier
                                                     .width(13.dp)
                                                     .fillMaxHeight(prevAnimatedHeight)
+                                                    .graphicsLayer {
+                                                        alpha = animatedBarAlpha
+                                                    }
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
                                                         Brush.verticalGradient(
@@ -2404,12 +2604,14 @@ fun StudyHoursRechartsBarChart(
                                                 .graphicsLayer {
                                                     scaleX = animatedScale
                                                     scaleY = animatedScale
+                                                    translationY = animatedLiftY
+                                                    alpha = animatedBarAlpha
                                                 }
                                                 .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                                 .background(
                                                     Brush.verticalGradient(
                                                         if (isHovered || isSelected) {
-                                                            listOf(barSubjectColor.copy(alpha = 0.90f), barSubjectColor)
+                                                            listOf(barSubjectColor.copy(alpha = 0.94f), barSubjectColor)
                                                         } else {
                                                             listOf(barSubjectColor.copy(alpha = 0.68f), barSubjectColor)
                                                         }
@@ -2417,8 +2619,8 @@ fun StudyHoursRechartsBarChart(
                                                 )
                                                 .then(
                                                     if (isHovered) Modifier.border(
-                                                        2.5.dp,
-                                                        barSubjectColor,
+                                                        2.dp,
+                                                        Color.White.copy(alpha = 0.85f),
                                                         RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                     ) else if (isSelected) Modifier.border(
                                                         2.dp,
@@ -2430,6 +2632,7 @@ fun StudyHoursRechartsBarChart(
                                                         RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
                                                     ) else Modifier
                                                 )
+                                                .testTag("bar_subject_fill_${stat.courseCode}")
                                         )
                                     }
 
@@ -2662,6 +2865,61 @@ fun StudyHoursRechartsBarChart(
                                                 }
 
                                                 Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), thickness = 0.8.dp)
+
+                                                // Specific Date & Study Duration Tooltip Banner
+                                                val popupMeta = remember(
+                                                    activePopupStat.courseCode,
+                                                    activePopupStat.totalMinutes,
+                                                    allStudySessions,
+                                                    selectedDateRange,
+                                                    currentSemester
+                                                ) {
+                                                    SubjectHoverTooltipHelper.buildSubjectHoverDateDuration(
+                                                        courseCode = activePopupStat.courseCode,
+                                                        totalMinutes = activePopupStat.totalMinutes,
+                                                        sessions = allStudySessions,
+                                                        dateRange = selectedDateRange,
+                                                        semester = currentSemester
+                                                    )
+                                                }
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = subjectColor.copy(alpha = 0.10f),
+                                                    border = BorderStroke(0.8.dp, subjectColor.copy(alpha = 0.25f)),
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .testTag("hover_date_duration_${activePopupStat.courseCode}")
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.CalendarToday,
+                                                                contentDescription = null,
+                                                                tint = subjectColor,
+                                                                modifier = Modifier.size(11.dp)
+                                                            )
+                                                            Text(
+                                                                text = popupMeta.specificDateLabel,
+                                                                fontSize = 9.5.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.onSurface
+                                                            )
+                                                        }
+                                                        Text(
+                                                            text = popupMeta.durationLabel,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = subjectColor
+                                                        )
+                                                    }
+                                                }
 
                                                 // 2 Key Breakdown Columns: Total Pomodoro Sessions & Total Hours Logged
                                                 Row(

@@ -1108,4 +1108,95 @@ object SubjectColorHelper {
     }
 }
 
+data class SubjectHoverDateDuration(
+    val specificDateLabel: String,
+    val shortDateLabel: String,
+    val durationLabel: String,
+    val latestSessionMinutes: Int,
+    val latestSessionDurationLabel: String
+)
 
+object SubjectHoverTooltipHelper {
+
+    fun formatDurationShort(totalMinutes: Int): String {
+        val safeMins = maxOf(0, totalMinutes)
+        val hours = safeMins / 60
+        val mins = safeMins % 60
+        return when {
+            hours > 0 -> "${hours}h ${mins}m"
+            else -> "${mins}m"
+        }
+    }
+
+    fun buildSubjectHoverDateDuration(
+        courseCode: String,
+        totalMinutes: Int,
+        sessions: List<StudySessionEntity>,
+        dateRange: StudyDateRange = StudyDateRange.LAST_7_DAYS,
+        semester: SemesterEntity? = null,
+        nowMs: Long = System.currentTimeMillis()
+    ): SubjectHoverDateDuration {
+        val matchingSessions = sessions.filter { s ->
+            s.courseCode.equals(courseCode, ignoreCase = true) &&
+                FocusScoreHelper.isFocusedSessionMode(s.mode) &&
+                StudyDateRangeHelper.isSessionInRange(
+                    sessionTimestampMs = s.timestampMs,
+                    range = dateRange,
+                    semester = semester,
+                    nowMs = nowMs
+                )
+        }
+        val latest = matchingSessions.maxByOrNull { it.timestampMs }
+        val fullDateFormatter = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.US)
+        val shortDateFormatter = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+
+        val specificDateLabel = latest?.let {
+            fullDateFormatter.format(java.util.Date(it.timestampMs))
+        } ?: fullDateFormatter.format(java.util.Date(nowMs))
+
+        val shortDateLabel = latest?.let {
+            shortDateFormatter.format(java.util.Date(it.timestampMs))
+        } ?: "—"
+
+        val latestMins = latest?.durationMinutes ?: 0
+
+        return SubjectHoverDateDuration(
+            specificDateLabel = specificDateLabel,
+            shortDateLabel = shortDateLabel,
+            durationLabel = formatDurationShort(totalMinutes),
+            latestSessionMinutes = latestMins,
+            latestSessionDurationLabel = formatDurationShort(latestMins)
+        )
+    }
+}
+
+object SubjectGoalVisibilityHelper {
+    fun filterSubjectsByGoalVisibility(
+        stats: List<SubjectStudyStats>,
+        hideGoalMet: Boolean,
+        goalForCourse: (String) -> Double,
+        onlyHighPriority: Boolean = false,
+        priorityForCourse: (String) -> String = { "Medium" }
+    ): List<SubjectStudyStats> {
+        return stats.filter { stat ->
+            val matchesPriority = !onlyHighPriority ||
+                priorityForCourse(stat.courseCode).equals("High", ignoreCase = true)
+            val goalHours = goalForCourse(stat.courseCode)
+            val matchesGoalVisibility = !hideGoalMet || stat.totalHours < goalHours
+            matchesPriority && matchesGoalVisibility
+        }
+    }
+
+    fun countGoalMetSubjects(
+        stats: List<SubjectStudyStats>,
+        goalForCourse: (String) -> Double,
+        onlyHighPriority: Boolean = false,
+        priorityForCourse: (String) -> String = { "Medium" }
+    ): Int {
+        return stats.count { stat ->
+            val matchesPriority = !onlyHighPriority ||
+                priorityForCourse(stat.courseCode).equals("High", ignoreCase = true)
+            matchesPriority && stat.totalHours >= goalForCourse(stat.courseCode)
+        }
+    }
+}
