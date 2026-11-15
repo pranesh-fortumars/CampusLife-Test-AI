@@ -60,9 +60,11 @@ import androidx.compose.ui.semantics.Role
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.StudyDateRange
+import com.example.data.local.SubjectChartSortOrder
 import com.example.data.local.SubjectColorHelper
 import com.example.data.local.SubjectGoalVisibilityHelper
 import com.example.data.local.SubjectHoverTooltipHelper
+import com.example.data.local.SubjectSortHelper
 import com.example.data.local.SubjectStudyStats
 import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
@@ -120,6 +122,7 @@ fun StudyHoursRechartsBarChart(
     var compareWithPreviousWeek by remember { mutableStateOf(false) }
     var onlyHighPriorityFilter by remember { mutableStateOf(false) }
     var hideGoalMetSubjects by remember { mutableStateOf(false) }
+    var subjectSortOrder by remember { mutableStateOf(SubjectChartSortOrder.HIGHEST_HOURS) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
     var showSubjectGoalsModal by remember { mutableStateOf(false) }
@@ -181,14 +184,22 @@ fun StudyHoursRechartsBarChart(
         hideGoalMetSubjects,
         subjectPriorities,
         subjectWeeklyGoals,
-        selectedDateRange
+        selectedDateRange,
+        subjectSortOrder,
+        courses
     ) {
-        SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+        val filtered = SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
             stats = studyStats,
             hideGoalMet = hideGoalMetSubjects,
             goalForCourse = ::getGoalForCourse,
             onlyHighPriority = onlyHighPriorityFilter,
             priorityForCourse = ::getPriorityForCourse
+        )
+        val courseNamesByCode = courses.associate { it.code to it.name }
+        SubjectSortHelper.sortSubjectStats(
+            stats = filtered,
+            sortOrder = subjectSortOrder,
+            courseNameForCode = { code -> courseNamesByCode[code] ?: code }
         )
     }
 
@@ -1006,6 +1017,82 @@ fun StudyHoursRechartsBarChart(
                             )
                         }
                     }
+
+                    // Sort By Toggle Row (Highest Hours vs Subject Name)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("sort_subjects_toggle_group"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwapVert,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = IndigoPrimary
+                            )
+                            Text(
+                                text = "Sort Bars:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(100))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SubjectChartSortOrder.values().forEach { order ->
+                                val isSelected = subjectSortOrder == order
+                                val sortIcon = when (order) {
+                                    SubjectChartSortOrder.HIGHEST_HOURS -> Icons.Default.BarChart
+                                    SubjectChartSortOrder.SUBJECT_NAME -> Icons.Default.SortByAlpha
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(100),
+                                    color = if (isSelected) IndigoPrimary else Color.Transparent,
+                                    shadowElevation = if (isSelected) 1.5.dp else 0.dp,
+                                    modifier = Modifier
+                                        .heightIn(min = 30.dp)
+                                        .clip(RoundedCornerShape(100))
+                                        .clickable {
+                                            subjectSortOrder = order
+                                        }
+                                        .testTag("sort_by_${order.name.lowercase()}")
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = sortIcon,
+                                            contentDescription = null,
+                                            tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Text(
+                                            text = order.label,
+                                            fontSize = 10.5.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Interactive Filters & Toggles Row
@@ -1365,48 +1452,50 @@ fun StudyHoursRechartsBarChart(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     displayedStudyStats.forEach { stat ->
-                        val subjectColor = getSubjectColor(stat.courseCode)
-                        val isSelectedChip = activeSelectedStat?.courseCode == stat.courseCode
-                        val courseTitle = courses.firstOrNull { it.code == stat.courseCode }?.name ?: stat.courseCode
+                        key(stat.courseCode) {
+                            val subjectColor = getSubjectColor(stat.courseCode)
+                            val isSelectedChip = activeSelectedStat?.courseCode == stat.courseCode
+                            val courseTitle = courses.firstOrNull { it.code == stat.courseCode }?.name ?: stat.courseCode
 
-                        Surface(
-                            shape = RoundedCornerShape(100),
-                            color = if (isSelectedChip) subjectColor.copy(alpha = 0.16f)
-                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                            border = BorderStroke(
-                                width = if (isSelectedChip) 1.3.dp else 0.8.dp,
-                                color = if (isSelectedChip) subjectColor else subjectColor.copy(alpha = 0.38f)
-                            ),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(100))
-                                .clickable {
-                                    selectedStat = if (selectedStat?.courseCode == stat.courseCode) null else stat
-                                }
-                                .testTag("subject_color_indicator_${stat.courseCode}")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = if (isSelectedChip) subjectColor.copy(alpha = 0.16f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                                border = BorderStroke(
+                                    width = if (isSelectedChip) 1.3.dp else 0.8.dp,
+                                    color = if (isSelectedChip) subjectColor else subjectColor.copy(alpha = 0.38f)
+                                ),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(100))
+                                    .clickable {
+                                        selectedStat = if (selectedStat?.courseCode == stat.courseCode) null else stat
+                                    }
+                                    .testTag("subject_color_indicator_${stat.courseCode}")
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(9.dp)
-                                        .clip(CircleShape)
-                                        .background(subjectColor)
-                                )
-                                Text(
-                                    text = stat.courseCode,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelectedChip) subjectColor else MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
-                                    fontSize = 9.5.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(9.dp)
+                                            .clip(CircleShape)
+                                            .background(subjectColor)
+                                    )
+                                    Text(
+                                        text = stat.courseCode,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelectedChip) subjectColor else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -2283,6 +2372,7 @@ fun StudyHoursRechartsBarChart(
                             val isAnyBarHovered = activeHoveredStat != null
 
                             displayedStudyStats.forEach { stat ->
+                                key(stat.courseCode) {
                                 val barSubjectColor = getSubjectColor(stat.courseCode)
                                 val isHovered = hoveredStat?.courseCode == stat.courseCode
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
@@ -2749,6 +2839,7 @@ fun StudyHoursRechartsBarChart(
                                             )
                                         }
                                     }
+                                }
                                 }
                             }
                         }

@@ -1148,4 +1148,36 @@ class ExampleUnitTest {
         )
         assertEquals(listOf("PHY102"), highAndIncomplete.map { it.courseCode })
     }
+
+    @Test
+    fun `test SubjectSortHelper sorts between Highest Hours and Subject Name`() {
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats("PHY102", totalMinutes = 120, sessionCount = 3),  // Physics (2.0h)
+            com.example.data.local.SubjectStudyStats("ENG215", totalMinutes = 300, sessionCount = 5),  // Technical Writing (5.0h)
+            com.example.data.local.SubjectStudyStats("CS201", totalMinutes = 180, sessionCount = 4),   // Data Structures (3.0h)
+            com.example.data.local.SubjectStudyStats("MATH204", totalMinutes = 300, sessionCount = 7)  // Linear Algebra (5.0h, more sessions)
+        )
+        val courseNames = mapOf(
+            "PHY102" to "Physics",
+            "ENG215" to "Technical Writing",
+            "CS201" to "Data Structures",
+            "MATH204" to "Linear Algebra"
+        )
+
+        // Highest Hours descending (tie-broken by sessionCount descending)
+        val byHours = com.example.data.local.SubjectSortHelper.sortSubjectStats(
+            stats = stats,
+            sortOrder = com.example.data.local.SubjectChartSortOrder.HIGHEST_HOURS,
+            courseNameForCode = { courseNames[it] ?: it }
+        )
+        assertEquals(listOf("MATH204", "ENG215", "CS201", "PHY102"), byHours.map { it.courseCode })
+
+        // Subject Name ascending alphabetically ("Data Structures", "Linear Algebra", "Physics", "Technical Writing")
+        val byName = com.example.data.local.SubjectSortHelper.sortSubjectStats(
+            stats = stats,
+            sortOrder = com.example.data.local.SubjectChartSortOrder.SUBJECT_NAME,
+            courseNameForCode = { courseNames[it] ?: it }
+        )
+        assertEquals(listOf("CS201", "MATH204", "PHY102", "ENG215"), byName.map { it.courseCode })
+    }
 }

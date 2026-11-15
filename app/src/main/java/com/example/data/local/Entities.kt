@@ -1200,3 +1200,29 @@ object SubjectGoalVisibilityHelper {
         }
     }
 }
+
+enum class SubjectChartSortOrder(val label: String) {
+    HIGHEST_HOURS("Highest Hours"),
+    SUBJECT_NAME("Subject Name")
+}
+
+object SubjectSortHelper {
+    fun sortSubjectStats(
+        stats: List<SubjectStudyStats>,
+        sortOrder: SubjectChartSortOrder,
+        courseNameForCode: (String) -> String = { it }
+    ): List<SubjectStudyStats> {
+        return when (sortOrder) {
+            SubjectChartSortOrder.HIGHEST_HOURS -> stats.sortedWith(
+                compareByDescending<SubjectStudyStats> { it.totalMinutes }
+                    .thenByDescending { it.sessionCount }
+                    .thenBy { courseNameForCode(it.courseCode).lowercase(java.util.Locale.US) }
+                    .thenBy { it.courseCode }
+            )
+            SubjectChartSortOrder.SUBJECT_NAME -> stats.sortedWith(
+                compareBy<SubjectStudyStats> { courseNameForCode(it.courseCode).lowercase(java.util.Locale.US) }
+                    .thenBy { it.courseCode }
+            )
+        }
+    }
+}
