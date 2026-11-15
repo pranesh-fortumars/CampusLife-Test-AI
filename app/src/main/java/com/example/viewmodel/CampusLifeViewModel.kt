@@ -10,7 +10,10 @@ import com.example.worker.DeadlineWorkScheduler
 import com.example.worker.ProjectAssignmentDeadlineService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class AppDestination(val label: String) {
@@ -1285,5 +1288,88 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             sessions = emptyList()
         )
     )
+
+    // Real-time Active Session Interval Timer for Subject Analytics (#subjectChartContainer)
+    private val _activeStudySession = MutableStateFlow(ActiveSessionState())
+    val activeStudySession: StateFlow<ActiveSessionState> = _activeStudySession.asStateFlow()
+    private var activeSessionTickerJob: Job? = null
+
+    fun selectActiveSessionSubject(courseCode: String) {
+        val current = _activeStudySession.value
+        if (!current.isRunning && current.elapsedSeconds == 0 && !current.courseCode.equals(courseCode, ignoreCase = true)) {
+            _activeStudySession.value = current.copy(courseCode = courseCode)
+        }
+    }
+
+    fun startOrResumeActiveSession(courseCode: String, targetMinutes: Int = 25) {
+        val current = _activeStudySession.value
+        val isSwitchingCourse = current.courseCode.isNotBlank() &&
+            !current.courseCode.equals(courseCode, ignoreCase = true)
+        val initialElapsed = if (isSwitchingCourse && !current.isRunning && current.elapsedSeconds == 0) {
+            0
+        } else {
+            current.elapsedSeconds
+        }
+        val activeCode = if (isSwitchingCourse && current.elapsedSeconds > 0) {
+            current.courseCode
+        } else {
+            courseCode
+        }
+        _activeStudySession.value = ActiveSessionState(
+            courseCode = activeCode,
+            isRunning = true,
+            elapsedSeconds = initialElapsed,
+            targetMinutes = targetMinutes
+        )
+        activeSessionTickerJob?.cancel()
+        activeSessionTickerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1000L)
+                _activeStudySession.update { state ->
+                    if (state.isRunning) state.copy(elapsedSeconds = state.elapsedSeconds + 1) else state
+                }
+            }
+        }
+    }
+
+    fun pauseActiveSession() {
+        activeSessionTickerJob?.cancel()
+        activeSessionTickerJob = null
+        _activeStudySession.update { it.copy(isRunning = false) }
+    }
+
+    fun resetActiveSession() {
+        activeSessionTickerJob?.cancel()
+        activeSessionTickerJob = null
+        _activeStudySession.update { it.copy(isRunning = false, elapsedSeconds = 0) }
+    }
+
+    fun commitAndStopActiveSession(fallbackCourseCode: String, subjectName: String): Int {
+        activeSessionTickerJob?.cancel()
+        activeSessionTickerJob = null
+        val snapshot = _activeStudySession.value
+        val targetCode = snapshot.courseCode.ifBlank { fallbackCourseCode }
+        val elapsedSecs = snapshot.elapsedSeconds
+        _activeStudySession.value = ActiveSessionState(courseCode = targetCode)
+        if (elapsedSecs <= 0) return 0
+        val loggedMinutes = maxOf(1, (elapsedSecs + 30) / 60)
+        val resolvedName = courses.value.firstOrNull {
+            it.code.equals(targetCode, ignoreCase = true)
+        }?.name ?: subjectName
+        recordStudySession(
+            courseCode = targetCode,
+            subjectName = resolvedName,
+            durationMinutes = loggedMinutes,
+            mode = "FOCUS",
+            notes = "Logged via Subject Analytics live Active Session (${ActiveSessionHelper.formatElapsedMmSs(elapsedSecs)})",
+            tag = _selectedSessionTagFilter.value.takeIf { it != "All" } ?: "Exam Prep"
+        )
+        return loggedMinutes
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        activeSessionTickerJob?.cancel()
+    }
 }
 

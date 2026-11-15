@@ -1289,3 +1289,69 @@ object GoalProgressStatusHelper {
         )
     }
 }
+
+data class ActiveSessionState(
+    val courseCode: String = "",
+    val isRunning: Boolean = false,
+    val elapsedSeconds: Int = 0,
+    val targetMinutes: Int = 25
+) {
+    val elapsedHours: Double get() = elapsedSeconds.coerceAtLeast(0) / 3600.0
+    val elapsedWholeMinutes: Int get() = elapsedSeconds.coerceAtLeast(0) / 60
+}
+
+data class ActiveSessionProgressSnapshot(
+    val formattedElapsedTimer: String,
+    val liveTotalHours: Double,
+    val liveGoalPercent: Int,
+    val liveGoalFraction: Float,
+    val sessionBlockProgressFraction: Float,
+    val liveAddedLabel: String
+)
+
+object ActiveSessionHelper {
+    fun formatElapsedMmSs(elapsedSeconds: Int): String {
+        val safe = elapsedSeconds.coerceAtLeast(0)
+        val hours = safe / 3600
+        val mins = (safe % 3600) / 60
+        val secs = safe % 60
+        return if (hours > 0) {
+            String.format(java.util.Locale.US, "%d:%02d:%02d", hours, mins, secs)
+        } else {
+            String.format(java.util.Locale.US, "%02d:%02d", mins, secs)
+        }
+    }
+
+    fun formatLiveAddedLabel(elapsedSeconds: Int): String {
+        val safe = elapsedSeconds.coerceAtLeast(0)
+        if (safe == 0) return "Ready"
+        val mins = safe / 60
+        val secs = safe % 60
+        return if (mins > 0) "+${mins}m ${secs}s live" else "+${secs}s live"
+    }
+
+    fun buildLiveProgressSnapshot(
+        baseHours: Double,
+        goalHours: Double,
+        elapsedSeconds: Int,
+        targetBlockMinutes: Int = 25
+    ): ActiveSessionProgressSnapshot {
+        val safeBase = baseHours.coerceAtLeast(0.0)
+        val safeElapsed = elapsedSeconds.coerceAtLeast(0)
+        val liveTotalHours = safeBase + (safeElapsed / 3600.0)
+        val progressInfo = GoalProgressStatusHelper.evaluateGoalProgress(
+            loggedHours = liveTotalHours,
+            goalHours = goalHours
+        )
+        val targetBlockSecs = (targetBlockMinutes.coerceAtLeast(1) * 60).toFloat()
+        val blockFraction = (safeElapsed / targetBlockSecs).coerceIn(0f, 1f)
+        return ActiveSessionProgressSnapshot(
+            formattedElapsedTimer = formatElapsedMmSs(safeElapsed),
+            liveTotalHours = liveTotalHours,
+            liveGoalPercent = progressInfo.percentageInt,
+            liveGoalFraction = progressInfo.progressFraction,
+            sessionBlockProgressFraction = blockFraction,
+            liveAddedLabel = formatLiveAddedLabel(safeElapsed)
+        )
+    }
+}

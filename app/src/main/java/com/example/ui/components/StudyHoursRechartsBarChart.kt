@@ -3,7 +3,11 @@ package com.example.ui.components
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -57,6 +61,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
+import com.example.data.local.ActiveSessionHelper
+import com.example.data.local.ActiveSessionState
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.GoalCompletionStatus
@@ -115,6 +121,7 @@ fun StudyHoursRechartsBarChart(
     val monthlySubjectFilter by viewModel.monthlySubjectFilter.collectAsState()
     val subjectGoalAlertsEnabled by viewModel.subjectGoalAlertsEnabled.collectAsState()
     val subjectGoalAlertReport by viewModel.subjectGoalAlertReport.collectAsState()
+    val activeStudySession by viewModel.activeStudySession.collectAsState()
     val context = LocalContext.current
     val currentDayKey = remember { viewModel.getCurrentDayKey() }
     val currentMonthKey = remember { SimpleDateFormat("MMM", Locale.US).format(Date()) }
@@ -1640,6 +1647,73 @@ fun StudyHoursRechartsBarChart(
             }
             }
 
+            // Real-time Active Session Indicator for Currently Selected Subject
+            AnimatedVisibility(
+                visible = viewMode == ChartViewMode.BY_SUBJECT,
+                enter = fadeIn(animationSpec = tween(180)),
+                exit = fadeOut(animationSpec = tween(180))
+            ) {
+                val activeTargetCourseCode = if (
+                    (activeStudySession.isRunning || activeStudySession.elapsedSeconds > 0) &&
+                    activeStudySession.courseCode.isNotBlank()
+                ) {
+                    activeStudySession.courseCode
+                } else {
+                    activeSelectedStat?.courseCode
+                        ?: displayedStudyStats.firstOrNull()?.courseCode
+                        ?: courses.firstOrNull()?.code
+                        ?: "CS201"
+                }
+                val activeTargetCourseName = courses.firstOrNull {
+                    it.code.equals(activeTargetCourseCode, ignoreCase = true)
+                }?.name ?: activeTargetCourseCode
+                val activeBaseStat = studyStats.firstOrNull {
+                    it.courseCode.equals(activeTargetCourseCode, ignoreCase = true)
+                } ?: displayedStudyStats.firstOrNull {
+                    it.courseCode.equals(activeTargetCourseCode, ignoreCase = true)
+                }
+                val activeTargetGoalHours = getGoalForCourse(activeTargetCourseCode)
+                val activeSessionForTarget = if (
+                    activeStudySession.courseCode.isBlank() ||
+                    activeStudySession.courseCode.equals(activeTargetCourseCode, ignoreCase = true)
+                ) {
+                    activeStudySession
+                } else {
+                    ActiveSessionState(courseCode = activeTargetCourseCode)
+                }
+
+                ActiveSessionIndicatorCard(
+                    courseCode = activeTargetCourseCode,
+                    courseName = activeTargetCourseName,
+                    subjectColor = getSubjectColor(activeTargetCourseCode),
+                    baseHours = activeBaseStat?.totalHours ?: 0.0,
+                    goalHours = activeTargetGoalHours,
+                    activeSession = activeSessionForTarget,
+                    onStartOrResume = {
+                        viewModel.startOrResumeActiveSession(activeTargetCourseCode)
+                    },
+                    onPause = {
+                        viewModel.pauseActiveSession()
+                    },
+                    onSaveAndStop = {
+                        val loggedMins = viewModel.commitAndStopActiveSession(
+                            fallbackCourseCode = activeTargetCourseCode,
+                            subjectName = activeTargetCourseName
+                        )
+                        if (loggedMins > 0) {
+                            Toast.makeText(
+                                context,
+                                "Saved ${loggedMins}m live study session for $activeTargetCourseCode",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    onReset = {
+                        viewModel.resetActiveSession()
+                    }
+                )
+            }
+
             // Detailed Breakdown Card for Subject Mode (Revealed on subject selection/tap)
             val activeTooltipStat = activeSelectedStat
             AnimatedVisibility(
@@ -2381,15 +2455,19 @@ fun StudyHoursRechartsBarChart(
                             displayedStudyStats.forEach { stat ->
                                 key(stat.courseCode) {
                                 val barSubjectColor = getSubjectColor(stat.courseCode)
+                                val isLiveBarActive = (activeStudySession.isRunning || activeStudySession.elapsedSeconds > 0) &&
+                                    activeStudySession.courseCode.equals(stat.courseCode, ignoreCase = true)
+                                val liveHoursDelta = if (isLiveBarActive) activeStudySession.elapsedHours else 0.0
+                                val effectiveTotalHours = stat.totalHours + liveHoursDelta
                                 val isHovered = hoveredStat?.courseCode == stat.courseCode
                                 val isSelected = selectedStat?.courseCode == stat.courseCode
-                                val isHighlighted = isHovered || isSelected
+                                val isHighlighted = isHovered || isSelected || isLiveBarActive
                                 val subjectGoal = getGoalForCourse(stat.courseCode)
                                 val targetThreshold50Pct = subjectGoal * 0.5
-                                val isBelow50 = stat.totalHours < targetThreshold50Pct
-                                val isGoalMet = stat.totalHours >= subjectGoal
+                                val isBelow50 = effectiveTotalHours < targetThreshold50Pct
+                                val isGoalMet = effectiveTotalHours >= subjectGoal
                                 val goalProgressInfo = GoalProgressStatusHelper.evaluateGoalProgress(
-                                    loggedHours = stat.totalHours,
+                                    loggedHours = effectiveTotalHours,
                                     goalHours = subjectGoal
                                 )
                                 val pctOfGoal = goalProgressInfo.percentageInt
@@ -2480,7 +2558,9 @@ fun StudyHoursRechartsBarChart(
                                             }
                                         }
                                         .clickable {
-                                            selectedStat = if (selectedStat?.courseCode == stat.courseCode) null else stat
+                                            val nextSelected = if (selectedStat?.courseCode == stat.courseCode) null else stat
+                                            selectedStat = nextSelected
+                                            nextSelected?.let { viewModel.selectActiveSessionSubject(it.courseCode) }
                                         }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
@@ -5688,4 +5768,303 @@ fun ExportStudyLogsDialog(
     )
 }
 
+@Composable
+private fun ActiveSessionIndicatorCard(
+    courseCode: String,
+    courseName: String,
+    subjectColor: Color,
+    baseHours: Double,
+    goalHours: Double,
+    activeSession: ActiveSessionState,
+    onStartOrResume: () -> Unit,
+    onPause: () -> Unit,
+    onSaveAndStop: () -> Unit,
+    onReset: () -> Unit
+) {
+    val snapshot = remember(baseHours, goalHours, activeSession.elapsedSeconds, activeSession.targetMinutes) {
+        ActiveSessionHelper.buildLiveProgressSnapshot(
+            baseHours = baseHours,
+            goalHours = goalHours,
+            elapsedSeconds = activeSession.elapsedSeconds,
+            targetBlockMinutes = activeSession.targetMinutes
+        )
+    }
 
+    val pulseTransition = rememberInfiniteTransition(label = "active_session_pulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "active_session_dot_alpha"
+    )
+
+    val animatedLiveGoalFraction by animateFloatAsState(
+        targetValue = snapshot.liveGoalFraction,
+        animationSpec = tween(durationMillis = 350),
+        label = "active_session_live_goal_progress"
+    )
+
+    val isRunning = activeSession.isRunning
+    val hasElapsed = activeSession.elapsedSeconds > 0
+    val statusAccentColor = if (isRunning) EmeraldTertiary else if (hasElapsed) WarningAmber else subjectColor
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (isRunning) {
+            EmeraldTertiaryContainer.copy(alpha = 0.45f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        },
+        border = BorderStroke(
+            width = if (isRunning) 1.3.dp else 1.dp,
+            color = statusAccentColor.copy(alpha = if (isRunning) 0.65f else 0.28f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("active_session_indicator_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Pulsing status dot when active timer is running
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(
+                                statusAccentColor.copy(
+                                    alpha = if (isRunning) pulseAlpha else 0.35f
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(statusAccentColor)
+                                .testTag("active_session_live_dot")
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Active Session",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = subjectColor
+                            ) {
+                                Text(
+                                    text = courseCode,
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(100),
+                                color = statusAccentColor.copy(alpha = 0.16f)
+                            ) {
+                                Text(
+                                    text = if (isRunning) "LIVE" else if (hasElapsed) "PAUSED" else "READY",
+                                    fontSize = 8.5.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = statusAccentColor,
+                                    modifier = Modifier
+                                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                                        .testTag("active_session_status_badge")
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = courseName,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Live interval timer readout (MM:SS)
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, statusAccentColor.copy(alpha = 0.35f)),
+                    modifier = Modifier.testTag("active_session_timer_readout")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = "Live Active Session Timer",
+                            tint = statusAccentColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = snapshot.formattedElapsedTimer,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            // Real-time goal progress bar combining logged + live elapsed study time
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (hasElapsed) {
+                            "Live Progress: ${String.format(Locale.US, "%.2f", snapshot.liveTotalHours)}h / ${String.format(Locale.US, "%.1f", goalHours)}h (${snapshot.liveAddedLabel})"
+                        } else {
+                            "Selected: ${String.format(Locale.US, "%.1f", baseHours)}h / ${String.format(Locale.US, "%.1f", goalHours)}h • Tap Start to track live"
+                        },
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("active_session_progress_summary")
+                    )
+                    Text(
+                        text = "${snapshot.liveGoalPercent}%",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = statusAccentColor,
+                        modifier = Modifier.testTag("active_session_live_percent")
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(100))
+                        .background(statusAccentColor.copy(alpha = 0.16f))
+                        .testTag("active_session_live_progress_bar")
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(animatedLiveGoalFraction.coerceAtLeast(0.03f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(100))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(statusAccentColor.copy(alpha = 0.78f), statusAccentColor)
+                                )
+                            )
+                    )
+                }
+            }
+
+            // Real-time Interval Timer Action Controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { if (isRunning) onPause() else onStartOrResume() },
+                    shape = RoundedCornerShape(100),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isRunning) WarningAmber else EmeraldTertiary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .heightIn(min = 36.dp)
+                        .testTag("btn_active_session_toggle")
+                ) {
+                    Icon(
+                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isRunning) "Pause Active Session" else "Start Live Session",
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (isRunning) "Pause" else if (hasElapsed) "Resume" else "Start Live",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                if (hasElapsed) {
+                    FilledTonalButton(
+                        onClick = onSaveAndStop,
+                        shape = RoundedCornerShape(100),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = IndigoPrimaryContainer,
+                            contentColor = IndigoOnPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .heightIn(min = 36.dp)
+                            .testTag("btn_active_session_save")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Save Live Session",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Save & Stop",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    TextButton(
+                        onClick = onReset,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .heightIn(min = 36.dp)
+                            .testTag("btn_active_session_reset")
+                    ) {
+                        Text(
+                            text = "Reset",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

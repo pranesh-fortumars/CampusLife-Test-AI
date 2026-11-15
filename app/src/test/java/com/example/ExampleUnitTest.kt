@@ -1251,4 +1251,39 @@ class ExampleUnitTest {
         assertEquals(0.3f, behind.progressFraction, 0.001f)
         assertEquals(com.example.data.local.GoalCompletionStatus.BEHIND, behind.status)
     }
+
+    @Test
+    fun `test ActiveSessionHelper formats live interval timer and updates study progress`() {
+        assertEquals("00:00", com.example.data.local.ActiveSessionHelper.formatElapsedMmSs(0))
+        assertEquals("00:42", com.example.data.local.ActiveSessionHelper.formatElapsedMmSs(42))
+        assertEquals("12:05", com.example.data.local.ActiveSessionHelper.formatElapsedMmSs(725))
+        assertEquals("1:05:10", com.example.data.local.ActiveSessionHelper.formatElapsedMmSs(3910))
+
+        assertEquals("Ready", com.example.data.local.ActiveSessionHelper.formatLiveAddedLabel(0))
+        assertEquals("+45s live", com.example.data.local.ActiveSessionHelper.formatLiveAddedLabel(45))
+        assertEquals("+15m 30s live", com.example.data.local.ActiveSessionHelper.formatLiveAddedLabel(930))
+
+        // Base 3.5h out of 4.0h goal, plus 1800s (0.5h) live -> hits 4.0h (100% of goal)
+        val snapshot = com.example.data.local.ActiveSessionHelper.buildLiveProgressSnapshot(
+            baseHours = 3.5,
+            goalHours = 4.0,
+            elapsedSeconds = 1800,
+            targetBlockMinutes = 30
+        )
+        assertEquals("30:00", snapshot.formattedElapsedTimer)
+        assertEquals(4.0, snapshot.liveTotalHours, 0.001)
+        assertEquals(100, snapshot.liveGoalPercent)
+        assertEquals(1.0f, snapshot.liveGoalFraction, 0.001f)
+        assertEquals(1.0f, snapshot.sessionBlockProgressFraction, 0.001f)
+        assertEquals("+30m 0s live", snapshot.liveAddedLabel)
+
+        // State derived properties
+        val state = com.example.data.local.ActiveSessionState(
+            courseCode = "CS201",
+            isRunning = true,
+            elapsedSeconds = 900
+        )
+        assertEquals(0.25, state.elapsedHours, 0.001)
+        assertEquals(15, state.elapsedWholeMinutes)
+    }
 }
