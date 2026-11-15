@@ -59,6 +59,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
+import com.example.data.local.GoalCompletionStatus
+import com.example.data.local.GoalProgressStatusHelper
 import com.example.data.local.StudyDateRange
 import com.example.data.local.SubjectChartSortOrder
 import com.example.data.local.SubjectColorHelper
@@ -1593,15 +1595,18 @@ fun StudyHoursRechartsBarChart(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .width(16.dp)
-                                .height(5.dp)
-                                .clip(RoundedCornerShape(100))
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            listOf(EmeraldTertiary, IndigoPrimary, WarningAmber, ErrorRed).forEach { statusDotColor ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(statusDotColor)
+                                )
+                            }
+                        }
                         Text(
-                            "Goal Progress",
+                            "Goal % Status",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2308,12 +2313,12 @@ fun StudyHoursRechartsBarChart(
                     BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(310.dp)
+                            .height(330.dp)
                             .testTag("recharts_subject_viewport")
                     ) {
                         val totalWidth = maxWidth
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            val bottomAxisY = size.height - 80.dp.toPx()
+                            val bottomAxisY = size.height - 96.dp.toPx()
                             val topY = 20.dp.toPx()
                             val chartHeight = bottomAxisY - topY
 
@@ -2383,7 +2388,17 @@ fun StudyHoursRechartsBarChart(
                                 val targetThreshold50Pct = subjectGoal * 0.5
                                 val isBelow50 = stat.totalHours < targetThreshold50Pct
                                 val isGoalMet = stat.totalHours >= subjectGoal
-                                val pctOfGoal = ((stat.totalHours / subjectGoal) * 100).toInt()
+                                val goalProgressInfo = GoalProgressStatusHelper.evaluateGoalProgress(
+                                    loggedHours = stat.totalHours,
+                                    goalHours = subjectGoal
+                                )
+                                val pctOfGoal = goalProgressInfo.percentageInt
+                                val goalStatusColor = when (goalProgressInfo.status) {
+                                    GoalCompletionStatus.COMPLETED -> EmeraldTertiary
+                                    GoalCompletionStatus.ON_TRACK -> IndigoPrimary
+                                    GoalCompletionStatus.IN_PROGRESS -> WarningAmber
+                                    GoalCompletionStatus.BEHIND -> ErrorRed
+                                }
                                 val hoverMeta = remember(
                                     stat.courseCode,
                                     stat.totalMinutes,
@@ -2399,7 +2414,7 @@ fun StudyHoursRechartsBarChart(
                                         semester = currentSemester
                                     )
                                 }
-                                val goalProgressFraction = (stat.totalHours / subjectGoal).toFloat().coerceIn(0f, 1f)
+                                val goalProgressFraction = goalProgressInfo.progressFraction
                                 val animatedGoalProgress by animateFloatAsState(
                                     targetValue = goalProgressFraction,
                                     animationSpec = tween(durationMillis = 800),
@@ -2691,7 +2706,7 @@ fun StudyHoursRechartsBarChart(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .fillMaxHeight(0.68f),
+                                                .fillMaxHeight(0.60f),
                                             horizontalArrangement = Arrangement.Center,
                                             verticalAlignment = Alignment.Bottom
                                         ) {
@@ -2748,7 +2763,7 @@ fun StudyHoursRechartsBarChart(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
-                                                .fillMaxHeight(animatedHeight * 0.68f)
+                                                .fillMaxHeight(animatedHeight * 0.60f)
                                                 .graphicsLayer {
                                                     scaleX = animatedScale
                                                     scaleY = animatedScale
@@ -2784,48 +2799,7 @@ fun StudyHoursRechartsBarChart(
                                         )
                                     }
 
-                                    Spacer(modifier = Modifier.height(5.dp))
-
-                                    // Visual Progress Bar beneath the subject bar
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(if (isHighlighted) 0.88f else 0.82f)
-                                            .height(5.dp)
-                                            .clip(RoundedCornerShape(100))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                                            .then(
-                                                if (isHighlighted) Modifier.border(1.dp, barSubjectColor, RoundedCornerShape(100))
-                                                else if (isBelow50) Modifier.border(0.8.dp, ErrorRed.copy(alpha = 0.4f), RoundedCornerShape(100))
-                                                else Modifier
-                                            )
-                                            .testTag("progress_bar_subject_${stat.courseCode}")
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth(animatedGoalProgress.coerceAtLeast(0.04f))
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(100))
-                                                .background(
-                                                    Brush.horizontalGradient(
-                                                        listOf(barSubjectColor.copy(alpha = 0.7f), barSubjectColor)
-                                                    )
-                                                )
-                                                .testTag("progress_bar_fill_${stat.courseCode}")
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(2.dp))
-
-                                    // Percentage of custom goal completed label
-                                    Text(
-                                        text = "$pctOfGoal%",
-                                        fontSize = 8.5.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) barSubjectColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.testTag("progress_percent_label_${stat.courseCode}")
-                                    )
-
-                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
 
                                     // Small line chart visualizing 4-week mastery trend from Room database
                                     val masteryTrend = subjectMasteryRecords[stat.courseCode]
@@ -2840,7 +2814,7 @@ fun StudyHoursRechartsBarChart(
                                             .testTag("mastery_mini_chart_${stat.courseCode}")
                                     )
 
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(3.dp))
 
                                     val compareBadgeTag = if (viewMode == ChartViewMode.BY_SUBJECT && compareSubjectsEnabled && subjectComparisonReport != null) {
                                         when (stat.courseCode) {
@@ -2849,54 +2823,112 @@ fun StudyHoursRechartsBarChart(
                                             else -> null
                                         }
                                     } else null
+                                    val courseDisplayName = courses.firstOrNull {
+                                        it.code.equals(stat.courseCode, ignoreCase = true)
+                                    }?.name ?: stat.courseCode
 
-                                    // Course Code with Unique Subject Color Dot & Conditional Alert / Compare Badge
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    // Subject Name & Course Code with Unique Subject Color Dot
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.testTag("label_subject_${stat.courseCode}")
                                     ) {
-                                        if (compareBadgeTag != null) {
-                                            Surface(
-                                                shape = RoundedCornerShape(4.dp),
-                                                color = if (compareBadgeTag == "A") CompareSubjectAColor else CompareSubjectBColor,
-                                                modifier = Modifier.testTag("compare_badge_${compareBadgeTag}_${stat.courseCode}")
-                                            ) {
-                                                Text(
-                                                    text = compareBadgeTag,
-                                                    fontSize = 8.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = Color.White,
-                                                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            if (compareBadgeTag != null) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = if (compareBadgeTag == "A") CompareSubjectAColor else CompareSubjectBColor,
+                                                    modifier = Modifier.testTag("compare_badge_${compareBadgeTag}_${stat.courseCode}")
+                                                ) {
+                                                    Text(
+                                                        text = compareBadgeTag,
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Color.White,
+                                                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                                    )
+                                                }
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(7.dp)
+                                                        .clip(CircleShape)
+                                                        .background(barSubjectColor)
+                                                        .testTag("bar_color_dot_${stat.courseCode}")
                                                 )
                                             }
-                                        } else {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(7.dp)
-                                                    .clip(CircleShape)
-                                                    .background(barSubjectColor)
-                                                    .testTag("bar_color_dot_${stat.courseCode}")
+                                            Text(
+                                                text = stat.courseCode,
+                                                fontSize = 10.5.sp,
+                                                fontWeight = if (isHighlighted || isBelow50 || compareBadgeTag != null) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                                color = if (compareBadgeTag == "A") CompareSubjectAColor
+                                                else if (compareBadgeTag == "B") CompareSubjectBColor
+                                                else if (isHighlighted) barSubjectColor
+                                                else MaterialTheme.colorScheme.onSurface
                                             )
+                                            if (isBelow50 && compareBadgeTag == null) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(5.dp)
+                                                        .clip(CircleShape)
+                                                        .background(ErrorRed)
+                                                )
+                                            }
                                         }
                                         Text(
-                                            text = stat.courseCode,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (isHighlighted || isBelow50 || compareBadgeTag != null) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                            color = if (compareBadgeTag == "A") CompareSubjectAColor
-                                            else if (compareBadgeTag == "B") CompareSubjectBColor
-                                            else if (isHighlighted) barSubjectColor
-                                            else MaterialTheme.colorScheme.onSurface
+                                            text = courseDisplayName,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("subject_name_label_${stat.courseCode}")
                                         )
-                                        if (isBelow50 && compareBadgeTag == null) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(5.dp)
-                                                    .clip(CircleShape)
-                                                    .background(ErrorRed)
-                                            )
-                                        }
                                     }
+
+                                    Spacer(modifier = Modifier.height(3.dp))
+
+                                    // Visual Goal Completion Progress Bar beneath the subject name (color-coded by status)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(if (isHighlighted) 0.90f else 0.84f)
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(100))
+                                            .background(goalStatusColor.copy(alpha = 0.16f))
+                                            .then(
+                                                if (isHighlighted) Modifier.border(1.dp, goalStatusColor, RoundedCornerShape(100))
+                                                else Modifier.border(0.6.dp, goalStatusColor.copy(alpha = 0.35f), RoundedCornerShape(100))
+                                            )
+                                            .testTag("progress_bar_subject_${stat.courseCode}")
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(animatedGoalProgress.coerceAtLeast(0.05f))
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(100))
+                                                .background(
+                                                    Brush.horizontalGradient(
+                                                        listOf(goalStatusColor.copy(alpha = 0.78f), goalStatusColor)
+                                                    )
+                                                )
+                                                .testTag("progress_bar_fill_${stat.courseCode}")
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                    Text(
+                                        text = "$pctOfGoal%",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = goalStatusColor,
+                                        modifier = Modifier.testTag("progress_percent_label_${stat.courseCode}")
+                                    )
                                 }
                                 }
                             }

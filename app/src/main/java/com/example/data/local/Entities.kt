@@ -1246,3 +1246,46 @@ object SubjectTrendHelper {
         }
     }
 }
+
+enum class GoalCompletionStatus(val label: String) {
+    COMPLETED("Goal Met"),
+    ON_TRACK("On Track"),
+    IN_PROGRESS("In Progress"),
+    BEHIND("Behind")
+}
+
+data class SubjectGoalProgressInfo(
+    val percentageInt: Int,
+    val progressFraction: Float,
+    val status: GoalCompletionStatus
+)
+
+object GoalProgressStatusHelper {
+    fun evaluateGoalProgress(
+        loggedHours: Double,
+        goalHours: Double
+    ): SubjectGoalProgressInfo {
+        if (goalHours <= 0.0) {
+            val pct = if (loggedHours > 0.0) 100 else 0
+            val status = if (pct >= 100) GoalCompletionStatus.COMPLETED else GoalCompletionStatus.BEHIND
+            return SubjectGoalProgressInfo(
+                percentageInt = pct,
+                progressFraction = (pct / 100f).coerceIn(0f, 1f),
+                status = status
+            )
+        }
+        val rawPct = ((loggedHours / goalHours) * 100.0).toInt().coerceAtLeast(0)
+        val fraction = (loggedHours / goalHours).toFloat().coerceIn(0f, 1f)
+        val status = when {
+            loggedHours >= goalHours || rawPct >= 100 -> GoalCompletionStatus.COMPLETED
+            rawPct >= 75 -> GoalCompletionStatus.ON_TRACK
+            rawPct >= 50 -> GoalCompletionStatus.IN_PROGRESS
+            else -> GoalCompletionStatus.BEHIND
+        }
+        return SubjectGoalProgressInfo(
+            percentageInt = rawPct,
+            progressFraction = fraction,
+            status = status
+        )
+    }
+}

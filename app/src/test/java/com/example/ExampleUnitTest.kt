@@ -1212,4 +1212,43 @@ class ExampleUnitTest {
             )
         )
     }
+
+    @Test
+    fun `test GoalProgressStatusHelper evaluates goal percentage and completion status tiers`() {
+        // Completed (>= 100%)
+        val completed = com.example.data.local.GoalProgressStatusHelper.evaluateGoalProgress(
+            loggedHours = 6.0,
+            goalHours = 5.0
+        )
+        assertEquals(120, completed.percentageInt)
+        assertEquals(1.0f, completed.progressFraction, 0.001f)
+        assertEquals(com.example.data.local.GoalCompletionStatus.COMPLETED, completed.status)
+
+        // On Track (75% - 99%)
+        val onTrack = com.example.data.local.GoalProgressStatusHelper.evaluateGoalProgress(
+            loggedHours = 4.0,
+            goalHours = 5.0
+        )
+        assertEquals(80, onTrack.percentageInt)
+        assertEquals(0.8f, onTrack.progressFraction, 0.001f)
+        assertEquals(com.example.data.local.GoalCompletionStatus.ON_TRACK, onTrack.status)
+
+        // In Progress (50% - 74%)
+        val inProgress = com.example.data.local.GoalProgressStatusHelper.evaluateGoalProgress(
+            loggedHours = 3.0,
+            goalHours = 5.0
+        )
+        assertEquals(60, inProgress.percentageInt)
+        assertEquals(0.6f, inProgress.progressFraction, 0.001f)
+        assertEquals(com.example.data.local.GoalCompletionStatus.IN_PROGRESS, inProgress.status)
+
+        // Behind (< 50%)
+        val behind = com.example.data.local.GoalProgressStatusHelper.evaluateGoalProgress(
+            loggedHours = 1.5,
+            goalHours = 5.0
+        )
+        assertEquals(30, behind.percentageInt)
+        assertEquals(0.3f, behind.progressFraction, 0.001f)
+        assertEquals(com.example.data.local.GoalCompletionStatus.BEHIND, behind.status)
+    }
 }
