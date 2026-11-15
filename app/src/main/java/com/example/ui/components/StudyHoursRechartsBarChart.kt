@@ -66,6 +66,8 @@ import com.example.data.local.SubjectGoalVisibilityHelper
 import com.example.data.local.SubjectHoverTooltipHelper
 import com.example.data.local.SubjectSortHelper
 import com.example.data.local.SubjectStudyStats
+import com.example.data.local.SubjectTrendDirection
+import com.example.data.local.SubjectTrendHelper
 import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
@@ -2586,10 +2588,14 @@ fun StudyHoursRechartsBarChart(
                                         }
                                     }
 
-                                    val prevStat = if (compareWithPreviousWeek) {
-                                        previousSubjectStats.firstOrNull { it.courseCode == stat.courseCode }
-                                    } else null
+                                    val prevStat = previousSubjectStats.firstOrNull {
+                                        it.courseCode.equals(stat.courseCode, ignoreCase = true)
+                                    }
                                     val prevH = prevStat?.totalHours ?: 0.0
+                                    val trendDirection = SubjectTrendHelper.evaluateTrendDirection(
+                                        currentMinutes = stat.totalMinutes,
+                                        previousMinutes = prevStat?.totalMinutes
+                                    )
                                     val prevHeightFraction = (prevH / maxHoursVal).toFloat().coerceIn(0.04f, 1f)
                                     val prevAnimatedHeight by animateFloatAsState(
                                         targetValue = prevHeightFraction,
@@ -2597,14 +2603,40 @@ fun StudyHoursRechartsBarChart(
                                         label = "bar_prev_${stat.courseCode}"
                                     )
 
-                                    // Hours value and target label
+                                    // Hours value and target label with directional week-over-week arrow
                                     if (compareWithPreviousWeek) {
-                                        Text(
-                                            text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h | ${String.format(Locale.US, "%.1f", prevH)}h",
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                            modifier = Modifier.testTag("bar_hours_label_${stat.courseCode}")
+                                        ) {
+                                            Text(
+                                                text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h | ${String.format(Locale.US, "%.1f", prevH)}h",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1
+                                            )
+                                            when (trendDirection) {
+                                                SubjectTrendDirection.UP -> Icon(
+                                                    imageVector = Icons.Default.ArrowUpward,
+                                                    contentDescription = "${stat.courseCode} increased vs previous week",
+                                                    tint = EmeraldTertiary,
+                                                    modifier = Modifier
+                                                        .size(10.dp)
+                                                        .testTag("trend_arrow_up_${stat.courseCode}")
+                                                )
+                                                SubjectTrendDirection.DOWN -> Icon(
+                                                    imageVector = Icons.Default.ArrowDownward,
+                                                    contentDescription = "${stat.courseCode} decreased vs previous week",
+                                                    tint = ErrorRed,
+                                                    modifier = Modifier
+                                                        .size(10.dp)
+                                                        .testTag("trend_arrow_down_${stat.courseCode}")
+                                                )
+                                                SubjectTrendDirection.UNCHANGED -> Unit
+                                            }
+                                        }
                                         Text(
                                             text = "This | Prev",
                                             fontSize = 8.sp,
@@ -2613,12 +2645,38 @@ fun StudyHoursRechartsBarChart(
                                             modifier = Modifier.padding(bottom = 2.dp)
                                         )
                                     } else {
-                                        Text(
-                                            text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                            modifier = Modifier.testTag("bar_hours_label_${stat.courseCode}")
+                                        ) {
+                                            Text(
+                                                text = "${String.format(Locale.US, "%.1f", stat.totalHours)}h",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isGoalMet) EmeraldTertiary else if (isBelow50) ErrorRed else if (isHighlighted) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1
+                                            )
+                                            when (trendDirection) {
+                                                SubjectTrendDirection.UP -> Icon(
+                                                    imageVector = Icons.Default.ArrowUpward,
+                                                    contentDescription = "${stat.courseCode} increased vs previous week",
+                                                    tint = EmeraldTertiary,
+                                                    modifier = Modifier
+                                                        .size(11.dp)
+                                                        .testTag("trend_arrow_up_${stat.courseCode}")
+                                                )
+                                                SubjectTrendDirection.DOWN -> Icon(
+                                                    imageVector = Icons.Default.ArrowDownward,
+                                                    contentDescription = "${stat.courseCode} decreased vs previous week",
+                                                    tint = ErrorRed,
+                                                    modifier = Modifier
+                                                        .size(11.dp)
+                                                        .testTag("trend_arrow_down_${stat.courseCode}")
+                                                )
+                                                SubjectTrendDirection.UNCHANGED -> Unit
+                                            }
+                                        }
                                         Text(
                                             text = "/${String.format(Locale.US, "%.0f", subjectGoal)}h",
                                             fontSize = 9.sp,

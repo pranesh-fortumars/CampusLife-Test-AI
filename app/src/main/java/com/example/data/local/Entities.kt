@@ -1226,3 +1226,23 @@ object SubjectSortHelper {
         }
     }
 }
+
+enum class SubjectTrendDirection {
+    UP,
+    DOWN,
+    UNCHANGED
+}
+
+object SubjectTrendHelper {
+    fun evaluateTrendDirection(
+        currentMinutes: Int,
+        previousMinutes: Int?
+    ): SubjectTrendDirection {
+        if (previousMinutes == null) return SubjectTrendDirection.UNCHANGED
+        return when {
+            currentMinutes > previousMinutes -> SubjectTrendDirection.UP
+            currentMinutes < previousMinutes -> SubjectTrendDirection.DOWN
+            else -> SubjectTrendDirection.UNCHANGED
+        }
+    }
+}

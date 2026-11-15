@@ -1180,4 +1180,36 @@ class ExampleUnitTest {
         )
         assertEquals(listOf("CS201", "MATH204", "PHY102", "ENG215"), byName.map { it.courseCode })
     }
+
+    @Test
+    fun `test SubjectTrendHelper detects up down and unchanged vs previous week`() {
+        assertEquals(
+            com.example.data.local.SubjectTrendDirection.UP,
+            com.example.data.local.SubjectTrendHelper.evaluateTrendDirection(
+                currentMinutes = 240,
+                previousMinutes = 180
+            )
+        )
+        assertEquals(
+            com.example.data.local.SubjectTrendDirection.DOWN,
+            com.example.data.local.SubjectTrendHelper.evaluateTrendDirection(
+                currentMinutes = 120,
+                previousMinutes = 180
+            )
+        )
+        assertEquals(
+            com.example.data.local.SubjectTrendDirection.UNCHANGED,
+            com.example.data.local.SubjectTrendHelper.evaluateTrendDirection(
+                currentMinutes = 180,
+                previousMinutes = 180
+            )
+        )
+        assertEquals(
+            com.example.data.local.SubjectTrendDirection.UNCHANGED,
+            com.example.data.local.SubjectTrendHelper.evaluateTrendDirection(
+                currentMinutes = 180,
+                previousMinutes = null
+            )
+        )
+    }
 }
