@@ -54,16 +54,14 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     private val studySessionDao = db.studySessionDao()
     private val subjectMasteryDao = db.subjectMasteryDao()
     private val weeklyDayNoteDao = db.weeklyDayNoteDao()
-
-    init {
-        viewModelScope.launch(Dispatchers.IO) {
-            db.populateInitialData()
-            ensureSubjectMasteryData()
-            ensureWeeklyDayNotesData()
-            ensureExtendedStudyHistoryData()
-            ensureFocusScoreBaselineSessions()
-        }
-    }
+    private val analyticsPrefs = application.getSharedPreferences(
+        "campus_life_analytics_prefs",
+        android.content.Context.MODE_PRIVATE
+    )
+    private val themePrefs = application.getSharedPreferences(
+        "campus_life_theme_prefs",
+        android.content.Context.MODE_PRIVATE
+    )
 
     // Navigation state
     private val _currentDestination = MutableStateFlow(AppDestination.HOME)
@@ -932,8 +930,6 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Daily study hour goal customization for analytics & chart thresholds
-    private val analyticsPrefs = getApplication<Application>().getSharedPreferences("campus_life_analytics_prefs", android.content.Context.MODE_PRIVATE)
-
     private val _dailyStudyGoalHours = MutableStateFlow(
         analyticsPrefs.getFloat("daily_study_goal_hours", 2.0f).toDouble()
     )
@@ -1075,8 +1071,6 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // Global Dark / Light Theme mode toggle for accessibility
-    private val themePrefs = getApplication<Application>().getSharedPreferences("campus_life_theme_prefs", android.content.Context.MODE_PRIVATE)
-
     private val _isDarkMode = MutableStateFlow<Boolean?>(
         if (themePrefs.contains("is_dark_mode")) themePrefs.getBoolean("is_dark_mode", false) else null
     )
@@ -1365,6 +1359,16 @@ class CampusLifeViewModel(application: Application) : AndroidViewModel(applicati
             tag = _selectedSessionTagFilter.value.takeIf { it != "All" } ?: "Exam Prep"
         )
         return loggedMinutes
+    }
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.populateInitialData()
+            ensureSubjectMasteryData()
+            ensureWeeklyDayNotesData()
+            ensureExtendedStudyHistoryData()
+            ensureFocusScoreBaselineSessions()
+        }
     }
 
     override fun onCleared() {
