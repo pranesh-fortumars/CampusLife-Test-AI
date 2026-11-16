@@ -1461,3 +1461,27 @@ object SubjectCategoryFilterHelper {
         }
     }
 }
+
+object SubjectBarEntryAnimationHelper {
+    const val ENTRY_DURATION_MS: Int = 520
+    const val STAGGER_STEP_MS: Long = 45L
+    const val MAX_STAGGER_DELAY_MS: Long = 225L
+
+    fun computeStaggerDelayMs(barIndex: Int): Long {
+        if (barIndex <= 0) return 0L
+        return (barIndex.toLong() * STAGGER_STEP_MS).coerceAtMost(MAX_STAGGER_DELAY_MS)
+    }
+
+    fun computeBottomUpHeightFraction(targetFraction: Float, entryProgress: Float): Float {
+        val safeTarget = targetFraction.coerceIn(0f, 1f)
+        val safeProgress = entryProgress.coerceIn(0f, 1f)
+        return (safeTarget * safeProgress).coerceIn(0f, 1f)
+    }
+
+    fun computeEntryAlpha(entryProgress: Float, baseAlpha: Float = 1f): Float {
+        val safeProgress = entryProgress.coerceIn(0f, 1f)
+        val safeBase = baseAlpha.coerceIn(0f, 1f)
+        return ((0.25f + (0.75f * safeProgress)) * safeBase).coerceIn(0f, 1f)
+    }
+}
+

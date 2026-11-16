@@ -3,12 +3,15 @@ package com.example.ui.components
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import kotlinx.coroutines.delay
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
@@ -55,6 +58,7 @@ import com.example.data.local.SubjectMasteryEntity
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -68,6 +72,7 @@ import com.example.data.local.DayStudyTrend
 import com.example.data.local.GoalCompletionStatus
 import com.example.data.local.GoalProgressStatusHelper
 import com.example.data.local.StudyDateRange
+import com.example.data.local.SubjectBarEntryAnimationHelper
 import com.example.data.local.SubjectCategoryFilter
 import com.example.data.local.SubjectCategoryFilterHelper
 import com.example.data.local.SubjectChartSortOrder
@@ -2550,8 +2555,23 @@ fun StudyHoursRechartsBarChart(
                             val hoverLiftPx = with(LocalDensity.current) { 3.dp.toPx() }
                             val isAnyBarHovered = activeHoveredStat != null
 
-                            displayedStudyStats.forEach { stat ->
+                            displayedStudyStats.forEachIndexed { barIndex, stat ->
                                 key(stat.courseCode) {
+                                val barEntryProgress = remember { Animatable(0f) }
+                                LaunchedEffect(selectedDateRange, selectedSubjectCategoryFilter, onlyHighPriorityFilter) {
+                                    barEntryProgress.snapTo(0f)
+                                    val staggerDelay = SubjectBarEntryAnimationHelper.computeStaggerDelayMs(barIndex)
+                                    if (staggerDelay > 0L) {
+                                        delay(staggerDelay)
+                                    }
+                                    barEntryProgress.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = tween(
+                                            durationMillis = SubjectBarEntryAnimationHelper.ENTRY_DURATION_MS,
+                                            easing = FastOutSlowInEasing
+                                        )
+                                    )
+                                }
                                 val barSubjectColor = getSubjectColor(stat.courseCode)
                                 val isLiveBarActive = (activeStudySession.isRunning || activeStudySession.elapsedSeconds > 0) &&
                                     activeStudySession.courseCode.equals(stat.courseCode, ignoreCase = true)
@@ -2916,7 +2936,20 @@ fun StudyHoursRechartsBarChart(
                                         )
                                     }
 
-                                    // Bar with Gradient reflecting progress towards target & hover scaling
+                                    val currentEntryHeightFraction = SubjectBarEntryAnimationHelper.computeBottomUpHeightFraction(
+                                        targetFraction = animatedHeight,
+                                        entryProgress = barEntryProgress.value
+                                    )
+                                    val prevEntryHeightFraction = SubjectBarEntryAnimationHelper.computeBottomUpHeightFraction(
+                                        targetFraction = prevAnimatedHeight,
+                                        entryProgress = barEntryProgress.value
+                                    )
+                                    val effectiveBarAlpha = SubjectBarEntryAnimationHelper.computeEntryAlpha(
+                                        entryProgress = barEntryProgress.value,
+                                        baseAlpha = animatedBarAlpha
+                                    )
+
+                                    // Bar with Gradient reflecting progress towards target, bottom-up entry growth & hover scaling
                                     if (compareWithPreviousWeek) {
                                         Row(
                                             modifier = Modifier
@@ -2929,12 +2962,13 @@ fun StudyHoursRechartsBarChart(
                                             Box(
                                                 modifier = Modifier
                                                     .width(13.dp)
-                                                    .fillMaxHeight(animatedHeight)
+                                                    .fillMaxHeight(currentEntryHeightFraction)
                                                     .graphicsLayer {
+                                                        transformOrigin = TransformOrigin(0.5f, 1f)
                                                         scaleX = animatedScale
                                                         scaleY = animatedScale
                                                         translationY = animatedLiftY
-                                                        alpha = animatedBarAlpha
+                                                        alpha = effectiveBarAlpha
                                                     }
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
@@ -2961,9 +2995,10 @@ fun StudyHoursRechartsBarChart(
                                             Box(
                                                 modifier = Modifier
                                                     .width(13.dp)
-                                                    .fillMaxHeight(prevAnimatedHeight)
+                                                    .fillMaxHeight(prevEntryHeightFraction)
                                                     .graphicsLayer {
-                                                        alpha = animatedBarAlpha
+                                                        transformOrigin = TransformOrigin(0.5f, 1f)
+                                                        alpha = effectiveBarAlpha
                                                     }
                                                     .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
                                                     .background(
@@ -2978,12 +3013,13 @@ fun StudyHoursRechartsBarChart(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
-                                                .fillMaxHeight(animatedHeight * 0.60f)
+                                                .fillMaxHeight(currentEntryHeightFraction * 0.60f)
                                                 .graphicsLayer {
+                                                    transformOrigin = TransformOrigin(0.5f, 1f)
                                                     scaleX = animatedScale
                                                     scaleY = animatedScale
                                                     translationY = animatedLiftY
-                                                    alpha = animatedBarAlpha
+                                                    alpha = effectiveBarAlpha
                                                 }
                                                 .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                                 .background(

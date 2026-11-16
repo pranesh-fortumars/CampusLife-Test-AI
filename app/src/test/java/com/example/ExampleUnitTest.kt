@@ -1381,4 +1381,51 @@ class ExampleUnitTest {
         assertFalse(phyTooltip.isGoalMet)
         assertTrue(phyTooltip.isBelow50)
     }
+
+    @Test
+    fun `test SubjectBarEntryAnimationHelper computes stagger delay and bottom-up height growth`() {
+        // Stagger delays increase gently per bar and cap at MAX_STAGGER_DELAY_MS
+        assertEquals(0L, com.example.data.local.SubjectBarEntryAnimationHelper.computeStaggerDelayMs(0))
+        assertEquals(45L, com.example.data.local.SubjectBarEntryAnimationHelper.computeStaggerDelayMs(1))
+        assertEquals(90L, com.example.data.local.SubjectBarEntryAnimationHelper.computeStaggerDelayMs(2))
+        assertEquals(225L, com.example.data.local.SubjectBarEntryAnimationHelper.computeStaggerDelayMs(8))
+
+        // Bottom-up height starts at 0f and smoothly reaches targetFraction at progress = 1f
+        assertEquals(
+            0f,
+            com.example.data.local.SubjectBarEntryAnimationHelper.computeBottomUpHeightFraction(
+                targetFraction = 0.8f,
+                entryProgress = 0f
+            ),
+            0.0001f
+        )
+        assertEquals(
+            0.4f,
+            com.example.data.local.SubjectBarEntryAnimationHelper.computeBottomUpHeightFraction(
+                targetFraction = 0.8f,
+                entryProgress = 0.5f
+            ),
+            0.0001f
+        )
+        assertEquals(
+            0.8f,
+            com.example.data.local.SubjectBarEntryAnimationHelper.computeBottomUpHeightFraction(
+                targetFraction = 0.8f,
+                entryProgress = 1f
+            ),
+            0.0001f
+        )
+
+        // Subtle entry alpha starts softly at 0.25f and ends at baseAlpha
+        assertEquals(
+            0.25f,
+            com.example.data.local.SubjectBarEntryAnimationHelper.computeEntryAlpha(0f, 1f),
+            0.0001f
+        )
+        assertEquals(
+            1f,
+            com.example.data.local.SubjectBarEntryAnimationHelper.computeEntryAlpha(1f, 1f),
+            0.0001f
+        )
+    }
 }
