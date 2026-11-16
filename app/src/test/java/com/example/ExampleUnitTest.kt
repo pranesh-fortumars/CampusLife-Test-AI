@@ -1545,4 +1545,207 @@ class ExampleUnitTest {
         assertEquals(86, examPrepReport.overallFocusScorePct) // 60/70 = 85.7 -> 86%
         assertEquals(com.example.data.local.FocusQualityTier.DEEP_FOCUS, examPrepReport.focusTier)
     }
+
+    @Test
+    fun `test CourseSevenDayTrendHelper computes last 7 days mini sparkline per course`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val cal = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.NOVEMBER, 16, 15, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val nowMs = cal.timeInMillis
+
+        val sessions = listOf(
+            // 6 days ago -> 30m CS201
+            com.example.data.local.StudySessionEntity(
+                id = 1L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 30,
+                timestampMs = nowMs - (6L * dayMs),
+                dateDisplay = "6d ago",
+                mode = "FOCUS",
+                tag = "Homework"
+            ),
+            // 2 days ago -> 60m CS201
+            com.example.data.local.StudySessionEntity(
+                id = 2L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 60,
+                timestampMs = nowMs - (2L * dayMs),
+                dateDisplay = "2d ago",
+                mode = "FOCUS",
+                tag = "Exam Prep"
+            ),
+            // Today -> 90m CS201 + 15m SHORT_BREAK (break must be excluded)
+            com.example.data.local.StudySessionEntity(
+                id = 3L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 90,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "FOCUS",
+                tag = "Exam Prep"
+            ),
+            com.example.data.local.StudySessionEntity(
+                id = 4L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 15,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "SHORT_BREAK",
+                tag = "Exam Prep"
+            ),
+            // 9 days ago -> outside 7-day window (must be excluded)
+            com.example.data.local.StudySessionEntity(
+                id = 5L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 120,
+                timestampMs = nowMs - (9L * dayMs),
+                dateDisplay = "9d ago",
+                mode = "FOCUS",
+                tag = "Exam Prep"
+            ),
+            // Different course -> excluded
+            com.example.data.local.StudySessionEntity(
+                id = 6L,
+                courseCode = "MATH204",
+                subjectName = "Discrete Math",
+                durationMinutes = 75,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "FOCUS",
+                tag = "Homework"
+            )
+        )
+
+        val sparkline = com.example.data.local.CourseSevenDayTrendHelper.buildSevenDaySparkline(
+            courseCode = "CS201",
+            courseName = "Data Structures",
+            sessions = sessions,
+            nowMs = nowMs
+        )
+
+        assertEquals(7, sparkline.points.size)
+        assertEquals(6, sparkline.points.first().dayOffsetFromToday)
+        assertEquals(0, sparkline.points.last().dayOffsetFromToday)
+        assertEquals("Today", sparkline.points.last().fullDateLabel)
+
+        // 30m + 60m + 90m = 180m = 3.0h across 3 active days
+        assertEquals(180, sparkline.totalMinutes)
+        assertEquals(3.0, sparkline.totalHours, 0.0001)
+        assertEquals(3, sparkline.activeDaysCount)
+        assertEquals(1.5, sparkline.peakHours, 0.0001)
+        // First 3 days = 0.5h (30m), last 3 days = 2.5h (150m) -> delta +2.0h upward
+        assertEquals(2.0, sparkline.trendDeltaHours, 0.0001)
+        assertTrue(sparkline.isUpward)
+
+        // Tag filter ("Exam Prep") excludes 6d-ago Homework 30m
+        val examOnly = com.example.data.local.CourseSevenDayTrendHelper.buildSevenDaySparkline(
+            courseCode = "CS201",
+            courseName = "Data Structures",
+            sessions = sessions,
+            tagFilter = "Exam Prep",
+            nowMs = nowMs
+        )
+        assertEquals(150, examOnly.totalMinutes)
+        assertEquals(2, examOnly.activeDaysCount)
+    }
+
+    @Test
+    fun `test CombinedTrendOverlayHelper requires 2 or more subjects and sums daily trends accurately`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val cal = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.NOVEMBER, 16, 15, 0, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val nowMs = cal.timeInMillis
+
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(
+                id = 10L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 60,
+                timestampMs = nowMs - (1L * dayMs),
+                dateDisplay = "Yesterday",
+                mode = "FOCUS"
+            ),
+            com.example.data.local.StudySessionEntity(
+                id = 11L,
+                courseCode = "MATH204",
+                subjectName = "Discrete Math",
+                durationMinutes = 90,
+                timestampMs = nowMs - (1L * dayMs),
+                dateDisplay = "Yesterday",
+                mode = "FOCUS"
+            ),
+            com.example.data.local.StudySessionEntity(
+                id = 12L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 30,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "FOCUS"
+            ),
+            // Unselected subject PHY102 must NOT be included
+            com.example.data.local.StudySessionEntity(
+                id = 13L,
+                courseCode = "PHY102",
+                subjectName = "Physics",
+                durationMinutes = 120,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "FOCUS"
+            )
+        )
+
+        // Single or duplicate course -> null
+        org.junit.Assert.assertNull(
+            com.example.data.local.CombinedTrendOverlayHelper.buildCombinedTrendOverlay(
+                selectedCourseCodes = listOf("CS201"),
+                sessions = sessions,
+                nowMs = nowMs
+            )
+        )
+        org.junit.Assert.assertNull(
+            com.example.data.local.CombinedTrendOverlayHelper.buildCombinedTrendOverlay(
+                selectedCourseCodes = listOf("CS201", "cs201"),
+                sessions = sessions,
+                nowMs = nowMs
+            )
+        )
+
+        val combined = com.example.data.local.CombinedTrendOverlayHelper.buildCombinedTrendOverlay(
+            selectedCourseCodes = listOf("CS201", "MATH204"),
+            sessions = sessions,
+            nowMs = nowMs
+        )
+        org.junit.Assert.assertNotNull(combined)
+        combined!!
+
+        assertEquals(listOf("CS201", "MATH204"), combined.selectedCourseCodes)
+        assertEquals(7, combined.points.size)
+        assertEquals(180, combined.totalCombinedMinutes)
+        assertEquals(3.0, combined.totalCombinedHours, 0.0001)
+
+        // Yesterday (index 5): 60m CS201 + 90m MATH204 = 150m (2.5h peak)
+        val yesterdayPt = combined.points[5]
+        assertEquals(150, yesterdayPt.combinedMinutes)
+        assertEquals(2.5, yesterdayPt.combinedHours, 0.0001)
+        assertEquals(1.0, yesterdayPt.perCourseHours["CS201"] ?: 0.0, 0.0001)
+        assertEquals(1.5, yesterdayPt.perCourseHours["MATH204"] ?: 0.0, 0.0001)
+        assertEquals(2.5, combined.peakCombinedHours, 0.0001)
+
+        // Today (index 6): 30m CS201 + 0m MATH204 = 30m (0.5h); PHY102 ignored
+        val todayPt = combined.points[6]
+        assertEquals(30, todayPt.combinedMinutes)
+        assertEquals(0.5, todayPt.combinedHours, 0.0001)
+    }
 }
+

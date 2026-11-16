@@ -1612,4 +1612,203 @@ object SubjectSessionBreakdownHelper {
     }
 }
 
+data class SevenDaySparklinePoint(
+    val dayOffsetFromToday: Int,
+    val dayLabel: String,
+    val fullDateLabel: String,
+    val minutes: Int,
+    val hours: Double
+)
 
+data class CourseSevenDaySparkline(
+    val courseCode: String,
+    val courseName: String,
+    val points: List<SevenDaySparklinePoint>,
+    val totalMinutes: Int,
+    val totalHours: Double,
+    val peakDayLabel: String,
+    val peakHours: Double,
+    val activeDaysCount: Int,
+    val trendDeltaHours: Double,
+    val isUpward: Boolean
+)
+
+object CourseSevenDayTrendHelper {
+
+    internal data class CalendarDayBucket(
+        val dayOffsetFromToday: Int,
+        val startMs: Long,
+        val endMs: Long,
+        val dayLabel: String,
+        val fullDateLabel: String
+    )
+
+    internal fun buildLastSevenDayBuckets(nowMs: Long): List<CalendarDayBucket> {
+        val shortDayFmt = java.text.SimpleDateFormat("EEE", java.util.Locale.US)
+        val fullDateFmt = java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+        val todayStartCal = java.util.Calendar.getInstance().apply {
+            timeInMillis = nowMs
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+
+        // Order oldest (6 days ago) -> newest (today, offset 0)
+        return (6 downTo 0).map { offset ->
+            val dayStartCal = (todayStartCal.clone() as java.util.Calendar).apply {
+                add(java.util.Calendar.DAY_OF_YEAR, -offset)
+            }
+            val dayEndCal = (dayStartCal.clone() as java.util.Calendar).apply {
+                add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+            CalendarDayBucket(
+                dayOffsetFromToday = offset,
+                startMs = dayStartCal.timeInMillis,
+                endMs = dayEndCal.timeInMillis,
+                dayLabel = shortDayFmt.format(dayStartCal.time),
+                fullDateLabel = if (offset == 0) "Today" else fullDateFmt.format(dayStartCal.time)
+            )
+        }
+    }
+
+    fun buildSevenDaySparkline(
+        courseCode: String,
+        courseName: String,
+        sessions: List<StudySessionEntity>,
+        tagFilter: String = "All",
+        nowMs: Long = System.currentTimeMillis()
+    ): CourseSevenDaySparkline {
+        val buckets = buildLastSevenDayBuckets(nowMs)
+        val windowStartMs = buckets.first().startMs
+        val windowEndMs = buckets.last().endMs
+
+        val relevantSessions = sessions.filter { s ->
+            s.courseCode.equals(courseCode, ignoreCase = true) &&
+                FocusScoreHelper.isFocusedSessionMode(s.mode) &&
+                (tagFilter == "All" || s.tag.equals(tagFilter, ignoreCase = true)) &&
+                s.timestampMs >= windowStartMs &&
+                s.timestampMs < windowEndMs
+        }
+
+        val points = buckets.map { bucket ->
+            val mins = relevantSessions
+                .filter { it.timestampMs >= bucket.startMs && it.timestampMs < bucket.endMs }
+                .sumOf { maxOf(0, it.durationMinutes) }
+            SevenDaySparklinePoint(
+                dayOffsetFromToday = bucket.dayOffsetFromToday,
+                dayLabel = bucket.dayLabel,
+                fullDateLabel = bucket.fullDateLabel,
+                minutes = mins,
+                hours = mins / 60.0
+            )
+        }
+
+        val totalMinutes = points.sumOf { it.minutes }
+        val totalHours = totalMinutes / 60.0
+        val peakPoint = points.maxByOrNull { it.minutes }
+        val activeDays = points.count { it.minutes > 0 }
+        val firstHalfHours = points.take(3).sumOf { it.hours }
+        val recentHalfHours = points.takeLast(3).sumOf { it.hours }
+        val deltaHours = recentHalfHours - firstHalfHours
+
+        return CourseSevenDaySparkline(
+            courseCode = courseCode,
+            courseName = courseName,
+            points = points,
+            totalMinutes = totalMinutes,
+            totalHours = totalHours,
+            peakDayLabel = peakPoint?.dayLabel ?: "—",
+            peakHours = peakPoint?.hours ?: 0.0,
+            activeDaysCount = activeDays,
+            trendDeltaHours = deltaHours,
+            isUpward = deltaHours >= 0.0
+        )
+    }
+}
+
+data class CombinedTrendDayPoint(
+    val dayOffsetFromToday: Int,
+    val dayLabel: String,
+    val fullDateLabel: String,
+    val combinedMinutes: Int,
+    val combinedHours: Double,
+    val perCourseHours: Map<String, Double>
+)
+
+data class CombinedTrendOverlayReport(
+    val selectedCourseCodes: List<String>,
+    val points: List<CombinedTrendDayPoint>,
+    val totalCombinedMinutes: Int,
+    val totalCombinedHours: Double,
+    val avgDailyCombinedHours: Double,
+    val peakDayLabel: String,
+    val peakCombinedHours: Double,
+    val maxAxisHours: Double
+)
+
+object CombinedTrendOverlayHelper {
+
+    fun buildCombinedTrendOverlay(
+        selectedCourseCodes: List<String>,
+        sessions: List<StudySessionEntity>,
+        tagFilter: String = "All",
+        nowMs: Long = System.currentTimeMillis()
+    ): CombinedTrendOverlayReport? {
+        val uniqueCourses = selectedCourseCodes
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinctBy { it.uppercase(java.util.Locale.US) }
+
+        if (uniqueCourses.size < 2) return null
+
+        val sparklinesByCourse = uniqueCourses.associateWith { code ->
+            CourseSevenDayTrendHelper.buildSevenDaySparkline(
+                courseCode = code,
+                courseName = code,
+                sessions = sessions,
+                tagFilter = tagFilter,
+                nowMs = nowMs
+            )
+        }
+
+        val referencePoints = sparklinesByCourse.values.first().points
+        val combinedPoints = referencePoints.indices.map { dayIdx ->
+            val refPt = referencePoints[dayIdx]
+            var dayMins = 0
+            val perCourse = LinkedHashMap<String, Double>()
+            uniqueCourses.forEach { code ->
+                val pt = sparklinesByCourse[code]?.points?.getOrNull(dayIdx)
+                val m = pt?.minutes ?: 0
+                dayMins += m
+                perCourse[code] = m / 60.0
+            }
+            CombinedTrendDayPoint(
+                dayOffsetFromToday = refPt.dayOffsetFromToday,
+                dayLabel = refPt.dayLabel,
+                fullDateLabel = refPt.fullDateLabel,
+                combinedMinutes = dayMins,
+                combinedHours = dayMins / 60.0,
+                perCourseHours = perCourse
+            )
+        }
+
+        val totalMinutes = combinedPoints.sumOf { it.combinedMinutes }
+        val totalHours = totalMinutes / 60.0
+        val avgDailyHours = totalHours / combinedPoints.size.coerceAtLeast(1)
+        val peakPt = combinedPoints.maxByOrNull { it.combinedMinutes }
+        val peakHours = peakPt?.combinedHours ?: 0.0
+        val maxAxisHours = maxOf(1.0, peakHours * 1.18)
+
+        return CombinedTrendOverlayReport(
+            selectedCourseCodes = uniqueCourses,
+            points = combinedPoints,
+            totalCombinedMinutes = totalMinutes,
+            totalCombinedHours = totalHours,
+            avgDailyCombinedHours = avgDailyHours,
+            peakDayLabel = peakPt?.dayLabel ?: "—",
+            peakCombinedHours = peakHours,
+            maxAxisHours = maxAxisHours
+        )
+    }
+}

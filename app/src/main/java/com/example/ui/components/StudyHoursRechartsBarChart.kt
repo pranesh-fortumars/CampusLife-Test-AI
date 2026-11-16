@@ -13,8 +13,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.delay
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -66,9 +68,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.example.data.local.ActiveSessionHelper
 import com.example.data.local.ActiveSessionState
+import com.example.data.local.CombinedTrendOverlayHelper
+import com.example.data.local.CombinedTrendOverlayReport
 import com.example.data.local.CourseEntity
+import com.example.data.local.CourseSevenDaySparkline
+import com.example.data.local.CourseSevenDayTrendHelper
 import com.example.data.local.DayStudyTrend
 import com.example.data.local.FocusQualityTier
 import com.example.data.local.GoalCompletionStatus
@@ -156,6 +164,10 @@ fun StudyHoursRechartsBarChart(
     var overlaySubjectStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var hoveredStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
+    var expandedTrendCourseCode by remember { mutableStateOf<String?>(null) }
+    var hoveredTrendCourseCode by remember { mutableStateOf<String?>(null) }
+    var selectedCompareCourses by remember { mutableStateOf(setOf<String>()) }
+    var showCombinedTrendOverlay by remember { mutableStateOf(true) }
 
     val subjectColorMap = remember(courses, studyStats) {
         val allCodes = (courses.map { it.code } + studyStats.map { it.courseCode }).distinct()
@@ -253,6 +265,22 @@ fun StudyHoursRechartsBarChart(
     }
     val activeSelectedDayTrend = selectedDayTrend?.let { sel ->
         weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
+    }
+    val activeTrendCourseCode = hoveredTrendCourseCode ?: expandedTrendCourseCode
+    val activeTrendStat = activeTrendCourseCode?.let { code ->
+        displayedStudyStats.firstOrNull { it.courseCode.equals(code, ignoreCase = true) }
+    }
+    val activeCompareCourses = remember(displayedStudyStats, selectedCompareCourses) {
+        displayedStudyStats.map { it.courseCode }.filter { code ->
+            selectedCompareCourses.any { it.equals(code, ignoreCase = true) }
+        }
+    }
+    val combinedTrendOverlayReport = remember(activeCompareCourses, allStudySessions, selectedSessionTagFilter) {
+        CombinedTrendOverlayHelper.buildCombinedTrendOverlay(
+            selectedCourseCodes = activeCompareCourses,
+            sessions = allStudySessions,
+            tagFilter = selectedSessionTagFilter
+        )
     }
 
     val monthlyWeeklyGoalHours = if (monthlySubjectFilter != null) {
@@ -2497,6 +2525,123 @@ fun StudyHoursRechartsBarChart(
                         }
                     }
                 } else {
+                    // Toggleable Combined Trend Overlay Controls (shown when Compare Subjects checkboxes are used)
+                    if (activeCompareCourses.size == 1) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = VioletSecondaryContainer.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, VioletSecondary.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("compare_subjects_hint_banner")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ShowChart,
+                                        contentDescription = null,
+                                        tint = VioletSecondary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "${activeCompareCourses.first()} selected — check 1 more subject to overlay Combined Trend",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { selectedCompareCourses = emptySet() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.testTag("btn_clear_compare_subjects")
+                                ) {
+                                    Text("Clear", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else if (activeCompareCourses.size >= 2) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = VioletSecondaryContainer.copy(alpha = 0.55f),
+                            border = BorderStroke(1.dp, VioletSecondary.copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("combined_trend_controls_row")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    FilterChip(
+                                        selected = showCombinedTrendOverlay,
+                                        onClick = { showCombinedTrendOverlay = !showCombinedTrendOverlay },
+                                        label = {
+                                            Text(
+                                                text = if (showCombinedTrendOverlay) "Combined Trend: ON" else "Combined Trend: OFF",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.ShowChart,
+                                                contentDescription = "Toggle Combined Trend Line Chart",
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(100),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = VioletSecondary,
+                                            selectedLabelColor = Color.White,
+                                            selectedLeadingIconColor = Color.White
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (showCombinedTrendOverlay) VioletSecondary else VioletSecondary.copy(alpha = 0.4f)
+                                        ),
+                                        modifier = Modifier
+                                            .heightIn(min = 34.dp)
+                                            .testTag("toggle_combined_trend_chart")
+                                    )
+                                    Text(
+                                        text = activeCompareCourses.joinToString(" + "),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                TextButton(
+                                    onClick = { selectedCompareCourses = emptySet() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.testTag("btn_clear_compare_subjects")
+                                ) {
+                                    Text("Clear", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
                     val maxSubjectGoal = displayedStudyStats.maxOfOrNull { getGoalForCourse(it.courseCode) } ?: 5.0
                     val maxHoursVal = max(
                         max(max(8.0, maxSubjectGoal + 1.5), (displayedStudyStats.maxOfOrNull { it.totalHours } ?: 6.0) + 1.5),
@@ -2506,12 +2651,12 @@ fun StudyHoursRechartsBarChart(
                     BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(330.dp)
+                            .height(412.dp)
                             .testTag("recharts_subject_viewport")
                     ) {
                         val totalWidth = maxWidth
                         Canvas(modifier = Modifier.fillMaxSize()) {
-                            val bottomAxisY = size.height - 96.dp.toPx()
+                            val bottomAxisY = size.height - 154.dp.toPx()
                             val topY = 20.dp.toPx()
                             val chartHeight = bottomAxisY - topY
 
@@ -2970,7 +3115,7 @@ fun StudyHoursRechartsBarChart(
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .fillMaxHeight(0.60f),
+                                                .fillMaxHeight(0.45f),
                                             horizontalArrangement = Arrangement.Center,
                                             verticalAlignment = Alignment.Bottom
                                         ) {
@@ -3029,7 +3174,7 @@ fun StudyHoursRechartsBarChart(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth(if (isHighlighted) 0.68f else 0.6f)
-                                                .fillMaxHeight(currentEntryHeightFraction * 0.60f)
+                                                .fillMaxHeight(currentEntryHeightFraction * 0.45f)
                                                 .graphicsLayer {
                                                     transformOrigin = TransformOrigin(0.5f, 1f)
                                                     scaleX = animatedScale
@@ -3094,68 +3239,150 @@ fun StudyHoursRechartsBarChart(
                                         it.code.equals(stat.courseCode, ignoreCase = true)
                                     }?.name ?: stat.courseCode
 
-                                    // Subject Name & Course Code with Unique Subject Color Dot
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.testTag("label_subject_${stat.courseCode}")
+                                    // Subject Name, Course Code & Interactive 7-Day Trend Icon
+                                    val isTrendExpanded = activeTrendCourseCode.equals(stat.courseCode, ignoreCase = true)
+                                    val trendIconInteractionSource = remember(stat.courseCode) { MutableInteractionSource() }
+                                    val isTrendIconHovered by trendIconInteractionSource.collectIsHoveredAsState()
+
+                                    LaunchedEffect(isTrendIconHovered) {
+                                        if (isTrendIconHovered) {
+                                            hoveredTrendCourseCode = stat.courseCode
+                                            hoveredStat = null
+                                        } else if (hoveredTrendCourseCode.equals(stat.courseCode, ignoreCase = true)) {
+                                            hoveredTrendCourseCode = null
+                                        }
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isTrendExpanded) barSubjectColor.copy(alpha = 0.14f) else Color.Transparent,
+                                        border = if (isTrendExpanded) BorderStroke(1.dp, barSubjectColor.copy(alpha = 0.55f)) else null,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .hoverable(interactionSource = trendIconInteractionSource)
+                                            .pointerInput(stat.courseCode) {
+                                                awaitPointerEventScope {
+                                                    while (true) {
+                                                        val event = awaitPointerEvent()
+                                                        when (event.type) {
+                                                            PointerEventType.Enter, PointerEventType.Move -> {
+                                                                hoveredTrendCourseCode = stat.courseCode
+                                                                hoveredStat = null
+                                                            }
+                                                            PointerEventType.Exit -> {
+                                                                if (hoveredTrendCourseCode.equals(stat.courseCode, ignoreCase = true)) {
+                                                                    hoveredTrendCourseCode = null
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            .clickable {
+                                                expandedTrendCourseCode = if (expandedTrendCourseCode.equals(stat.courseCode, ignoreCase = true)) {
+                                                    null
+                                                } else {
+                                                    stat.courseCode
+                                                }
+                                                if (expandedTrendCourseCode == null && hoveredTrendCourseCode.equals(stat.courseCode, ignoreCase = true)) {
+                                                    hoveredTrendCourseCode = null
+                                                }
+                                            }
+                                            .semantics {
+                                                contentDescription = "Show 7-day trend sparkline for ${stat.courseCode}"
+                                            }
+                                            .testTag("btn_subject_trend_${stat.courseCode}")
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center,
+                                            modifier = Modifier
+                                                .padding(horizontal = 2.dp, vertical = 3.dp)
+                                                .testTag("label_subject_${stat.courseCode}")
                                         ) {
-                                            if (compareBadgeTag != null) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    color = if (compareBadgeTag == "A") CompareSubjectAColor else CompareSubjectBColor,
-                                                    modifier = Modifier.testTag("compare_badge_${compareBadgeTag}_${stat.courseCode}")
-                                                ) {
-                                                    Text(
-                                                        text = compareBadgeTag,
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.ExtraBold,
-                                                        color = Color.White,
-                                                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                            ) {
+                                                if (compareBadgeTag != null) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(4.dp),
+                                                        color = if (compareBadgeTag == "A") CompareSubjectAColor else CompareSubjectBColor,
+                                                        modifier = Modifier.testTag("compare_badge_${compareBadgeTag}_${stat.courseCode}")
+                                                    ) {
+                                                        Text(
+                                                            text = compareBadgeTag,
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = Color.White,
+                                                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                                                        )
+                                                    }
+                                                } else {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(6.dp)
+                                                            .clip(CircleShape)
+                                                            .background(barSubjectColor)
+                                                            .testTag("bar_color_dot_${stat.courseCode}")
                                                     )
                                                 }
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(7.dp)
-                                                        .clip(CircleShape)
-                                                        .background(barSubjectColor)
-                                                        .testTag("bar_color_dot_${stat.courseCode}")
+                                                Text(
+                                                    text = stat.courseCode,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (isHighlighted || isBelow50 || compareBadgeTag != null || isTrendExpanded) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                                    color = if (compareBadgeTag == "A") CompareSubjectAColor
+                                                    else if (compareBadgeTag == "B") CompareSubjectBColor
+                                                    else if (isHighlighted || isTrendExpanded) barSubjectColor
+                                                    else MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
+                                                if (isBelow50 && compareBadgeTag == null) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(5.dp)
+                                                            .clip(CircleShape)
+                                                            .background(ErrorRed)
+                                                    )
+                                                }
                                             }
-                                            Text(
-                                                text = stat.courseCode,
-                                                fontSize = 10.5.sp,
-                                                fontWeight = if (isHighlighted || isBelow50 || compareBadgeTag != null) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                                color = if (compareBadgeTag == "A") CompareSubjectAColor
-                                                else if (compareBadgeTag == "B") CompareSubjectBColor
-                                                else if (isHighlighted) barSubjectColor
-                                                else MaterialTheme.colorScheme.onSurface
-                                            )
-                                            if (isBelow50 && compareBadgeTag == null) {
-                                                Box(
+                                            Spacer(modifier = Modifier.height(1.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Text(
+                                                    text = courseDisplayName,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    textAlign = TextAlign.Center,
                                                     modifier = Modifier
-                                                        .size(5.dp)
-                                                        .clip(CircleShape)
-                                                        .background(ErrorRed)
+                                                        .weight(1f)
+                                                        .testTag("subject_name_label_${stat.courseCode}")
                                                 )
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = if (isTrendExpanded) barSubjectColor else barSubjectColor.copy(alpha = 0.14f),
+                                                    modifier = Modifier.size(16.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.ShowChart,
+                                                            contentDescription = "Trend for ${stat.courseCode}",
+                                                            tint = if (isTrendExpanded) Color.White else barSubjectColor,
+                                                            modifier = Modifier.size(11.dp)
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
-                                        Text(
-                                            text = courseDisplayName,
-                                            fontSize = 8.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .testTag("subject_name_label_${stat.courseCode}")
-                                        )
                                     }
 
                                     Spacer(modifier = Modifier.height(3.dp))
@@ -3196,6 +3423,87 @@ fun StudyHoursRechartsBarChart(
                                         color = goalStatusColor,
                                         modifier = Modifier.testTag("progress_percent_label_${stat.courseCode}")
                                     )
+
+                                    Spacer(modifier = Modifier.height(3.dp))
+
+                                    // Per-item 'Compare Subjects' Checkbox (48.dp touch target)
+                                    val isCheckedForCompare = selectedCompareCourses.any {
+                                        it.equals(stat.courseCode, ignoreCase = true)
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isCheckedForCompare) barSubjectColor.copy(alpha = 0.12f)
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                            )
+                                            .then(
+                                                if (isCheckedForCompare) Modifier.border(
+                                                    width = 1.dp,
+                                                    color = barSubjectColor.copy(alpha = 0.55f),
+                                                    shape = RoundedCornerShape(8.dp)
+                                                ) else Modifier
+                                            )
+                                            .toggleable(
+                                                value = isCheckedForCompare,
+                                                role = Role.Checkbox,
+                                                onValueChange = { checked ->
+                                                    val updated = selectedCompareCourses.filterNot {
+                                                        it.equals(stat.courseCode, ignoreCase = true)
+                                                    }.toMutableSet()
+                                                    if (checked) {
+                                                        updated.add(stat.courseCode)
+                                                    }
+                                                    selectedCompareCourses = updated
+                                                }
+                                            )
+                                            .semantics {
+                                                contentDescription = "Compare Subjects ${stat.courseCode}"
+                                            }
+                                            .testTag("checkbox_compare_subject_${stat.courseCode}"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(
+                                                        if (isCheckedForCompare) barSubjectColor else Color.Transparent
+                                                    )
+                                                    .border(
+                                                        width = 1.4.dp,
+                                                        color = if (isCheckedForCompare) barSubjectColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (isCheckedForCompare) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = Color.White,
+                                                        modifier = Modifier.size(11.dp)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "Compare",
+                                                fontSize = 7.5.sp,
+                                                fontWeight = if (isCheckedForCompare) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isCheckedForCompare) barSubjectColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                overflow = TextOverflow.Clip
+                                            )
+                                        }
+                                    }
                                 }
                                 }
                             }
@@ -3565,6 +3873,55 @@ fun StudyHoursRechartsBarChart(
                                     }
                                 }
                             }
+                        }
+
+                        // Toggleable 'Combined Trend' Line Chart Overlaying the Main Bar Chart (when 2+ subjects checked)
+                        val overlayReport = combinedTrendOverlayReport
+                        if (activeCompareCourses.size >= 2 && showCombinedTrendOverlay && overlayReport != null) {
+                            CombinedTrendOverlayLayer(
+                                report = overlayReport,
+                                subjectColorProvider = ::getSubjectColor,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(258.dp)
+                                    .padding(top = 20.dp)
+                                    .zIndex(15f)
+                            )
+                        }
+                    }
+
+                    // Expandable 7-Day Course Mini-Sparkline Card (shown on Trend icon click or hover)
+                    AnimatedVisibility(
+                        visible = activeTrendStat != null,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        activeTrendStat?.let { trendStat ->
+                            val courseTitle = courses.firstOrNull {
+                                it.code.equals(trendStat.courseCode, ignoreCase = true)
+                            }?.name ?: trendStat.courseCode
+                            val sparklineData = remember(
+                                trendStat.courseCode,
+                                courseTitle,
+                                allStudySessions,
+                                selectedSessionTagFilter
+                            ) {
+                                CourseSevenDayTrendHelper.buildSevenDaySparkline(
+                                    courseCode = trendStat.courseCode,
+                                    courseName = courseTitle,
+                                    sessions = allStudySessions,
+                                    tagFilter = selectedSessionTagFilter
+                                )
+                            }
+                            SubjectSevenDaySparklineCard(
+                                sparkline = sparklineData,
+                                subjectColor = getSubjectColor(trendStat.courseCode),
+                                isPinnedByClick = expandedTrendCourseCode.equals(trendStat.courseCode, ignoreCase = true),
+                                onClose = {
+                                    expandedTrendCourseCode = null
+                                    hoveredTrendCourseCode = null
+                                }
+                            )
                         }
                     }
                 } else {
@@ -6868,6 +7225,434 @@ private fun SubjectSessionBreakdownRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SubjectSevenDaySparklineCard(
+    sparkline: CourseSevenDaySparkline,
+    subjectColor: Color,
+    isPinnedByClick: Boolean,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val deltaSign = if (sparkline.trendDeltaHours >= 0) "+" else ""
+    val deltaFormatted = "$deltaSign${String.format(Locale.US, "%.1f", sparkline.trendDeltaHours)}h"
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        border = BorderStroke(1.2.dp, subjectColor.copy(alpha = 0.55f)),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("subject_7day_sparkline_${sparkline.courseCode}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Header row: Subject identity + 7D delta badge + dismiss button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = subjectColor
+                    ) {
+                        Text(
+                            text = sparkline.courseCode,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "${sparkline.courseName} — Last 7 Days",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "Total: ${String.format(Locale.US, "%.1f", sparkline.totalHours)}h • Peak: ${sparkline.peakDayLabel} (${String.format(Locale.US, "%.1f", sparkline.peakHours)}h) • ${sparkline.activeDaysCount}/7 active days",
+                            fontSize = 9.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(100),
+                        color = if (sparkline.isUpward) EmeraldTertiaryContainer else WarningContainer
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (sparkline.isUpward) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                contentDescription = null,
+                                tint = if (sparkline.isUpward) EmeraldTertiary else WarningAmber,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Text(
+                                text = deltaFormatted,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (sparkline.isUpward) EmeraldOnTertiaryContainer else OnWarningContainer
+                            )
+                        }
+                    }
+
+                    if (isPinnedByClick) {
+                        IconButton(
+                            onClick = onClose,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .minimumInteractiveComponentSize()
+                                .testTag("btn_close_sparkline_${sparkline.courseCode}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close ${sparkline.courseCode} 7-day trend",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 7-Day Mini-Sparkline Canvas
+            val points = sparkline.points
+            val maxSparkHours = maxOf(0.5, points.maxOfOrNull { it.hours } ?: 1.0)
+            val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .testTag("subject_7day_sparkline_canvas_${sparkline.courseCode}")
+            ) {
+                if (points.size >= 2) {
+                    val padX = 14.dp.toPx()
+                    val padTop = 8.dp.toPx()
+                    val padBottom = 8.dp.toPx()
+                    val usableW = (size.width - (padX * 2f)).coerceAtLeast(1f)
+                    val usableH = (size.height - padTop - padBottom).coerceAtLeast(1f)
+                    val stepX = usableW / (points.size - 1).toFloat()
+
+                    // Midline guide
+                    val midY = padTop + (usableH * 0.5f)
+                    drawLine(
+                        color = outlineColor,
+                        start = Offset(padX, midY),
+                        end = Offset(size.width - padX, midY),
+                        strokeWidth = 1.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
+                    )
+
+                    val coords = points.mapIndexed { idx, pt ->
+                        val x = padX + (idx * stepX)
+                        val norm = (pt.hours / maxSparkHours).toFloat().coerceIn(0f, 1f)
+                        val y = (size.height - padBottom) - (norm * usableH)
+                        Offset(x, y)
+                    }
+
+                    val fillPath = Path().apply {
+                        moveTo(coords.first().x, size.height - padBottom)
+                        lineTo(coords.first().x, coords.first().y)
+                        for (i in 1 until coords.size) {
+                            lineTo(coords[i].x, coords[i].y)
+                        }
+                        lineTo(coords.last().x, size.height - padBottom)
+                        close()
+                    }
+                    drawPath(
+                        path = fillPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                subjectColor.copy(alpha = 0.34f),
+                                subjectColor.copy(alpha = 0.03f)
+                            )
+                        )
+                    )
+
+                    val strokePath = Path().apply {
+                        moveTo(coords.first().x, coords.first().y)
+                        for (i in 1 until coords.size) {
+                            lineTo(coords[i].x, coords[i].y)
+                        }
+                    }
+                    drawPath(
+                        path = strokePath,
+                        color = subjectColor,
+                        style = Stroke(
+                            width = 2.4.dp.toPx(),
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+
+                    coords.forEachIndexed { idx, pt ->
+                        val isToday = idx == coords.lastIndex
+                        val isPeak = points[idx].hours > 0.0 && points[idx].hours >= (sparkline.peakHours - 0.001)
+                        if (isToday || isPeak) {
+                            drawCircle(
+                                color = subjectColor.copy(alpha = 0.25f),
+                                radius = 7.dp.toPx(),
+                                center = pt
+                            )
+                        }
+                        drawCircle(
+                            color = Color.White,
+                            radius = if (isToday) 4.2.dp.toPx() else 3.2.dp.toPx(),
+                            center = pt
+                        )
+                        drawCircle(
+                            color = subjectColor,
+                            radius = if (isToday) 4.2.dp.toPx() else 3.2.dp.toPx(),
+                            center = pt,
+                            style = Stroke(width = 1.8.dp.toPx())
+                        )
+                    }
+                }
+            }
+
+            // 7-Day X-Axis Labels & Hours
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                points.forEachIndexed { idx, pt ->
+                    val isToday = idx == points.lastIndex
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = if (pt.minutes > 0) "${String.format(Locale.US, "%.1f", pt.hours)}h" else "0h",
+                            fontSize = 8.5.sp,
+                            fontWeight = if (pt.minutes > 0) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isToday) subjectColor else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (isToday) "Today" else pt.dayLabel,
+                            fontSize = 8.sp,
+                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isToday) subjectColor else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CombinedTrendOverlayLayer(
+    report: CombinedTrendOverlayReport,
+    subjectColorProvider: (String) -> Color,
+    modifier: Modifier = Modifier
+) {
+    val combinedLineColor = VioletSecondary
+    val points = report.points
+
+    Box(
+        modifier = modifier.testTag("combined_trend_overlay_chart")
+    ) {
+        // Line Chart Canvas Overlaying the Main Bar Chart Area
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            if (points.size >= 2) {
+                val padX = 20.dp.toPx()
+                val padTop = 34.dp.toPx()
+                val padBottom = 18.dp.toPx()
+                val usableW = (size.width - (padX * 2f)).coerceAtLeast(1f)
+                val usableH = (size.height - padTop - padBottom).coerceAtLeast(1f)
+                val stepX = usableW / (points.size - 1).toFloat()
+                val scaleMax = report.maxAxisHours.coerceAtLeast(0.5)
+
+                // Individual selected-subject subtle dashed lines
+                report.selectedCourseCodes.forEach { courseCode ->
+                    val courseColor = subjectColorProvider(courseCode)
+                    val coursePath = Path()
+                    points.forEachIndexed { idx, pt ->
+                        val x = padX + (idx * stepX)
+                        val hrs = pt.perCourseHours[courseCode] ?: 0.0
+                        val norm = (hrs / scaleMax).toFloat().coerceIn(0f, 1f)
+                        val y = (size.height - padBottom) - (norm * usableH)
+                        if (idx == 0) coursePath.moveTo(x, y) else coursePath.lineTo(x, y)
+                    }
+                    drawPath(
+                        path = coursePath,
+                        color = courseColor.copy(alpha = 0.55f),
+                        style = Stroke(
+                            width = 1.6.dp.toPx(),
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
+                        )
+                    )
+                }
+
+                // Combined Trend Line coordinates
+                val combinedCoords = points.mapIndexed { idx, pt ->
+                    val x = padX + (idx * stepX)
+                    val norm = (pt.combinedHours / scaleMax).toFloat().coerceIn(0f, 1f)
+                    val y = (size.height - padBottom) - (norm * usableH)
+                    Offset(x, y)
+                }
+
+                // Soft translucent area under combined line
+                val fillPath = Path().apply {
+                    moveTo(combinedCoords.first().x, size.height - padBottom)
+                    lineTo(combinedCoords.first().x, combinedCoords.first().y)
+                    for (i in 1 until combinedCoords.size) {
+                        lineTo(combinedCoords[i].x, combinedCoords[i].y)
+                    }
+                    lineTo(combinedCoords.last().x, size.height - padBottom)
+                    close()
+                }
+                drawPath(
+                    path = fillPath,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            combinedLineColor.copy(alpha = 0.22f),
+                            combinedLineColor.copy(alpha = 0.02f)
+                        )
+                    )
+                )
+
+                val combinedStrokePath = Path().apply {
+                    moveTo(combinedCoords.first().x, combinedCoords.first().y)
+                    for (i in 1 until combinedCoords.size) {
+                        lineTo(combinedCoords[i].x, combinedCoords[i].y)
+                    }
+                }
+
+                // White halo stroke for crisp contrast over vertical bars
+                drawPath(
+                    path = combinedStrokePath,
+                    color = Color.White.copy(alpha = 0.88f),
+                    style = Stroke(
+                        width = 5.2.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
+
+                // Main Combined Trend stroke
+                drawPath(
+                    path = combinedStrokePath,
+                    color = combinedLineColor,
+                    style = Stroke(
+                        width = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
+
+                // Point markers along the Combined Trend line
+                combinedCoords.forEachIndexed { idx, pt ->
+                    val isToday = idx == combinedCoords.lastIndex
+                    val isPeak = points[idx].combinedHours > 0.0 &&
+                        points[idx].combinedHours >= (report.peakCombinedHours - 0.001)
+                    if (isToday || isPeak) {
+                        drawCircle(
+                            color = combinedLineColor.copy(alpha = 0.26f),
+                            radius = 8.dp.toPx(),
+                            center = pt
+                        )
+                    }
+                    drawCircle(
+                        color = Color.White,
+                        radius = if (isToday || isPeak) 4.8.dp.toPx() else 3.6.dp.toPx(),
+                        center = pt
+                    )
+                    drawCircle(
+                        color = combinedLineColor,
+                        radius = if (isToday || isPeak) 4.8.dp.toPx() else 3.6.dp.toPx(),
+                        center = pt,
+                        style = Stroke(width = 2.2.dp.toPx())
+                    )
+                }
+            }
+        }
+
+        // Top Floating Combined Trend Summary & Legend Badge
+        Surface(
+            shape = RoundedCornerShape(100),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            shadowElevation = 4.dp,
+            border = BorderStroke(1.dp, combinedLineColor.copy(alpha = 0.65f)),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 2.dp, end = 4.dp)
+                .testTag("combined_trend_overlay_badge")
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(combinedLineColor)
+                )
+                Text(
+                    text = "Combined 7D: ${String.format(Locale.US, "%.1f", report.totalCombinedHours)}h • Peak ${String.format(Locale.US, "%.1f", report.peakCombinedHours)}h (${report.peakDayLabel})",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // Bottom 7-Day X-Axis Strip along the overlay base
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            points.forEachIndexed { idx, pt ->
+                val isToday = idx == points.lastIndex
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                ) {
+                    Text(
+                        text = if (isToday) "Today" else pt.dayLabel,
+                        fontSize = 7.5.sp,
+                        fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = if (isToday) combinedLineColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp)
                     )
                 }
             }
