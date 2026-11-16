@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -69,6 +70,7 @@ import com.example.data.local.ActiveSessionHelper
 import com.example.data.local.ActiveSessionState
 import com.example.data.local.CourseEntity
 import com.example.data.local.DayStudyTrend
+import com.example.data.local.FocusQualityTier
 import com.example.data.local.GoalCompletionStatus
 import com.example.data.local.GoalProgressStatusHelper
 import com.example.data.local.StudyDateRange
@@ -79,6 +81,9 @@ import com.example.data.local.SubjectChartSortOrder
 import com.example.data.local.SubjectColorHelper
 import com.example.data.local.SubjectGoalVisibilityHelper
 import com.example.data.local.SubjectHoverTooltipHelper
+import com.example.data.local.SubjectSessionBreakdownHelper
+import com.example.data.local.SubjectSessionBreakdownItem
+import com.example.data.local.SubjectSessionBreakdownReport
 import com.example.data.local.SubjectSortHelper
 import com.example.data.local.SubjectStudyStats
 import com.example.data.local.SubjectTrendDirection
@@ -148,6 +153,7 @@ fun StudyHoursRechartsBarChart(
     var preselectedSubjectForGoalModal by remember { mutableStateOf<String?>(null) }
 
     var selectedStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
+    var overlaySubjectStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var hoveredStat by remember { mutableStateOf<SubjectStudyStats?>(null) }
     var selectedDayTrend by remember { mutableStateOf<DayStudyTrend?>(null) }
 
@@ -239,6 +245,9 @@ fun StudyHoursRechartsBarChart(
     val activeSelectedStat = selectedStat?.let { sel ->
         displayedStudyStats.firstOrNull { it.courseCode == sel.courseCode }
     }
+    val activeOverlayStat = overlaySubjectStat?.let { ov ->
+        displayedStudyStats.firstOrNull { it.courseCode == ov.courseCode }
+    }
     val activeHoveredStat = hoveredStat?.let { hov ->
         displayedStudyStats.firstOrNull { it.courseCode == hov.courseCode }
     }
@@ -296,8 +305,12 @@ fun StudyHoursRechartsBarChart(
         }
     }
 
-    Card(
+    Box(
         modifier = modifier
+            .fillMaxWidth()
+    ) {
+    Card(
+        modifier = Modifier
             .fillMaxWidth()
             .testTag("recharts_study_hours_card"),
         shape = RoundedCornerShape(22.dp),
@@ -553,6 +566,7 @@ fun StudyHoursRechartsBarChart(
                                 .clickable {
                                     viewModel.selectDateRange(range)
                                     selectedStat = null
+                                    overlaySubjectStat = null
                                     hoveredStat = null
                                     selectedDayTrend = null
                                 }
@@ -749,6 +763,7 @@ fun StudyHoursRechartsBarChart(
                                     .clickable {
                                         viewMode = mode
                                         selectedStat = null
+                                        overlaySubjectStat = null
                                         selectedDayTrend = null
                                         if (mode != ChartViewMode.WEEKLY_TREND) {
                                             selectedWeeklySubjectFilter = null
@@ -2396,6 +2411,7 @@ fun StudyHoursRechartsBarChart(
                             onClick = {
                                 selectedSubjectCategoryFilter = group
                                 selectedStat = null
+                                overlaySubjectStat = null
                                 hoveredStat = null
                             },
                             label = {
@@ -2695,10 +2711,10 @@ fun StudyHoursRechartsBarChart(
                                             }
                                         }
                                         .clickable {
-                                            val nextSelected = if (selectedStat?.courseCode == stat.courseCode) null else stat
-                                            selectedStat = nextSelected
-                                            hoveredStat = nextSelected
-                                            nextSelected?.let { viewModel.selectActiveSessionSubject(it.courseCode) }
+                                            selectedStat = stat
+                                            overlaySubjectStat = stat
+                                            hoveredStat = null
+                                            viewModel.selectActiveSessionSubject(stat.courseCode)
                                         }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
@@ -4583,6 +4599,67 @@ fun StudyHoursRechartsBarChart(
         }
     }
 
+    // Bar-click Overlay Panel inside #subjectChartContainer showing study sessions breakdown (date, session type, focus score)
+    if (viewMode == ChartViewMode.BY_SUBJECT && activeOverlayStat != null) {
+        BackHandler(enabled = true) {
+            overlaySubjectStat = null
+        }
+
+        val overlayCourseName = courses.firstOrNull {
+            it.code.equals(activeOverlayStat.courseCode, ignoreCase = true)
+        }?.name ?: activeOverlayStat.courseCode
+        val overlaySubjectColor = getSubjectColor(activeOverlayStat.courseCode)
+        val overlayGoalHours = getGoalForCourse(activeOverlayStat.courseCode)
+        val overlayReport = remember(
+            activeOverlayStat.courseCode,
+            overlayCourseName,
+            allStudySessions,
+            selectedDateRange,
+            currentSemester,
+            selectedSessionTagFilter
+        ) {
+            SubjectSessionBreakdownHelper.buildSubjectSessionBreakdown(
+                courseCode = activeOverlayStat.courseCode,
+                courseName = overlayCourseName,
+                sessions = allStudySessions,
+                dateRange = selectedDateRange,
+                semester = currentSemester,
+                tagFilter = selectedSessionTagFilter
+            )
+        }
+
+        SubjectSessionBreakdownOverlayPanel(
+            stat = activeOverlayStat,
+            report = overlayReport,
+            subjectColor = overlaySubjectColor,
+            goalHours = overlayGoalHours,
+            dateRangeLabel = selectedDateRange.label,
+            tagFilter = selectedSessionTagFilter,
+            onQuickAddThirtyMin = {
+                viewModel.quickAddThirtyMinutes(
+                    courseCode = activeOverlayStat.courseCode,
+                    dateDisplay = "Today"
+                )
+                Toast.makeText(
+                    context,
+                    "+30m focused study session logged for ${activeOverlayStat.courseCode}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onEditGoal = {
+                preselectedSubjectForGoalModal = activeOverlayStat.courseCode
+                showSubjectGoalsModal = true
+            },
+            onDismiss = {
+                overlaySubjectStat = null
+            },
+            modifier = Modifier
+                .matchParentSize()
+                .zIndex(50f)
+        )
+    }
+    }
+
     if (showGoalSettingsModal) {
         CustomizeDailyGoalDialog(
             currentGoalHours = dailyGoalHours,
@@ -6271,3 +6348,530 @@ private fun ActiveSessionIndicatorCard(
         }
     }
 }
+
+@Composable
+fun SubjectSessionBreakdownOverlayPanel(
+    stat: SubjectStudyStats,
+    report: SubjectSessionBreakdownReport,
+    subjectColor: Color,
+    goalHours: Double,
+    dateRangeLabel: String,
+    tagFilter: String,
+    onQuickAddThirtyMin: () -> Unit,
+    onEditGoal: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tierColor = when (report.focusTier) {
+        FocusQualityTier.DEEP_FOCUS -> EmeraldTertiary
+        FocusQualityTier.MODERATE -> WarningAmber
+        FocusQualityTier.SHALLOW -> ErrorRed
+        FocusQualityTier.NO_DATA -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val tierContainerColor = when (report.focusTier) {
+        FocusQualityTier.DEEP_FOCUS -> EmeraldTertiaryContainer
+        FocusQualityTier.MODERATE -> WarningContainer
+        FocusQualityTier.SHALLOW -> ErrorContainer
+        FocusQualityTier.NO_DATA -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val goalPct = if (goalHours > 0.0) ((stat.totalHours / goalHours) * 100.0).roundToInt() else 0
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color.Black.copy(alpha = 0.52f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss
+            )
+            .testTag("subject_session_overlay_scrim"),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 12.dp,
+            border = BorderStroke(1.5.dp, subjectColor.copy(alpha = 0.78f)),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {}
+                )
+                .testTag("subject_session_overlay_panel")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Header: Subject code, name, date range & close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = subjectColor
+                        ) {
+                            Text(
+                                text = report.courseCode,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = report.courseName,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = if (tagFilter == "All") {
+                                    "$dateRangeLabel • ${report.sessionCount} session${if (report.sessionCount == 1) "" else "s"}"
+                                } else {
+                                    "$dateRangeLabel • '$tagFilter' • ${report.sessionCount} session${if (report.sessionCount == 1) "" else "s"}"
+                                },
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("btn_close_subject_overlay")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close study session breakdown overlay",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Summary KPI Row: Focus Score | Focused vs Total | Goal Progress
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = tierContainerColor.copy(alpha = 0.65f),
+                        border = BorderStroke(1.dp, tierColor.copy(alpha = 0.45f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("overlay_focus_score_summary_${report.courseCode}")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Focus Score",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = if (report.totalLoggedMinutes > 0) "${report.overallFocusScorePct}%" else "—",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = tierColor
+                            )
+                            Text(
+                                text = report.focusTier.label,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = tierColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Focused Time",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = SubjectHoverTooltipHelper.formatDurationShort(report.focusedMinutes),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = subjectColor
+                            )
+                            Text(
+                                text = "of ${SubjectHoverTooltipHelper.formatDurationShort(report.totalLoggedMinutes)} total",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Goal Progress",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "$goalPct%",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (goalPct >= 100) EmeraldTertiary else if (goalPct < 50) ErrorRed else IndigoPrimary
+                            )
+                            Text(
+                                text = "${String.format(Locale.US, "%.1f", stat.totalHours)} / ${String.format(Locale.US, "%.1f", goalHours)}h",
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.16f), thickness = 0.8.dp)
+
+                // Study Sessions Breakdown Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = subjectColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = "Study Sessions Breakdown",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "Date • Type • Focus",
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Scrollable list of individual study sessions
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .testTag("subject_overlay_sessions_list_${report.courseCode}"),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    if (report.sessions.isEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("overlay_empty_sessions_${report.courseCode}")
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EventNote,
+                                    contentDescription = null,
+                                    tint = subjectColor,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Text(
+                                    text = "No study sessions logged for ${report.courseCode} in $dateRangeLabel.",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    } else {
+                        report.sessions.forEach { item ->
+                            SubjectSessionBreakdownRow(
+                                item = item,
+                                subjectColor = subjectColor
+                            )
+                        }
+                    }
+                }
+
+                // Overlay Footer Actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = onQuickAddThirtyMin,
+                        shape = RoundedCornerShape(100),
+                        colors = ButtonDefaults.buttonColors(containerColor = subjectColor),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 42.dp)
+                            .testTag("btn_overlay_quick_add_${report.courseCode}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreTime,
+                            contentDescription = "Log 30 minutes",
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "+30m Focus",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = onEditGoal,
+                        shape = RoundedCornerShape(100),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .heightIn(min = 42.dp)
+                            .testTag("btn_overlay_edit_goal_${report.courseCode}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Goal",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Goal",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .heightIn(min = 42.dp)
+                            .testTag("btn_overlay_dismiss_${report.courseCode}")
+                    ) {
+                        Text(
+                            text = "Close",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubjectSessionBreakdownRow(
+    item: SubjectSessionBreakdownItem,
+    subjectColor: Color
+) {
+    val accentColor = when {
+        item.isFocused -> EmeraldTertiary
+        item.isBreak -> WarningAmber
+        else -> ErrorRed
+    }
+    val scoreBgColor = when {
+        item.isFocused -> EmeraldTertiaryContainer
+        item.isBreak -> WarningContainer
+        else -> ErrorContainer
+    }
+    val scoreTextColor = when {
+        item.isFocused -> EmeraldOnTertiaryContainer
+        item.isBreak -> OnWarningContainer
+        else -> OnErrorContainer
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+        border = BorderStroke(0.9.dp, accentColor.copy(alpha = 0.35f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("overlay_session_item_${item.sessionId}")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor)
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                // Row 1: Date & Time + Session Focus Score Badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = subjectColor,
+                            modifier = Modifier.size(11.dp)
+                        )
+                        Text(
+                            text = "${item.formattedDate} • ${item.relativeDateLabel} (${item.formattedTime})",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(100),
+                        color = scoreBgColor
+                    ) {
+                        Text(
+                            text = "${item.sessionFocusScorePct}% Focus",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = scoreTextColor,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                // Row 2: Session Type + Tag + Duration
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = accentColor.copy(alpha = 0.14f)
+                        ) {
+                            Text(
+                                text = item.sessionTypeLabel,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = accentColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = subjectColor.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                text = item.categoryTag,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = subjectColor,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = item.durationLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                if (item.notes.isNotBlank()) {
+                    Text(
+                        text = item.notes,
+                        fontSize = 9.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+

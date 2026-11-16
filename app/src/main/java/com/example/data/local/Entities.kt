@@ -1485,3 +1485,131 @@ object SubjectBarEntryAnimationHelper {
     }
 }
 
+data class SubjectSessionBreakdownItem(
+    val sessionId: Long,
+    val courseCode: String,
+    val formattedDate: String,
+    val relativeDateLabel: String,
+    val formattedTime: String,
+    val durationMinutes: Int,
+    val durationLabel: String,
+    val sessionTypeLabel: String,
+    val categoryTag: String,
+    val notes: String,
+    val isFocused: Boolean,
+    val isBreak: Boolean,
+    val sessionFocusScorePct: Int,
+    val timestampMs: Long
+)
+
+data class SubjectSessionBreakdownReport(
+    val courseCode: String,
+    val courseName: String,
+    val overallFocusScorePct: Int,
+    val focusTier: FocusQualityTier,
+    val focusedMinutes: Int,
+    val nonFocusMinutes: Int,
+    val totalLoggedMinutes: Int,
+    val sessionCount: Int,
+    val sessions: List<SubjectSessionBreakdownItem>
+)
+
+object SubjectSessionBreakdownHelper {
+
+    fun classifySessionType(mode: String): String {
+        return when (mode.trim().uppercase(java.util.Locale.US)) {
+            "FOCUS" -> "Deep Focus"
+            "DEEP_WORK", "DEEP_FOCUS" -> "Deep Work"
+            "SHALLOW" -> "Shallow Study"
+            "SHORT_BREAK" -> "Short Break"
+            "LONG_BREAK" -> "Long Break"
+            "BREAK" -> "Break"
+            else -> mode.trim()
+                .replace('_', ' ')
+                .lowercase(java.util.Locale.US)
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.US) else it.toString() }
+                .ifBlank { "Study Log" }
+        }
+    }
+
+    fun sessionFocusContributionPct(mode: String): Int {
+        return if (FocusScoreHelper.isFocusedSessionMode(mode)) 100 else 0
+    }
+
+    fun buildSubjectSessionBreakdown(
+        courseCode: String,
+        courseName: String,
+        sessions: List<StudySessionEntity>,
+        dateRange: StudyDateRange = StudyDateRange.LAST_7_DAYS,
+        semester: SemesterEntity? = null,
+        tagFilter: String = "All",
+        nowMs: Long = System.currentTimeMillis()
+    ): SubjectSessionBreakdownReport {
+        val dateFormatter = java.text.SimpleDateFormat("MMM d, yyyy", java.util.Locale.US)
+        val timeFormatter = java.text.SimpleDateFormat("h:mm a", java.util.Locale.US)
+
+        val matching = sessions.filter { s ->
+            val matchesCourse = s.courseCode.equals(courseCode, ignoreCase = true)
+            val inRange = StudyDateRangeHelper.isSessionInRange(
+                sessionTimestampMs = s.timestampMs,
+                range = dateRange,
+                semester = semester,
+                nowMs = nowMs
+            )
+            val matchesTag = tagFilter == "All" || s.tag.equals(tagFilter, ignoreCase = true)
+            matchesCourse && inRange && matchesTag
+        }.sortedByDescending { it.timestampMs }
+
+        var focusedMins = 0
+        var nonFocusMins = 0
+        val items = matching.map { s ->
+            val mins = maxOf(0, s.durationMinutes)
+            val isFocused = FocusScoreHelper.isFocusedSessionMode(s.mode)
+            val isBreak = FocusScoreHelper.isBreakSessionMode(s.mode)
+            if (isFocused) {
+                focusedMins += mins
+            } else {
+                nonFocusMins += mins
+            }
+            val dateObj = java.util.Date(s.timestampMs)
+            SubjectSessionBreakdownItem(
+                sessionId = s.id,
+                courseCode = s.courseCode,
+                formattedDate = dateFormatter.format(dateObj),
+                relativeDateLabel = s.dateDisplay.ifBlank { dateFormatter.format(dateObj) },
+                formattedTime = timeFormatter.format(dateObj),
+                durationMinutes = mins,
+                durationLabel = SubjectHoverTooltipHelper.formatDurationShort(mins),
+                sessionTypeLabel = classifySessionType(s.mode),
+                categoryTag = s.tag.ifBlank { "General" },
+                notes = s.notes,
+                isFocused = isFocused,
+                isBreak = isBreak,
+                sessionFocusScorePct = sessionFocusContributionPct(s.mode),
+                timestampMs = s.timestampMs
+            )
+        }
+
+        val totalMins = focusedMins + nonFocusMins
+        val overallScorePct = if (totalMins > 0) {
+            kotlin.math.round((focusedMins.toDouble() / totalMins.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+        } else {
+            0
+        }
+        val tier = FocusScoreHelper.tierForScore(overallScorePct, totalMins)
+
+        return SubjectSessionBreakdownReport(
+            courseCode = courseCode,
+            courseName = courseName,
+            overallFocusScorePct = overallScorePct,
+            focusTier = tier,
+            focusedMinutes = focusedMins,
+            nonFocusMinutes = nonFocusMins,
+            totalLoggedMinutes = totalMins,
+            sessionCount = items.size,
+            sessions = items
+        )
+    }
+}
+
+

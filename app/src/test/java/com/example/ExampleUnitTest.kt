@@ -1428,4 +1428,121 @@ class ExampleUnitTest {
             0.0001f
         )
     }
+
+    @Test
+    fun `test SubjectSessionBreakdownHelper builds detailed session breakdown with date, type, and focus score`() {
+        val dayMs = com.example.data.local.StudyDateRangeHelper.ONE_DAY_MS
+        val cal = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.NOVEMBER, 16, 14, 30, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val nowMs = cal.timeInMillis
+        val twoDaysAgoMs = nowMs - (2L * dayMs)
+        val yesterdayMs = nowMs - (1L * dayMs)
+        val twentyDaysAgoMs = nowMs - (20L * dayMs)
+
+        val sessions = listOf(
+            com.example.data.local.StudySessionEntity(
+                id = 1L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 60,
+                timestampMs = twoDaysAgoMs,
+                dateDisplay = "2d ago",
+                mode = "FOCUS",
+                notes = "AVL rotations",
+                tag = "Exam Prep"
+            ),
+            com.example.data.local.StudySessionEntity(
+                id = 2L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 30,
+                timestampMs = yesterdayMs,
+                dateDisplay = "Yesterday",
+                mode = "SHALLOW",
+                notes = "Skimmed slides",
+                tag = "Revision"
+            ),
+            com.example.data.local.StudySessionEntity(
+                id = 3L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 10,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "SHORT_BREAK",
+                notes = "Coffee break",
+                tag = "Exam Prep"
+            ),
+            // Different course should be excluded
+            com.example.data.local.StudySessionEntity(
+                id = 4L,
+                courseCode = "MATH204",
+                subjectName = "Linear Algebra",
+                durationMinutes = 50,
+                timestampMs = nowMs,
+                dateDisplay = "Today",
+                mode = "FOCUS"
+            ),
+            // Out-of-range session (20 days ago) should be excluded in LAST_7_DAYS
+            com.example.data.local.StudySessionEntity(
+                id = 5L,
+                courseCode = "CS201",
+                subjectName = "Data Structures",
+                durationMinutes = 90,
+                timestampMs = twentyDaysAgoMs,
+                dateDisplay = "20d ago",
+                mode = "FOCUS"
+            )
+        )
+
+        val report = com.example.data.local.SubjectSessionBreakdownHelper.buildSubjectSessionBreakdown(
+            courseCode = "CS201",
+            courseName = "Data Structures",
+            sessions = sessions,
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS,
+            nowMs = nowMs
+        )
+
+        // 60m FOCUS out of 100m total = 60% Moderate Focus
+        assertEquals("CS201", report.courseCode)
+        assertEquals("Data Structures", report.courseName)
+        assertEquals(60, report.focusedMinutes)
+        assertEquals(40, report.nonFocusMinutes)
+        assertEquals(100, report.totalLoggedMinutes)
+        assertEquals(60, report.overallFocusScorePct)
+        assertEquals(com.example.data.local.FocusQualityTier.MODERATE, report.focusTier)
+        assertEquals(3, report.sessionCount)
+
+        // Sorted newest first: id 3 (Today SHORT_BREAK), id 2 (Yesterday SHALLOW), id 1 (2d ago FOCUS)
+        assertEquals(listOf(3L, 2L, 1L), report.sessions.map { it.sessionId })
+
+        assertEquals("Short Break", report.sessions[0].sessionTypeLabel)
+        assertEquals(0, report.sessions[0].sessionFocusScorePct)
+        assertTrue(report.sessions[0].isBreak)
+        assertEquals("Today", report.sessions[0].relativeDateLabel)
+
+        assertEquals("Shallow Study", report.sessions[1].sessionTypeLabel)
+        assertEquals(0, report.sessions[1].sessionFocusScorePct)
+        assertFalse(report.sessions[1].isFocused)
+
+        assertEquals("Deep Focus", report.sessions[2].sessionTypeLabel)
+        assertEquals(100, report.sessions[2].sessionFocusScorePct)
+        assertTrue(report.sessions[2].isFocused)
+        assertEquals("1h 0m", report.sessions[2].durationLabel)
+
+        // Tag filtering works cleanly
+        val examPrepReport = com.example.data.local.SubjectSessionBreakdownHelper.buildSubjectSessionBreakdown(
+            courseCode = "CS201",
+            courseName = "Data Structures",
+            sessions = sessions,
+            dateRange = com.example.data.local.StudyDateRange.LAST_7_DAYS,
+            tagFilter = "Exam Prep",
+            nowMs = nowMs
+        )
+        assertEquals(2, examPrepReport.sessionCount)
+        assertEquals(86, examPrepReport.overallFocusScorePct) // 60/70 = 85.7 -> 86%
+        assertEquals(com.example.data.local.FocusQualityTier.DEEP_FOCUS, examPrepReport.focusTier)
+    }
 }
