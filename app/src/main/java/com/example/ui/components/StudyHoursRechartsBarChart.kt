@@ -68,6 +68,8 @@ import com.example.data.local.DayStudyTrend
 import com.example.data.local.GoalCompletionStatus
 import com.example.data.local.GoalProgressStatusHelper
 import com.example.data.local.StudyDateRange
+import com.example.data.local.SubjectCategoryFilter
+import com.example.data.local.SubjectCategoryFilterHelper
 import com.example.data.local.SubjectChartSortOrder
 import com.example.data.local.SubjectColorHelper
 import com.example.data.local.SubjectGoalVisibilityHelper
@@ -133,6 +135,7 @@ fun StudyHoursRechartsBarChart(
     var compareWithPreviousWeek by remember { mutableStateOf(false) }
     var onlyHighPriorityFilter by remember { mutableStateOf(false) }
     var hideGoalMetSubjects by remember { mutableStateOf(false) }
+    var selectedSubjectCategoryFilter by remember { mutableStateOf(SubjectCategoryFilter.ALL) }
     var subjectSortOrder by remember { mutableStateOf(SubjectChartSortOrder.HIGHEST_HOURS) }
     var showExportDialog by remember { mutableStateOf(false) }
     var showGoalSettingsModal by remember { mutableStateOf(false) }
@@ -177,12 +180,20 @@ fun StudyHoursRechartsBarChart(
     val goalMetCount = remember(
         studyStats,
         onlyHighPriorityFilter,
+        selectedSubjectCategoryFilter,
         subjectPriorities,
         subjectWeeklyGoals,
-        selectedDateRange
+        selectedDateRange,
+        courses
     ) {
-        SubjectGoalVisibilityHelper.countGoalMetSubjects(
+        val courseNamesByCode = courses.associate { it.code to it.name }
+        val categoryFiltered = SubjectCategoryFilterHelper.filterStatsByCategory(
             stats = studyStats,
+            filter = selectedSubjectCategoryFilter,
+            courseNameForCode = { code -> courseNamesByCode[code] ?: code }
+        )
+        SubjectGoalVisibilityHelper.countGoalMetSubjects(
+            stats = categoryFiltered,
             goalForCourse = ::getGoalForCourse,
             onlyHighPriority = onlyHighPriorityFilter,
             priorityForCourse = ::getPriorityForCourse
@@ -193,20 +204,26 @@ fun StudyHoursRechartsBarChart(
         studyStats,
         onlyHighPriorityFilter,
         hideGoalMetSubjects,
+        selectedSubjectCategoryFilter,
         subjectPriorities,
         subjectWeeklyGoals,
         selectedDateRange,
         subjectSortOrder,
         courses
     ) {
-        val filtered = SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+        val courseNamesByCode = courses.associate { it.code to it.name }
+        val categoryFiltered = SubjectCategoryFilterHelper.filterStatsByCategory(
             stats = studyStats,
+            filter = selectedSubjectCategoryFilter,
+            courseNameForCode = { code -> courseNamesByCode[code] ?: code }
+        )
+        val filtered = SubjectGoalVisibilityHelper.filterSubjectsByGoalVisibility(
+            stats = categoryFiltered,
             hideGoalMet = hideGoalMetSubjects,
             goalForCourse = ::getGoalForCourse,
             onlyHighPriority = onlyHighPriorityFilter,
             priorityForCourse = ::getPriorityForCourse
         )
-        val courseNamesByCode = courses.associate { it.code to it.name }
         SubjectSortHelper.sortSubjectStats(
             stats = filtered,
             sortOrder = subjectSortOrder,
@@ -2337,6 +2354,74 @@ fun StudyHoursRechartsBarChart(
                     subjectColorProvider = ::getSubjectColor
                 )
             } else if (viewMode == ChartViewMode.BY_SUBJECT) {
+                // Row of Subject Visibility Filter Buttons directly above the Bar Chart
+                val courseNamesByCode = remember(courses) { courses.associate { it.code to it.name } }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .testTag("subject_category_filter_row"),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SubjectCategoryFilter.values().forEach { group ->
+                        val isGroupSelected = selectedSubjectCategoryFilter == group
+                        val groupCount = remember(studyStats, group, courseNamesByCode) {
+                            SubjectCategoryFilterHelper.filterStatsByCategory(
+                                stats = studyStats,
+                                filter = group,
+                                courseNameForCode = { code -> courseNamesByCode[code] ?: code }
+                            ).size
+                        }
+                        val groupIcon = when (group) {
+                            SubjectCategoryFilter.ALL -> Icons.Default.Apps
+                            SubjectCategoryFilter.CS_COURSES -> Icons.Default.Code
+                            SubjectCategoryFilter.MATH_PHYSICS -> Icons.Default.Functions
+                            SubjectCategoryFilter.HUMANITIES -> Icons.Default.MenuBook
+                        }
+                        val groupAccent = when (group) {
+                            SubjectCategoryFilter.ALL -> IndigoPrimary
+                            SubjectCategoryFilter.CS_COURSES -> VioletSecondary
+                            SubjectCategoryFilter.MATH_PHYSICS -> EmeraldTertiary
+                            SubjectCategoryFilter.HUMANITIES -> Color(0xFFEA580C)
+                        }
+
+                        FilterChip(
+                            selected = isGroupSelected,
+                            onClick = {
+                                selectedSubjectCategoryFilter = group
+                                selectedStat = null
+                                hoveredStat = null
+                            },
+                            label = {
+                                Text(
+                                    text = "${group.label} ($groupCount)",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isGroupSelected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = groupIcon,
+                                    contentDescription = "Filter ${group.label}",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(100),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = groupAccent.copy(alpha = 0.16f),
+                                selectedLabelColor = groupAccent,
+                                selectedLeadingIconColor = groupAccent
+                            ),
+                            border = if (isGroupSelected) BorderStroke(1.2.dp, groupAccent) else null,
+                            modifier = Modifier
+                                .heightIn(min = 34.dp)
+                                .testTag("filter_subject_group_${group.name.lowercase()}")
+                        )
+                    }
+                }
+
                 // By Subject View
                 if (displayedStudyStats.isEmpty()) {
                     Box(
@@ -2352,7 +2437,9 @@ fun StudyHoursRechartsBarChart(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
+                                text = if (selectedSubjectCategoryFilter != SubjectCategoryFilter.ALL && studyStats.isNotEmpty()) {
+                                    "No ${selectedSubjectCategoryFilter.label} subjects match the current filters."
+                                } else if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
                                     "All visible subjects have already met their study goal! Uncheck 'Hide Goal Met' to view completed subjects."
                                 } else if (onlyHighPriorityFilter && studyStats.isNotEmpty()) {
                                     "No High Priority subjects to display. You can set subject priority levels in 'Edit Goals'!"
@@ -2363,7 +2450,18 @@ fun StudyHoursRechartsBarChart(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
-                            if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
+                            if (selectedSubjectCategoryFilter != SubjectCategoryFilter.ALL && studyStats.isNotEmpty()) {
+                                TextButton(
+                                    onClick = { selectedSubjectCategoryFilter = SubjectCategoryFilter.ALL },
+                                    modifier = Modifier.testTag("btn_reset_subject_category_filter")
+                                ) {
+                                    Text(
+                                        text = "Show All Subjects",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
                                 TextButton(
                                     onClick = { hideGoalMetSubjects = false },
                                     modifier = Modifier.testTag("btn_show_goal_met_subjects")

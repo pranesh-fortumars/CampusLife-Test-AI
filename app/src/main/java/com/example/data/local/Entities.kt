@@ -1355,3 +1355,53 @@ object ActiveSessionHelper {
         )
     }
 }
+
+enum class SubjectCategoryFilter(val label: String) {
+    ALL("All"),
+    CS_COURSES("CS Courses"),
+    MATH_PHYSICS("Math/Physics"),
+    HUMANITIES("Other / Writing")
+}
+
+object SubjectCategoryFilterHelper {
+    fun matchesCategory(
+        courseCode: String,
+        courseName: String,
+        filter: SubjectCategoryFilter
+    ): Boolean {
+        if (filter == SubjectCategoryFilter.ALL) return true
+        val upperCode = courseCode.trim().uppercase(java.util.Locale.US)
+        val lowerName = courseName.lowercase(java.util.Locale.US)
+        val isCs = upperCode.startsWith("CS") ||
+            lowerName.contains("computer") ||
+            lowerName.contains("data structures") ||
+            lowerName.contains("operating systems") ||
+            lowerName.contains("algorithm") ||
+            lowerName.contains("software")
+        val isMathPhysics = upperCode.startsWith("MATH") ||
+            upperCode.startsWith("PHY") ||
+            upperCode.startsWith("STAT") ||
+            lowerName.contains("math") ||
+            lowerName.contains("physics") ||
+            lowerName.contains("electromagnetism") ||
+            lowerName.contains("calculus") ||
+            lowerName.contains("algebra")
+        return when (filter) {
+            SubjectCategoryFilter.ALL -> true
+            SubjectCategoryFilter.CS_COURSES -> isCs
+            SubjectCategoryFilter.MATH_PHYSICS -> isMathPhysics
+            SubjectCategoryFilter.HUMANITIES -> !isCs && !isMathPhysics
+        }
+    }
+
+    fun filterStatsByCategory(
+        stats: List<SubjectStudyStats>,
+        filter: SubjectCategoryFilter,
+        courseNameForCode: (String) -> String = { it }
+    ): List<SubjectStudyStats> {
+        if (filter == SubjectCategoryFilter.ALL) return stats
+        return stats.filter { stat ->
+            matchesCategory(stat.courseCode, courseNameForCode(stat.courseCode), filter)
+        }
+    }
+}

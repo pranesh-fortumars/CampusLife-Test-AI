@@ -1286,4 +1286,50 @@ class ExampleUnitTest {
         assertEquals(0.25, state.elapsedHours, 0.001)
         assertEquals(15, state.elapsedWholeMinutes)
     }
+
+    @Test
+    fun `test SubjectCategoryFilterHelper toggles subject groups between All, CS Courses, Math Physics, and Other`() {
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats("CS201", totalMinutes = 240, sessionCount = 5),
+            com.example.data.local.SubjectStudyStats("CS310", totalMinutes = 180, sessionCount = 4),
+            com.example.data.local.SubjectStudyStats("MATH204", totalMinutes = 200, sessionCount = 4),
+            com.example.data.local.SubjectStudyStats("PHY102", totalMinutes = 150, sessionCount = 3),
+            com.example.data.local.SubjectStudyStats("ENG215", totalMinutes = 90, sessionCount = 2)
+        )
+        val courseNames = mapOf(
+            "CS201" to "Data Structures & Algorithms",
+            "CS310" to "Operating Systems & Concurrency",
+            "MATH204" to "Discrete Mathematics & Graph Theory",
+            "PHY102" to "Applied Electromagnetism",
+            "ENG215" to "Technical Writing & Research"
+        )
+
+        val all = com.example.data.local.SubjectCategoryFilterHelper.filterStatsByCategory(
+            stats = stats,
+            filter = com.example.data.local.SubjectCategoryFilter.ALL,
+            courseNameForCode = { courseNames[it] ?: it }
+        )
+        assertEquals(5, all.size)
+
+        val csOnly = com.example.data.local.SubjectCategoryFilterHelper.filterStatsByCategory(
+            stats = stats,
+            filter = com.example.data.local.SubjectCategoryFilter.CS_COURSES,
+            courseNameForCode = { courseNames[it] ?: it }
+        )
+        assertEquals(listOf("CS201", "CS310"), csOnly.map { it.courseCode })
+
+        val mathPhysicsOnly = com.example.data.local.SubjectCategoryFilterHelper.filterStatsByCategory(
+            stats = stats,
+            filter = com.example.data.local.SubjectCategoryFilter.MATH_PHYSICS,
+            courseNameForCode = { courseNames[it] ?: it }
+        )
+        assertEquals(listOf("MATH204", "PHY102"), mathPhysicsOnly.map { it.courseCode })
+
+        val otherOnly = com.example.data.local.SubjectCategoryFilterHelper.filterStatsByCategory(
+            stats = stats,
+            filter = com.example.data.local.SubjectCategoryFilter.HUMANITIES,
+            courseNameForCode = { courseNames[it] ?: it }
+        )
+        assertEquals(listOf("ENG215"), otherOnly.map { it.courseCode })
+    }
 }
