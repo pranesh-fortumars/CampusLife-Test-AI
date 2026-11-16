@@ -2575,6 +2575,25 @@ fun StudyHoursRechartsBarChart(
                                     GoalCompletionStatus.IN_PROGRESS -> WarningAmber
                                     GoalCompletionStatus.BEHIND -> ErrorRed
                                 }
+                                val liveSecondsForBar = if (isLiveBarActive) activeStudySession.elapsedSeconds else 0
+                                val barSubjectName = courses.firstOrNull {
+                                    it.code.equals(stat.courseCode, ignoreCase = true)
+                                }?.name ?: stat.courseCode
+                                val hoverProgressTooltip = remember(
+                                    stat.courseCode,
+                                    barSubjectName,
+                                    stat.totalMinutes,
+                                    subjectGoal,
+                                    liveSecondsForBar
+                                ) {
+                                    SubjectHoverTooltipHelper.buildSubjectHoverProgressTooltip(
+                                        courseCode = stat.courseCode,
+                                        subjectName = barSubjectName,
+                                        loggedMinutes = stat.totalMinutes,
+                                        goalHours = subjectGoal,
+                                        liveSeconds = liveSecondsForBar
+                                    )
+                                }
                                 val hoverMeta = remember(
                                     stat.courseCode,
                                     stat.totalMinutes,
@@ -2624,7 +2643,7 @@ fun StudyHoursRechartsBarChart(
                                 LaunchedEffect(isSystemHovered) {
                                     if (isSystemHovered) {
                                         hoveredStat = stat
-                                    } else if (hoveredStat?.courseCode == stat.courseCode) {
+                                    } else if (hoveredStat?.courseCode == stat.courseCode && selectedStat?.courseCode != stat.courseCode) {
                                         hoveredStat = null
                                     }
                                 }
@@ -2643,7 +2662,7 @@ fun StudyHoursRechartsBarChart(
                                                 while (true) {
                                                     val event = awaitPointerEvent()
                                                     when (event.type) {
-                                                        PointerEventType.Enter, PointerEventType.Move -> {
+                                                        PointerEventType.Enter, PointerEventType.Move, PointerEventType.Press -> {
                                                             hoveredStat = stat
                                                         }
                                                         PointerEventType.Exit -> {
@@ -2658,44 +2677,62 @@ fun StudyHoursRechartsBarChart(
                                         .clickable {
                                             val nextSelected = if (selectedStat?.courseCode == stat.courseCode) null else stat
                                             selectedStat = nextSelected
+                                            hoveredStat = nextSelected
                                             nextSelected?.let { viewModel.selectActiveSessionSubject(it.courseCode) }
                                         }
                                         .testTag("bar_subject_${stat.courseCode}")
                                 ) {
-                                    // Tooltip-like hover label showing specific date and study duration
+                                    // Hover-state tooltip anchored above each bar showing exact study hours & percentage progress
                                     if (isHovered) {
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             modifier = Modifier
                                                 .padding(bottom = 2.dp)
+                                                .wrapContentWidth(unbounded = true)
                                                 .testTag("hover_badge_${stat.courseCode}")
-                                                .testTag("hover_tooltip_label_${stat.courseCode}")
                                         ) {
                                             Surface(
                                                 shape = RoundedCornerShape(8.dp),
                                                 color = Color(0xFF0F172A),
-                                                shadowElevation = 4.dp,
-                                                border = BorderStroke(1.dp, barSubjectColor.copy(alpha = 0.9f))
+                                                shadowElevation = 6.dp,
+                                                border = BorderStroke(1.2.dp, barSubjectColor.copy(alpha = 0.95f)),
+                                                modifier = Modifier
+                                                    .widthIn(min = 74.dp, max = 112.dp)
+                                                    .testTag("hover_tooltip_label_${stat.courseCode}")
                                             ) {
                                                 Column(
                                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                                                 ) {
                                                     Text(
-                                                        text = hoverMeta.shortDateLabel,
+                                                        text = "${stat.courseCode} • ${hoverMeta.shortDateLabel}",
                                                         fontSize = 7.5.sp,
-                                                        fontWeight = FontWeight.Medium,
+                                                        fontWeight = FontWeight.SemiBold,
                                                         color = Color(0xFFCBD5E1),
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                     Text(
-                                                        text = hoverMeta.durationLabel,
-                                                        fontSize = 8.5.sp,
+                                                        text = hoverProgressTooltip.exactHoursLabel,
+                                                        fontSize = 9.sp,
                                                         fontWeight = FontWeight.ExtraBold,
                                                         color = Color.White,
                                                         maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.testTag("hover_tooltip_hours_${stat.courseCode}")
+                                                    )
+                                                    Text(
+                                                        text = "${hoverProgressTooltip.progressPercentLabel} goal",
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = when {
+                                                            hoverProgressTooltip.isGoalMet -> Color(0xFF34D399)
+                                                            hoverProgressTooltip.isBelow50 -> Color(0xFFFCA5A5)
+                                                            else -> Color(0xFFA5B4FC)
+                                                        },
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.testTag("hover_tooltip_progress_${stat.courseCode}")
                                                     )
                                                 }
                                             }
@@ -3125,9 +3162,19 @@ fun StudyHoursRechartsBarChart(
 
                                     val courseName = courses.firstOrNull { it.code == activePopupStat.courseCode }?.name ?: "Course Study"
                                     val subjectGoal = getGoalForCourse(activePopupStat.courseCode)
-                                    val progressPct = ((activePopupStat.totalHours / subjectGoal) * 100).toInt()
-                                    val isMet = activePopupStat.totalHours >= subjectGoal
-                                    val isBelow50 = activePopupStat.totalHours < (subjectGoal * 0.5)
+                                    val livePopupSeconds = if (
+                                        (activeStudySession.isRunning || activeStudySession.elapsedSeconds > 0) &&
+                                        activeStudySession.courseCode.equals(activePopupStat.courseCode, ignoreCase = true)
+                                    ) activeStudySession.elapsedSeconds else 0
+                                    val popupProgressTooltip = SubjectHoverTooltipHelper.buildSubjectHoverProgressTooltip(
+                                        courseCode = activePopupStat.courseCode,
+                                        subjectName = courseName,
+                                        loggedMinutes = activePopupStat.totalMinutes,
+                                        goalHours = subjectGoal,
+                                        liveSeconds = livePopupSeconds
+                                    )
+                                    val isMet = popupProgressTooltip.isGoalMet
+                                    val isBelow50 = popupProgressTooltip.isBelow50
                                     val subjectColor = getSubjectColor(activePopupStat.courseCode)
 
                                     Box(
@@ -3136,14 +3183,15 @@ fun StudyHoursRechartsBarChart(
                                             .width(cardWidth)
                                             .zIndex(30f)
                                             .testTag("subject_hover_popup_card")
-                                            .testTag("subject_hover_popup_${activePopupStat.courseCode}")
                                     ) {
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
                                             color = MaterialTheme.colorScheme.surface,
                                             shadowElevation = 8.dp,
                                             border = BorderStroke(1.2.dp, subjectColor.copy(alpha = 0.7f)),
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("subject_hover_popup_${activePopupStat.courseCode}")
                                         ) {
                                             Column(
                                                 modifier = Modifier.padding(10.dp),
@@ -3213,7 +3261,7 @@ fun StudyHoursRechartsBarChart(
                                                             color = if (isMet) EmeraldTertiaryContainer else if (isBelow50) ErrorContainer else IndigoPrimaryContainer
                                                         ) {
                                                             Text(
-                                                                text = if (isMet) "Met 🎉" else if (isBelow50) "<50% ⚠️" else "$progressPct%",
+                                                                text = popupProgressTooltip.progressPercentLabel,
                                                                 fontSize = 8.5.sp,
                                                                 fontWeight = FontWeight.Bold,
                                                                 color = if (isMet) EmeraldOnTertiaryContainer else if (isBelow50) OnErrorContainer else IndigoOnPrimaryContainer,
@@ -3272,7 +3320,7 @@ fun StudyHoursRechartsBarChart(
                                                             )
                                                         }
                                                         Text(
-                                                            text = popupMeta.durationLabel,
+                                                            text = popupProgressTooltip.durationLabel,
                                                             fontSize = 10.sp,
                                                             fontWeight = FontWeight.ExtraBold,
                                                             color = subjectColor
@@ -3280,7 +3328,7 @@ fun StudyHoursRechartsBarChart(
                                                     }
                                                 }
 
-                                                // 2 Key Breakdown Columns: Total Pomodoro Sessions & Total Hours Logged
+                                                // 2 Key Breakdown Columns: Total Pomodoro Sessions & Exact Hours Logged
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     horizontalArrangement = Arrangement.SpaceBetween
@@ -3316,7 +3364,7 @@ fun StudyHoursRechartsBarChart(
                                                         )
                                                     }
 
-                                                    // Metric 2: Total Hours Logged
+                                                    // Metric 2: Exact Study Hours Logged
                                                     Column(
                                                         horizontalAlignment = Alignment.End,
                                                         modifier = Modifier.testTag("hover_total_hours_${activePopupStat.courseCode}")
@@ -3329,52 +3377,73 @@ fun StudyHoursRechartsBarChart(
                                                                 modifier = Modifier.size(12.dp)
                                                             )
                                                             Text(
-                                                                "Hours Logged",
+                                                                "Exact Hours",
                                                                 fontSize = 9.sp,
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                         }
                                                         Text(
-                                                            text = "${String.format(Locale.US, "%.1f", activePopupStat.totalHours)} hrs",
+                                                            text = popupProgressTooltip.exactHoursLabel,
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = subjectColor
                                                         )
                                                         Text(
-                                                            text = "${activePopupStat.totalMinutes} mins total",
+                                                            text = "${popupProgressTooltip.durationLabel} (${activePopupStat.totalMinutes}m)",
                                                             fontSize = 8.5.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
                                                     }
                                                 }
 
-                                                // Progress vs Goal Mini Bar
-                                                Row(
+                                                // Percentage Progress vs Goal Summary & Mini Bar
+                                                Column(
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                    verticalArrangement = Arrangement.spacedBy(3.dp)
                                                 ) {
-                                                    Text(
-                                                        text = "Goal: ${String.format(Locale.US, "%.1f", subjectGoal)}h ($progressPct%)",
-                                                        fontSize = 8.5.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        modifier = Modifier.testTag("hover_goal_progress_${activePopupStat.courseCode}")
-                                                    )
-                                                    val remaining = (subjectGoal - activePopupStat.totalHours).coerceAtLeast(0.0)
-                                                    if (remaining > 0) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
                                                         Text(
-                                                            text = "${String.format(Locale.US, "%.1f", remaining)}h left",
+                                                            text = popupProgressTooltip.goalSummaryLabel,
                                                             fontSize = 8.5.sp,
                                                             fontWeight = FontWeight.SemiBold,
-                                                            color = if (isBelow50) ErrorRed else IndigoPrimary
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.testTag("hover_goal_progress_${activePopupStat.courseCode}")
                                                         )
-                                                    } else {
-                                                        Text(
-                                                            text = "Goal Completed! 🏆",
-                                                            fontSize = 8.5.sp,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = EmeraldTertiary
+                                                        val remaining = (subjectGoal - popupProgressTooltip.exactHours).coerceAtLeast(0.0)
+                                                        if (remaining > 0.01) {
+                                                            Text(
+                                                                text = "${String.format(Locale.US, "%.2f", remaining)}h left",
+                                                                fontSize = 8.5.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = if (isBelow50) ErrorRed else IndigoPrimary
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                text = "Goal Met! 🏆",
+                                                                fontSize = 8.5.sp,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = EmeraldTertiary
+                                                            )
+                                                        }
+                                                    }
+                                                    val popupBarColor = if (isMet) EmeraldTertiary else if (isBelow50) ErrorRed else IndigoPrimary
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(4.dp)
+                                                            .clip(RoundedCornerShape(100))
+                                                            .background(popupBarColor.copy(alpha = 0.16f))
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth((popupProgressTooltip.progressPercentExact / 100.0).toFloat().coerceIn(0.04f, 1f))
+                                                                .fillMaxHeight()
+                                                                .clip(RoundedCornerShape(100))
+                                                                .background(popupBarColor)
                                                         )
                                                     }
                                                 }

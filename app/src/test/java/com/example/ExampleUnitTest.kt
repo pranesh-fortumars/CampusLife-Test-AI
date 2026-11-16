@@ -1332,4 +1332,53 @@ class ExampleUnitTest {
         )
         assertEquals(listOf("ENG215"), otherOnly.map { it.courseCode })
     }
+
+    @Test
+    fun `test SubjectHoverTooltipHelper buildSubjectHoverProgressTooltip calculates exact hours and percentage progress`() {
+        // 270m = 4.50 hrs against a 5.0h goal -> 90.0%
+        val csTooltip = com.example.data.local.SubjectHoverTooltipHelper.buildSubjectHoverProgressTooltip(
+            courseCode = "CS201",
+            subjectName = "Data Structures",
+            loggedMinutes = 270,
+            goalHours = 5.0
+        )
+        assertEquals(4.5, csTooltip.exactHours, 0.001)
+        assertEquals("4.50 hrs", csTooltip.exactHoursLabel)
+        assertEquals("4.50h", csTooltip.compactExactHoursLabel)
+        assertEquals("4h 30m", csTooltip.durationLabel)
+        assertEquals(90.0, csTooltip.progressPercentExact, 0.01)
+        assertEquals(90, csTooltip.progressPercentInt)
+        assertEquals("90.0%", csTooltip.progressPercentLabel)
+        assertEquals("90.0% of 5.0h goal", csTooltip.goalSummaryLabel)
+        assertFalse(csTooltip.isGoalMet)
+        assertFalse(csTooltip.isBelow50)
+
+        // With 1800s (0.50h) active live study time -> hits 5.00 hrs = 100.0% (Goal Met)
+        val liveTooltip = com.example.data.local.SubjectHoverTooltipHelper.buildSubjectHoverProgressTooltip(
+            courseCode = "CS201",
+            subjectName = "Data Structures",
+            loggedMinutes = 270,
+            goalHours = 5.0,
+            liveSeconds = 1800
+        )
+        assertEquals(5.0, liveTooltip.exactHours, 0.001)
+        assertEquals("5.00 hrs", liveTooltip.exactHoursLabel)
+        assertEquals("100.0%", liveTooltip.progressPercentLabel)
+        assertTrue(liveTooltip.isGoalMet)
+        assertFalse(liveTooltip.isBelow50)
+
+        // 75m = 1.25 hrs against a 4.0h goal -> 31.25% -> "31.3%" (Below 50%)
+        val phyTooltip = com.example.data.local.SubjectHoverTooltipHelper.buildSubjectHoverProgressTooltip(
+            courseCode = "PHY102",
+            subjectName = "Physics",
+            loggedMinutes = 75,
+            goalHours = 4.0
+        )
+        assertEquals(1.25, phyTooltip.exactHours, 0.001)
+        assertEquals("1.25 hrs", phyTooltip.exactHoursLabel)
+        assertEquals("31.3%", phyTooltip.progressPercentLabel)
+        assertEquals("31.3% of 4.0h goal", phyTooltip.goalSummaryLabel)
+        assertFalse(phyTooltip.isGoalMet)
+        assertTrue(phyTooltip.isBelow50)
+    }
 }

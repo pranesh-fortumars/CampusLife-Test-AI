@@ -1116,6 +1116,22 @@ data class SubjectHoverDateDuration(
     val latestSessionDurationLabel: String
 )
 
+data class SubjectHoverProgressTooltip(
+    val courseCode: String,
+    val subjectName: String,
+    val exactHours: Double,
+    val goalHours: Double,
+    val exactHoursLabel: String,
+    val compactExactHoursLabel: String,
+    val durationLabel: String,
+    val progressPercentExact: Double,
+    val progressPercentInt: Int,
+    val progressPercentLabel: String,
+    val goalSummaryLabel: String,
+    val isGoalMet: Boolean,
+    val isBelow50: Boolean
+)
+
 object SubjectHoverTooltipHelper {
 
     fun formatDurationShort(totalMinutes: Int): String {
@@ -1126,6 +1142,46 @@ object SubjectHoverTooltipHelper {
             hours > 0 -> "${hours}h ${mins}m"
             else -> "${mins}m"
         }
+    }
+
+    fun formatExactHours(hours: Double): String {
+        val safeHours = maxOf(0.0, hours)
+        return String.format(java.util.Locale.US, "%.2f", safeHours)
+    }
+
+    fun buildSubjectHoverProgressTooltip(
+        courseCode: String,
+        subjectName: String,
+        loggedMinutes: Int,
+        goalHours: Double,
+        liveSeconds: Int = 0
+    ): SubjectHoverProgressTooltip {
+        val safeMinutes = maxOf(0, loggedMinutes)
+        val safeLiveSeconds = maxOf(0, liveSeconds)
+        val safeGoal = goalHours.coerceAtLeast(0.5)
+        val exactHours = (safeMinutes / 60.0) + (safeLiveSeconds / 3600.0)
+        val totalMinutesRounded = safeMinutes + (safeLiveSeconds / 60)
+        val progressPercentExact = (exactHours / safeGoal) * 100.0
+        val progressPercentInt = kotlin.math.round(progressPercentExact).toInt().coerceAtLeast(0)
+        val formattedExact = formatExactHours(exactHours)
+        val formattedPct = String.format(java.util.Locale.US, "%.1f%%", progressPercentExact)
+        val formattedGoal = String.format(java.util.Locale.US, "%.1fh", safeGoal)
+
+        return SubjectHoverProgressTooltip(
+            courseCode = courseCode,
+            subjectName = subjectName,
+            exactHours = exactHours,
+            goalHours = safeGoal,
+            exactHoursLabel = "$formattedExact hrs",
+            compactExactHoursLabel = "${formattedExact}h",
+            durationLabel = formatDurationShort(totalMinutesRounded),
+            progressPercentExact = progressPercentExact,
+            progressPercentInt = progressPercentInt,
+            progressPercentLabel = formattedPct,
+            goalSummaryLabel = "$formattedPct of $formattedGoal goal",
+            isGoalMet = exactHours >= safeGoal,
+            isBelow50 = exactHours < (safeGoal * 0.5)
+        )
     }
 
     fun buildSubjectHoverDateDuration(
