@@ -96,6 +96,8 @@ import com.example.data.local.SubjectSortHelper
 import com.example.data.local.SubjectStudyStats
 import com.example.data.local.SubjectTrendDirection
 import com.example.data.local.SubjectTrendHelper
+import com.example.data.local.SubjectVisibilityFilterHelper
+import com.example.data.local.SubjectVisibilityOption
 import com.example.data.local.WeeklySubjectContribution
 import com.example.ui.theme.*
 import com.example.viewmodel.CampusLifeViewModel
@@ -168,6 +170,8 @@ fun StudyHoursRechartsBarChart(
     var hoveredTrendCourseCode by remember { mutableStateOf<String?>(null) }
     var selectedCompareCourses by remember { mutableStateOf(setOf<String>()) }
     var showCombinedTrendOverlay by remember { mutableStateOf(true) }
+    var hiddenSubjectCodes by remember { mutableStateOf(setOf<String>()) }
+    var showSubjectMultiFilterDropdown by remember { mutableStateOf(false) }
 
     val subjectColorMap = remember(courses, studyStats) {
         val allCodes = (courses.map { it.code } + studyStats.map { it.courseCode }).distinct()
@@ -200,18 +204,45 @@ fun StudyHoursRechartsBarChart(
         StudyDateRange.SEMESTER -> "h/mo"
     }
 
+    val allSubjectFilterOptions = remember(courses, studyStats) {
+        SubjectVisibilityFilterHelper.buildSubjectOptions(
+            courses = courses,
+            stats = studyStats
+        )
+    }
+    val allSubjectCodesForFilter = remember(allSubjectFilterOptions) {
+        allSubjectFilterOptions.map { it.courseCode }
+    }
+    val visibleWeeklyTrends = remember(weeklyTrends, hiddenSubjectCodes) {
+        SubjectVisibilityFilterHelper.filterWeeklyTrendsByVisibleSubjects(
+            trends = weeklyTrends,
+            hiddenCourseCodes = hiddenSubjectCodes
+        )
+    }
+    val visiblePreviousWeeklyTrends = remember(previousWeeklyTrends, hiddenSubjectCodes) {
+        SubjectVisibilityFilterHelper.filterWeeklyTrendsByVisibleSubjects(
+            trends = previousWeeklyTrends,
+            hiddenCourseCodes = hiddenSubjectCodes
+        )
+    }
+
     val goalMetCount = remember(
         studyStats,
         onlyHighPriorityFilter,
         selectedSubjectCategoryFilter,
+        hiddenSubjectCodes,
         subjectPriorities,
         subjectWeeklyGoals,
         selectedDateRange,
         courses
     ) {
         val courseNamesByCode = courses.associate { it.code to it.name }
-        val categoryFiltered = SubjectCategoryFilterHelper.filterStatsByCategory(
+        val visibilityFiltered = SubjectVisibilityFilterHelper.filterVisibleSubjectStats(
             stats = studyStats,
+            hiddenCourseCodes = hiddenSubjectCodes
+        )
+        val categoryFiltered = SubjectCategoryFilterHelper.filterStatsByCategory(
+            stats = visibilityFiltered,
             filter = selectedSubjectCategoryFilter,
             courseNameForCode = { code -> courseNamesByCode[code] ?: code }
         )
@@ -228,6 +259,7 @@ fun StudyHoursRechartsBarChart(
         onlyHighPriorityFilter,
         hideGoalMetSubjects,
         selectedSubjectCategoryFilter,
+        hiddenSubjectCodes,
         subjectPriorities,
         subjectWeeklyGoals,
         selectedDateRange,
@@ -235,8 +267,12 @@ fun StudyHoursRechartsBarChart(
         courses
     ) {
         val courseNamesByCode = courses.associate { it.code to it.name }
-        val categoryFiltered = SubjectCategoryFilterHelper.filterStatsByCategory(
+        val visibilityFiltered = SubjectVisibilityFilterHelper.filterVisibleSubjectStats(
             stats = studyStats,
+            hiddenCourseCodes = hiddenSubjectCodes
+        )
+        val categoryFiltered = SubjectCategoryFilterHelper.filterStatsByCategory(
+            stats = visibilityFiltered,
             filter = selectedSubjectCategoryFilter,
             courseNameForCode = { code -> courseNamesByCode[code] ?: code }
         )
@@ -264,7 +300,7 @@ fun StudyHoursRechartsBarChart(
         displayedStudyStats.firstOrNull { it.courseCode == hov.courseCode }
     }
     val activeSelectedDayTrend = selectedDayTrend?.let { sel ->
-        weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
+        visibleWeeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
     }
     val activeTrendCourseCode = hoveredTrendCourseCode ?: expandedTrendCourseCode
     val activeTrendStat = activeTrendCourseCode?.let { code ->
@@ -2387,6 +2423,45 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
+            // Multi-Select Subject Visibility Filter Dropdown above the study hours bar chart
+            if (viewMode != ChartViewMode.MONTHLY && allSubjectFilterOptions.isNotEmpty()) {
+                SubjectVisibilityMultiSelectDropdown(
+                    options = allSubjectFilterOptions,
+                    hiddenCourseCodes = hiddenSubjectCodes,
+                    expanded = showSubjectMultiFilterDropdown,
+                    onExpandChange = { showSubjectMultiFilterDropdown = it },
+                    onToggleSubject = { code ->
+                        hiddenSubjectCodes = SubjectVisibilityFilterHelper.toggleSubjectVisibility(
+                            courseCode = code,
+                            hiddenCourseCodes = hiddenSubjectCodes
+                        )
+                        if (selectedStat?.courseCode.equals(code, ignoreCase = true)) {
+                            selectedStat = null
+                        }
+                        if (overlaySubjectStat?.courseCode.equals(code, ignoreCase = true)) {
+                            overlaySubjectStat = null
+                        }
+                        if (hoveredStat?.courseCode.equals(code, ignoreCase = true)) {
+                            hoveredStat = null
+                        }
+                        if (selectedWeeklySubjectFilter.equals(code, ignoreCase = true)) {
+                            selectedWeeklySubjectFilter = null
+                        }
+                    },
+                    onSelectAll = {
+                        hiddenSubjectCodes = SubjectVisibilityFilterHelper.selectAllSubjects()
+                    },
+                    onClearAll = {
+                        hiddenSubjectCodes = SubjectVisibilityFilterHelper.hideAllSubjects(allSubjectCodesForFilter)
+                        selectedStat = null
+                        overlaySubjectStat = null
+                        hoveredStat = null
+                        selectedWeeklySubjectFilter = null
+                    },
+                    subjectColorProvider = ::getSubjectColor
+                )
+            }
+
             // Main Chart Viewport
             val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             val goalLineColor = WarningAmber.copy(alpha = 0.85f)
@@ -2486,7 +2561,11 @@ fun StudyHoursRechartsBarChart(
                             modifier = Modifier.padding(16.dp)
                         ) {
                             Text(
-                                text = if (selectedSubjectCategoryFilter != SubjectCategoryFilter.ALL && studyStats.isNotEmpty()) {
+                                text = if (hiddenSubjectCodes.isNotEmpty() && studyStats.isNotEmpty() &&
+                                    studyStats.none { SubjectVisibilityFilterHelper.isSubjectVisible(it.courseCode, hiddenSubjectCodes) }
+                                ) {
+                                    "All subjects are hidden by the subject filter dropdown."
+                                } else if (selectedSubjectCategoryFilter != SubjectCategoryFilter.ALL && studyStats.isNotEmpty()) {
                                     "No ${selectedSubjectCategoryFilter.label} subjects match the current filters."
                                 } else if (hideGoalMetSubjects && studyStats.isNotEmpty() && goalMetCount > 0) {
                                     "All visible subjects have already met their study goal! Uncheck 'Hide Goal Met' to view completed subjects."
@@ -2499,7 +2578,20 @@ fun StudyHoursRechartsBarChart(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
-                            if (selectedSubjectCategoryFilter != SubjectCategoryFilter.ALL && studyStats.isNotEmpty()) {
+                            if (hiddenSubjectCodes.isNotEmpty() && studyStats.isNotEmpty() &&
+                                studyStats.none { SubjectVisibilityFilterHelper.isSubjectVisible(it.courseCode, hiddenSubjectCodes) }
+                            ) {
+                                TextButton(
+                                    onClick = { hiddenSubjectCodes = SubjectVisibilityFilterHelper.selectAllSubjects() },
+                                    modifier = Modifier.testTag("btn_reset_hidden_subjects_empty_state")
+                                ) {
+                                    Text(
+                                        text = "Show All Subjects",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else if (selectedSubjectCategoryFilter != SubjectCategoryFilter.ALL && studyStats.isNotEmpty()) {
                                 TextButton(
                                     onClick = { selectedSubjectCategoryFilter = SubjectCategoryFilter.ALL },
                                     modifier = Modifier.testTag("btn_reset_subject_category_filter")
@@ -3927,8 +4019,8 @@ fun StudyHoursRechartsBarChart(
                 } else {
                 // Trend View: Adapts across Last 7 Days (Mon-Sun), This Month (Wk 1-4), and Semester (Months)
                 val maxDailyHours = max(
-                    max(max(4.0, periodBucketGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
-                    if (compareWithPreviousWeek) (previousWeeklyTrends.maxOfOrNull { it.totalHours } ?: 0.0) + 0.8 else 0.0
+                    max(max(4.0, periodBucketGoalHours + 1.2), (visibleWeeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
+                    if (compareWithPreviousWeek) (visiblePreviousWeeklyTrends.maxOfOrNull { it.totalHours } ?: 0.0) + 0.8 else 0.0
                 )
 
                 Box(
@@ -3978,7 +4070,7 @@ fun StudyHoursRechartsBarChart(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.Bottom
                     ) {
-                        weeklyTrends.forEach { dayTrend ->
+                        visibleWeeklyTrends.forEach { dayTrend ->
                             val isSelected = selectedDayTrend?.dayKey == dayTrend.dayKey
                             val reachesGoal = dayTrend.totalHours >= periodBucketGoalHours
                             val isToday = when (selectedDateRange) {
@@ -4000,7 +4092,7 @@ fun StudyHoursRechartsBarChart(
                             }
 
                             val prevDayTrend = if (compareWithPreviousWeek) {
-                                previousWeeklyTrends.firstOrNull { it.dayKey == dayTrend.dayKey }
+                                visiblePreviousWeeklyTrends.firstOrNull { it.dayKey == dayTrend.dayKey }
                             } else null
                             val prevDayHours = prevDayTrend?.totalHours ?: 0.0
                             val prevTargetFraction = (prevDayHours / maxDailyHours).toFloat().coerceIn(0.04f, 1f)
@@ -7659,4 +7751,321 @@ fun CombinedTrendOverlayLayer(
         }
     }
 }
+
+@Composable
+fun SubjectVisibilityMultiSelectDropdown(
+    options: List<SubjectVisibilityOption>,
+    hiddenCourseCodes: Set<String>,
+    expanded: Boolean,
+    onExpandChange: (Boolean) -> Unit,
+    onToggleSubject: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onClearAll: () -> Unit,
+    subjectColorProvider: (String) -> Color,
+    modifier: Modifier = Modifier
+) {
+    val allCodes = remember(options) { options.map { it.courseCode } }
+    val visibleOptions = remember(options, hiddenCourseCodes) {
+        options.filter { SubjectVisibilityFilterHelper.isSubjectVisible(it.courseCode, hiddenCourseCodes) }
+    }
+    val summaryText = remember(allCodes, hiddenCourseCodes) {
+        SubjectVisibilityFilterHelper.formatFilterSummary(
+            allCourseCodes = allCodes,
+            hiddenCourseCodes = hiddenCourseCodes
+        )
+    }
+    val hasActiveFilter = hiddenCourseCodes.isNotEmpty()
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("subject_multiselect_filter_container")
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (hasActiveFilter) {
+                    IndigoPrimaryContainer.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                },
+                border = BorderStroke(
+                    width = if (hasActiveFilter) 1.3.dp else 1.dp,
+                    color = if (hasActiveFilter) IndigoPrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { onExpandChange(!expanded) }
+                    .semantics {
+                        contentDescription = "Filter subjects shown in chart bars: $summaryText"
+                    }
+                    .testTag("btn_subject_multiselect_dropdown")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (hasActiveFilter) IndigoPrimary.copy(alpha = 0.16f)
+                                    else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Checklist,
+                                contentDescription = null,
+                                tint = if (hasActiveFilter) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                text = "Subjects Shown in Bars",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = summaryText,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasActiveFilter) IndigoPrimary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.testTag("subject_multiselect_summary_label")
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Mini color dots for visible subjects
+                        Row(horizontalArrangement = Arrangement.spacedBy((-3).dp)) {
+                            visibleOptions.take(4).forEach { opt ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(subjectColorProvider(opt.courseCode))
+                                        .border(1.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(100),
+                            color = if (hasActiveFilter) IndigoPrimary else MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = "${visibleOptions.size}/${options.size}",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (hasActiveFilter) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (expanded) "Collapse subject filter" else "Expand subject filter",
+                            tint = if (hasActiveFilter) IndigoPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            if (hasActiveFilter) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = IndigoPrimaryContainer,
+                    border = BorderStroke(1.dp, IndigoPrimary.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onSelectAll() }
+                        .testTag("btn_reset_subject_multiselect")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    ) {
+                        Text(
+                            text = "All",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = IndigoPrimary
+                        )
+                    }
+                }
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { onExpandChange(false) },
+            modifier = Modifier
+                .widthIn(min = 260.dp, max = 330.dp)
+                .testTag("subject_multiselect_dropdown_menu")
+        ) {
+            // Quick Select All / Clear Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Toggle Subjects (${visibleOptions.size}/${options.size})",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Select All",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = IndigoPrimary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onSelectAll() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("btn_multiselect_select_all")
+                    )
+                    Text(
+                        text = "Hide All",
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onClearAll() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("btn_multiselect_clear_all")
+                    )
+                }
+            }
+
+            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+            options.forEach { option ->
+                val isVisible = SubjectVisibilityFilterHelper.isSubjectVisible(
+                    courseCode = option.courseCode,
+                    hiddenCourseCodes = hiddenCourseCodes
+                )
+                val subjectColor = subjectColorProvider(option.courseCode)
+
+                DropdownMenuItem(
+                    onClick = { onToggleSubject(option.courseCode) },
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("dropdown_subject_item_${option.courseCode}"),
+                    leadingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(if (isVisible) subjectColor else Color.Transparent)
+                                .border(
+                                    width = 1.6.dp,
+                                    color = if (isVisible) subjectColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                    shape = RoundedCornerShape(5.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isVisible) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "${option.courseCode} visible",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                    },
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(subjectColor)
+                            )
+                            Column {
+                                Text(
+                                    text = option.courseCode,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isVisible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = option.courseName,
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    },
+                    trailingIcon = {
+                        Text(
+                            text = "${String.format(Locale.US, "%.1f", option.totalHours)}h",
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isVisible) subjectColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                )
+            }
+
+            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = { onExpandChange(false) },
+                    modifier = Modifier.testTag("btn_done_subject_multiselect")
+                ) {
+                    Text(
+                        text = "Done",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = IndigoPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
 

@@ -1747,5 +1747,67 @@ class ExampleUnitTest {
         assertEquals(30, todayPt.combinedMinutes)
         assertEquals(0.5, todayPt.combinedHours, 0.0001)
     }
+
+    @Test
+    fun `test SubjectVisibilityFilterHelper toggles specific subjects in bars and weekly trends`() {
+        val stats = listOf(
+            com.example.data.local.SubjectStudyStats(courseCode = "CS201", totalMinutes = 180, sessionCount = 3),
+            com.example.data.local.SubjectStudyStats(courseCode = "MATH204", totalMinutes = 120, sessionCount = 2),
+            com.example.data.local.SubjectStudyStats(courseCode = "PHY102", totalMinutes = 60, sessionCount = 1)
+        )
+        val courses = listOf(
+            com.example.data.local.CourseEntity(code = "CS201", name = "Data Structures", instructor = "Dr. A", room = "R101", dayOfWeek = "Mon", timeSlot = "10:00 AM"),
+            com.example.data.local.CourseEntity(code = "MATH204", name = "Discrete Math", instructor = "Dr. B", room = "R202", dayOfWeek = "Tue", timeSlot = "11:00 AM"),
+            com.example.data.local.CourseEntity(code = "PHY102", name = "Electromagnetism", instructor = "Dr. C", room = "R303", dayOfWeek = "Wed", timeSlot = "1:00 PM")
+        )
+
+        val options = com.example.data.local.SubjectVisibilityFilterHelper.buildSubjectOptions(
+            courses = courses,
+            stats = stats
+        )
+        assertEquals(listOf("CS201", "MATH204", "PHY102"), options.map { it.courseCode })
+        assertEquals(3.0, options[0].totalHours, 0.0001)
+
+        // Initially all visible
+        var hidden = com.example.data.local.SubjectVisibilityFilterHelper.selectAllSubjects()
+        assertEquals(3, com.example.data.local.SubjectVisibilityFilterHelper.filterVisibleSubjectStats(stats, hidden).size)
+        assertEquals("All Subjects (3)", com.example.data.local.SubjectVisibilityFilterHelper.formatFilterSummary(listOf("CS201", "MATH204", "PHY102"), hidden))
+
+        // Hide CS201 (case-insensitive)
+        hidden = com.example.data.local.SubjectVisibilityFilterHelper.toggleSubjectVisibility("cs201", hidden)
+        assertFalse(com.example.data.local.SubjectVisibilityFilterHelper.isSubjectVisible("CS201", hidden))
+        assertTrue(com.example.data.local.SubjectVisibilityFilterHelper.isSubjectVisible("MATH204", hidden))
+
+        val filteredStats = com.example.data.local.SubjectVisibilityFilterHelper.filterVisibleSubjectStats(stats, hidden)
+        assertEquals(listOf("MATH204", "PHY102"), filteredStats.map { it.courseCode })
+        assertEquals("MATH204, PHY102 (2/3)", com.example.data.local.SubjectVisibilityFilterHelper.formatFilterSummary(listOf("CS201", "MATH204", "PHY102"), hidden))
+
+        // Weekly trend bars exclude hidden CS201 minutes & update primary subject
+        val dayTrend = com.example.data.local.DayStudyTrend(
+            dayKey = "Mon",
+            dayLabel = "Monday",
+            totalMinutes = 150,
+            sessionCount = 3,
+            primarySubject = "CS201",
+            subjectBreakdown = mapOf("CS201" to 90, "MATH204" to 60)
+        )
+        val filteredTrends = com.example.data.local.SubjectVisibilityFilterHelper.filterWeeklyTrendsByVisibleSubjects(
+            trends = listOf(dayTrend),
+            hiddenCourseCodes = hidden
+        )
+        assertEquals(60, filteredTrends.first().totalMinutes)
+        assertEquals("MATH204", filteredTrends.first().primarySubject)
+        assertEquals(mapOf("MATH204" to 60), filteredTrends.first().subjectBreakdown)
+
+        // Hide all subjects -> 0 visible
+        val allHidden = com.example.data.local.SubjectVisibilityFilterHelper.hideAllSubjects(listOf("CS201", "MATH204", "PHY102"))
+        assertEquals(0, com.example.data.local.SubjectVisibilityFilterHelper.filterVisibleSubjectStats(stats, allHidden).size)
+        assertEquals("No Subjects Selected (0/3)", com.example.data.local.SubjectVisibilityFilterHelper.formatFilterSummary(listOf("CS201", "MATH204", "PHY102"), allHidden))
+
+        // Re-enable CS201 from all-hidden state
+        val afterToggle = com.example.data.local.SubjectVisibilityFilterHelper.toggleSubjectVisibility("CS201", allHidden)
+        assertEquals(listOf("CS201"), com.example.data.local.SubjectVisibilityFilterHelper.filterVisibleSubjectStats(stats, afterToggle).map { it.courseCode })
+        assertEquals("CS201 (1/3)", com.example.data.local.SubjectVisibilityFilterHelper.formatFilterSummary(listOf("CS201", "MATH204", "PHY102"), afterToggle))
+    }
 }
 

@@ -1812,3 +1812,121 @@ object CombinedTrendOverlayHelper {
         )
     }
 }
+
+data class SubjectVisibilityOption(
+    val courseCode: String,
+    val courseName: String,
+    val totalHours: Double
+)
+
+object SubjectVisibilityFilterHelper {
+
+    fun isSubjectVisible(courseCode: String, hiddenCourseCodes: Set<String>): Boolean {
+        val normalized = courseCode.trim()
+        if (normalized.isEmpty()) return true
+        return hiddenCourseCodes.none { it.equals(normalized, ignoreCase = true) }
+    }
+
+    fun toggleSubjectVisibility(
+        courseCode: String,
+        hiddenCourseCodes: Set<String>
+    ): Set<String> {
+        val normalized = courseCode.trim()
+        if (normalized.isEmpty()) return hiddenCourseCodes
+        val currentlyHidden = hiddenCourseCodes.any { it.equals(normalized, ignoreCase = true) }
+        return if (currentlyHidden) {
+            hiddenCourseCodes.filterNot { it.equals(normalized, ignoreCase = true) }.toSet()
+        } else {
+            hiddenCourseCodes + normalized
+        }
+    }
+
+    fun selectAllSubjects(): Set<String> = emptySet()
+
+    fun hideAllSubjects(allCourseCodes: List<String>): Set<String> {
+        return allCourseCodes.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy {
+            it.uppercase(java.util.Locale.US)
+        }.toSet()
+    }
+
+    fun buildSubjectOptions(
+        courses: List<CourseEntity>,
+        stats: List<SubjectStudyStats>
+    ): List<SubjectVisibilityOption> {
+        val nameByCode = courses.associate { it.code.uppercase(java.util.Locale.US) to it.name }
+        val hoursByCode = stats.associate { it.courseCode.uppercase(java.util.Locale.US) to it.totalHours }
+        val orderedCodes = (stats.map { it.courseCode } + courses.map { it.code })
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinctBy { it.uppercase(java.util.Locale.US) }
+
+        return orderedCodes.map { code ->
+            val key = code.uppercase(java.util.Locale.US)
+            SubjectVisibilityOption(
+                courseCode = code,
+                courseName = nameByCode[key] ?: code,
+                totalHours = hoursByCode[key] ?: 0.0
+            )
+        }
+    }
+
+    fun filterVisibleSubjectStats(
+        stats: List<SubjectStudyStats>,
+        hiddenCourseCodes: Set<String>
+    ): List<SubjectStudyStats> {
+        if (hiddenCourseCodes.isEmpty()) return stats
+        return stats.filter { isSubjectVisible(it.courseCode, hiddenCourseCodes) }
+    }
+
+    fun filterWeeklyTrendsByVisibleSubjects(
+        trends: List<DayStudyTrend>,
+        hiddenCourseCodes: Set<String>
+    ): List<DayStudyTrend> {
+        if (hiddenCourseCodes.isEmpty()) return trends
+        return trends.map { day ->
+            if (day.subjectBreakdown.isEmpty()) {
+                day
+            } else {
+                val visibleBreakdown = day.subjectBreakdown.filterKeys { code ->
+                    isSubjectVisible(code, hiddenCourseCodes)
+                }
+                val visibleTotalMins = visibleBreakdown.values.sum()
+                val rawTotalMins = day.subjectBreakdown.values.sum().coerceAtLeast(1)
+                val scaledSessions = if (visibleTotalMins == 0) {
+                    0
+                } else {
+                    maxOf(1, kotlin.math.round(day.sessionCount.toDouble() * (visibleTotalMins.toDouble() / rawTotalMins.toDouble())).toInt())
+                }
+                val visibleTopSubject = visibleBreakdown
+                    .filterValues { it > 0 }
+                    .maxByOrNull { it.value }
+                    ?.key ?: "—"
+
+                day.copy(
+                    totalMinutes = visibleTotalMins,
+                    sessionCount = scaledSessions,
+                    primarySubject = visibleTopSubject,
+                    subjectBreakdown = visibleBreakdown
+                )
+            }
+        }
+    }
+
+    fun formatFilterSummary(
+        allCourseCodes: List<String>,
+        hiddenCourseCodes: Set<String>
+    ): String {
+        val uniqueCodes = allCourseCodes.map { it.trim() }.filter { it.isNotEmpty() }
+            .distinctBy { it.uppercase(java.util.Locale.US) }
+        if (uniqueCodes.isEmpty()) return "No Subjects"
+        val visible = uniqueCodes.filter { isSubjectVisible(it, hiddenCourseCodes) }
+        return when {
+            visible.size == uniqueCodes.size -> "All Subjects (${uniqueCodes.size})"
+            visible.isEmpty() -> "No Subjects Selected (0/${uniqueCodes.size})"
+            visible.size == 1 -> "${visible.first()} (1/${uniqueCodes.size})"
+            visible.size == 2 -> "${visible[0]}, ${visible[1]} (2/${uniqueCodes.size})"
+            else -> "${visible.size} of ${uniqueCodes.size} Subjects"
+        }
+    }
+}
+
