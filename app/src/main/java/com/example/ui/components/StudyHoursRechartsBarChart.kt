@@ -69,7 +69,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import com.example.data.local.ActiveSessionHelper
 import com.example.data.local.ActiveSessionState
 import com.example.data.local.CombinedTrendOverlayHelper
@@ -213,18 +216,6 @@ fun StudyHoursRechartsBarChart(
     val allSubjectCodesForFilter = remember(allSubjectFilterOptions) {
         allSubjectFilterOptions.map { it.courseCode }
     }
-    val visibleWeeklyTrends = remember(weeklyTrends, hiddenSubjectCodes) {
-        SubjectVisibilityFilterHelper.filterWeeklyTrendsByVisibleSubjects(
-            trends = weeklyTrends,
-            hiddenCourseCodes = hiddenSubjectCodes
-        )
-    }
-    val visiblePreviousWeeklyTrends = remember(previousWeeklyTrends, hiddenSubjectCodes) {
-        SubjectVisibilityFilterHelper.filterWeeklyTrendsByVisibleSubjects(
-            trends = previousWeeklyTrends,
-            hiddenCourseCodes = hiddenSubjectCodes
-        )
-    }
 
     val goalMetCount = remember(
         studyStats,
@@ -300,7 +291,7 @@ fun StudyHoursRechartsBarChart(
         displayedStudyStats.firstOrNull { it.courseCode == hov.courseCode }
     }
     val activeSelectedDayTrend = selectedDayTrend?.let { sel ->
-        visibleWeeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
+        weeklyTrends.firstOrNull { it.dayKey == sel.dayKey } ?: sel
     }
     val activeTrendCourseCode = hoveredTrendCourseCode ?: expandedTrendCourseCode
     val activeTrendStat = activeTrendCourseCode?.let { code ->
@@ -2423,45 +2414,6 @@ fun StudyHoursRechartsBarChart(
                 }
             }
 
-            // Multi-Select Subject Visibility Filter Dropdown above the study hours bar chart
-            if (viewMode != ChartViewMode.MONTHLY && allSubjectFilterOptions.isNotEmpty()) {
-                SubjectVisibilityMultiSelectDropdown(
-                    options = allSubjectFilterOptions,
-                    hiddenCourseCodes = hiddenSubjectCodes,
-                    expanded = showSubjectMultiFilterDropdown,
-                    onExpandChange = { showSubjectMultiFilterDropdown = it },
-                    onToggleSubject = { code ->
-                        hiddenSubjectCodes = SubjectVisibilityFilterHelper.toggleSubjectVisibility(
-                            courseCode = code,
-                            hiddenCourseCodes = hiddenSubjectCodes
-                        )
-                        if (selectedStat?.courseCode.equals(code, ignoreCase = true)) {
-                            selectedStat = null
-                        }
-                        if (overlaySubjectStat?.courseCode.equals(code, ignoreCase = true)) {
-                            overlaySubjectStat = null
-                        }
-                        if (hoveredStat?.courseCode.equals(code, ignoreCase = true)) {
-                            hoveredStat = null
-                        }
-                        if (selectedWeeklySubjectFilter.equals(code, ignoreCase = true)) {
-                            selectedWeeklySubjectFilter = null
-                        }
-                    },
-                    onSelectAll = {
-                        hiddenSubjectCodes = SubjectVisibilityFilterHelper.selectAllSubjects()
-                    },
-                    onClearAll = {
-                        hiddenSubjectCodes = SubjectVisibilityFilterHelper.hideAllSubjects(allSubjectCodesForFilter)
-                        selectedStat = null
-                        overlaySubjectStat = null
-                        hoveredStat = null
-                        selectedWeeklySubjectFilter = null
-                    },
-                    subjectColorProvider = ::getSubjectColor
-                )
-            }
-
             // Main Chart Viewport
             val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
             val goalLineColor = WarningAmber.copy(alpha = 0.85f)
@@ -2477,8 +2429,49 @@ fun StudyHoursRechartsBarChart(
                     subjectColorProvider = ::getSubjectColor
                 )
             } else if (viewMode == ChartViewMode.BY_SUBJECT) {
-                // Row of Subject Visibility Filter Buttons directly above the Bar Chart
-                val courseNamesByCode = remember(courses) { courses.associate { it.code to it.name } }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("subjectChartContainer"),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Multi-Select Subject Visibility Filter Dropdown above the study hours bars
+                    if (allSubjectFilterOptions.isNotEmpty()) {
+                        SubjectVisibilityMultiSelectDropdown(
+                            options = allSubjectFilterOptions,
+                            hiddenCourseCodes = hiddenSubjectCodes,
+                            expanded = showSubjectMultiFilterDropdown,
+                            onExpandChange = { showSubjectMultiFilterDropdown = it },
+                            onToggleSubject = { code ->
+                                hiddenSubjectCodes = SubjectVisibilityFilterHelper.toggleSubjectVisibility(
+                                    courseCode = code,
+                                    hiddenCourseCodes = hiddenSubjectCodes
+                                )
+                                if (selectedStat?.courseCode.equals(code, ignoreCase = true)) {
+                                    selectedStat = null
+                                }
+                                if (overlaySubjectStat?.courseCode.equals(code, ignoreCase = true)) {
+                                    overlaySubjectStat = null
+                                }
+                                if (hoveredStat?.courseCode.equals(code, ignoreCase = true)) {
+                                    hoveredStat = null
+                                }
+                            },
+                            onSelectAll = {
+                                hiddenSubjectCodes = SubjectVisibilityFilterHelper.selectAllSubjects()
+                            },
+                            onClearAll = {
+                                hiddenSubjectCodes = SubjectVisibilityFilterHelper.hideAllSubjects(allSubjectCodesForFilter)
+                                selectedStat = null
+                                overlaySubjectStat = null
+                                hoveredStat = null
+                            },
+                            subjectColorProvider = ::getSubjectColor
+                        )
+                    }
+
+                    // Row of Subject Visibility Filter Buttons directly above the Bar Chart
+                    val courseNamesByCode = remember(courses) { courses.associate { it.code to it.name } }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -4016,11 +4009,12 @@ fun StudyHoursRechartsBarChart(
                             )
                         }
                     }
+                }
                 } else {
                 // Trend View: Adapts across Last 7 Days (Mon-Sun), This Month (Wk 1-4), and Semester (Months)
                 val maxDailyHours = max(
-                    max(max(4.0, periodBucketGoalHours + 1.2), (visibleWeeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
-                    if (compareWithPreviousWeek) (visiblePreviousWeeklyTrends.maxOfOrNull { it.totalHours } ?: 0.0) + 0.8 else 0.0
+                    max(max(4.0, periodBucketGoalHours + 1.2), (weeklyTrends.maxOfOrNull { it.totalHours } ?: 3.5) + 0.8),
+                    if (compareWithPreviousWeek) (previousWeeklyTrends.maxOfOrNull { it.totalHours } ?: 0.0) + 0.8 else 0.0
                 )
 
                 Box(
@@ -4070,7 +4064,7 @@ fun StudyHoursRechartsBarChart(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.Bottom
                     ) {
-                        visibleWeeklyTrends.forEach { dayTrend ->
+                        weeklyTrends.forEach { dayTrend ->
                             val isSelected = selectedDayTrend?.dayKey == dayTrend.dayKey
                             val reachesGoal = dayTrend.totalHours >= periodBucketGoalHours
                             val isToday = when (selectedDateRange) {
@@ -4092,7 +4086,7 @@ fun StudyHoursRechartsBarChart(
                             }
 
                             val prevDayTrend = if (compareWithPreviousWeek) {
-                                visiblePreviousWeeklyTrends.firstOrNull { it.dayKey == dayTrend.dayKey }
+                                previousWeeklyTrends.firstOrNull { it.dayKey == dayTrend.dayKey }
                             } else null
                             val prevDayHours = prevDayTrend?.totalHours ?: 0.0
                             val prevTargetFraction = (prevDayHours / maxDailyHours).toFloat().coerceIn(0.04f, 1f)
@@ -7981,6 +7975,11 @@ fun SubjectVisibilityMultiSelectDropdown(
                     onClick = { onToggleSubject(option.courseCode) },
                     modifier = Modifier
                         .heightIn(min = 48.dp)
+                        .semantics {
+                            role = Role.Checkbox
+                            toggleableState = ToggleableState(isVisible)
+                            contentDescription = "Toggle ${option.courseCode} ${option.courseName}"
+                        }
                         .testTag("dropdown_subject_item_${option.courseCode}"),
                     leadingIcon = {
                         Box(
