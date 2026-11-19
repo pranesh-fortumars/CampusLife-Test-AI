@@ -8,6 +8,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        #subjectChartSvg [data-subject] {
+            transition: opacity 180ms ease, filter 180ms ease, transform 180ms ease, stroke-width 180ms ease;
+        }
+        #subjectChartSvg .subject-bar-interact {
+            cursor: pointer;
+            outline: none;
+        }
+        #subjectChartSvg .subject-bar-dimmed {
+            opacity: 0.22;
+        }
+        #subjectChartSvg rect.subject-bar-highlighted {
+            filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.7)) brightness(1.14);
+            stroke: #e0e7ff;
+            stroke-width: 1.8px;
+        }
+        #subjectChartSvg rect.subject-bar-highlighted[data-subject="ENG215"] {
+            filter: drop-shadow(0 0 10px rgba(248, 113, 113, 0.75)) brightness(1.12);
+            stroke: #fecaca;
+            stroke-width: 1.8px;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between antialiased selection:bg-indigo-500 selection:text-white">
@@ -312,6 +332,28 @@
                         <span id="subjectFilterActiveHint" class="text-[11px] text-slate-400">Showing all 5 subjects</span>
                     </div>
 
+                    <!-- Floating Interactive Chart Tooltip -->
+                    <div id="subjectChartTooltip"
+                         role="tooltip"
+                         aria-hidden="true"
+                         class="pointer-events-none hidden absolute z-30 w-56 rounded-2xl bg-slate-950/95 border border-indigo-500/40 shadow-2xl shadow-black/70 px-3.5 py-2.5 text-xs text-slate-100 backdrop-blur-md transition-opacity duration-150">
+                        <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
+                            <div>
+                                <div id="tooltipSubjectCode" class="font-extrabold text-white text-sm tracking-tight">CS201</div>
+                                <div id="tooltipCourseName" class="text-[11px] text-slate-400">Data Structures</div>
+                            </div>
+                            <span id="tooltipProgressBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">92%</span>
+                        </div>
+                        <div class="mt-2 flex items-center justify-between">
+                            <span class="text-slate-400 text-[11px]">Logged Sessions:</span>
+                            <span id="tooltipSessionsCount" class="font-extrabold text-indigo-300 text-xs">11 sessions</span>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">Hours / Goal:</span>
+                            <span id="tooltipHoursSummary" class="font-semibold text-slate-200">5.5h / 6.0h</span>
+                        </div>
+                    </div>
+
                     <div class="w-full overflow-x-auto">
                     <svg id="subjectChartSvg" viewBox="0 0 650 220" class="w-full h-56 min-w-[500px]">
                         <!-- Grid Lines -->
@@ -328,36 +370,36 @@
 
                         <!-- Bars with individual target ratios -->
                         <!-- CS201: 5.5h of 6.0h goal (92%) -->
-                        <rect data-subject="CS201" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="CS201" x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
-                        <text data-subject="CS201" x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
-                        <text data-subject="CS201" x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
+                        <rect data-subject="CS201" data-course="Data Structures" data-sessions="11" data-hours="5.5h" data-goal="6.0h" data-pct="92%" tabindex="0" class="subject-bar-interact subject-main-bar" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="CS201" class="subject-bar-interact" x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
+                        <text data-subject="CS201" class="subject-bar-interact" x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
+                        <text data-subject="CS201" class="subject-bar-interact" x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
 
                         <!-- MATH204: 4.0h of 5.0h goal (80%) -->
-                        <rect data-subject="MATH204" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="MATH204" x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
-                        <text data-subject="MATH204" x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
-                        <text data-subject="MATH204" x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
+                        <rect data-subject="MATH204" data-course="Linear Algebra" data-sessions="8" data-hours="4.0h" data-goal="5.0h" data-pct="80%" tabindex="0" class="subject-bar-interact subject-main-bar" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="MATH204" class="subject-bar-interact" x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
+                        <text data-subject="MATH204" class="subject-bar-interact" x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
+                        <text data-subject="MATH204" class="subject-bar-interact" x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
 
                         <!-- CS310: 3.5h of 4.5h goal (78%) -->
-                        <rect data-subject="CS310" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="CS310" x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
-                        <text data-subject="CS310" x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
-                        <text data-subject="CS310" x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
+                        <rect data-subject="CS310" data-course="Operating Systems" data-sessions="7" data-hours="3.5h" data-goal="4.5h" data-pct="78%" tabindex="0" class="subject-bar-interact subject-main-bar" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="CS310" class="subject-bar-interact" x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
+                        <text data-subject="CS310" class="subject-bar-interact" x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
+                        <text data-subject="CS310" class="subject-bar-interact" x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
 
                         <!-- PHY102: 2.5h of 4.0h goal (63%) -->
-                        <rect data-subject="PHY102" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="PHY102" x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
-                        <text data-subject="PHY102" x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
-                        <text data-subject="PHY102" x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
+                        <rect data-subject="PHY102" data-course="Engineering Physics" data-sessions="5" data-hours="2.5h" data-goal="4.0h" data-pct="63%" tabindex="0" class="subject-bar-interact subject-main-bar" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="PHY102" class="subject-bar-interact" x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
+                        <text data-subject="PHY102" class="subject-bar-interact" x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
+                        <text data-subject="PHY102" class="subject-bar-interact" x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
 
                         <!-- ENG215: 1.5h of 3.5h goal (43% - Below 50% Alert) -->
-                        <rect data-subject="ENG215" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
-                        <text data-subject="ENG215" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="ENG215" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
-                        <text data-subject="ENG215" x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
-                        <text data-subject="ENG215" x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
-                        <text data-subject="ENG215" x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
+                        <rect data-subject="ENG215" class="subject-bar-interact" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="ENG215" data-course="Technical Writing" data-sessions="3" data-hours="1.5h" data-goal="3.5h" data-pct="43%" tabindex="0" class="subject-bar-interact subject-main-bar" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
+                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
+                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
+                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
 
                         <defs>
                             <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -653,6 +695,125 @@
             }
 
             updateSubjectChartVisibility();
+        })();
+
+        (function initSubjectBarHoverEffects() {
+            const container = document.getElementById('subjectChartContainer');
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const tooltip = document.getElementById('subjectChartTooltip');
+            if (!container || !chartSvg || !tooltip) return;
+
+            const tooltipCodeEl = document.getElementById('tooltipSubjectCode');
+            const tooltipCourseEl = document.getElementById('tooltipCourseName');
+            const tooltipBadgeEl = document.getElementById('tooltipProgressBadge');
+            const tooltipSessionsEl = document.getElementById('tooltipSessionsCount');
+            const tooltipHoursEl = document.getElementById('tooltipHoursSummary');
+
+            const subjectElements = Array.from(chartSvg.querySelectorAll('[data-subject]'));
+            let activeHoveredSubject = null;
+
+            function clearHoverState() {
+                activeHoveredSubject = null;
+                subjectElements.forEach((el) => {
+                    el.classList.remove('subject-bar-dimmed', 'subject-bar-highlighted');
+                });
+                tooltip.classList.add('hidden');
+                tooltip.setAttribute('aria-hidden', 'true');
+            }
+
+            function positionTooltipForBar(mainBar) {
+                if (!mainBar) return;
+                const containerRect = container.getBoundingClientRect();
+                const barRect = mainBar.getBoundingClientRect();
+
+                // Reveal momentarily so offsetWidth/offsetHeight are measurable
+                tooltip.classList.remove('hidden');
+                tooltip.setAttribute('aria-hidden', 'false');
+
+                const tipWidth = tooltip.offsetWidth || 224;
+                const tipHeight = tooltip.offsetHeight || 96;
+
+                let left = (barRect.left - containerRect.left) + (barRect.width / 2) - (tipWidth / 2);
+                const maxLeft = Math.max(8, containerRect.width - tipWidth - 8);
+                left = Math.max(8, Math.min(left, maxLeft));
+
+                let top = (barRect.top - containerRect.top) - tipHeight - 12;
+                if (top < 8) {
+                    top = (barRect.bottom - containerRect.top) + 10;
+                }
+
+                tooltip.style.left = Math.round(left) + 'px';
+                tooltip.style.top = Math.round(top) + 'px';
+            }
+
+            function applyHoverState(subject) {
+                const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + subject + '"]');
+                if (!mainBar || mainBar.style.display === 'none') {
+                    clearHoverState();
+                    return;
+                }
+
+                activeHoveredSubject = subject;
+                subjectElements.forEach((el) => {
+                    if (el.style.display === 'none') return;
+                    const isMatch = el.getAttribute('data-subject') === subject;
+                    el.classList.toggle('subject-bar-highlighted', isMatch);
+                    el.classList.toggle('subject-bar-dimmed', !isMatch);
+                });
+
+                const courseName = mainBar.getAttribute('data-course') || subject;
+                const sessions = mainBar.getAttribute('data-sessions') || '0';
+                const hours = mainBar.getAttribute('data-hours') || '0h';
+                const goal = mainBar.getAttribute('data-goal') || '0h';
+                const pct = mainBar.getAttribute('data-pct') || '0%';
+                const isAlert = subject === 'ENG215';
+
+                if (tooltipCodeEl) tooltipCodeEl.textContent = subject;
+                if (tooltipCourseEl) tooltipCourseEl.textContent = courseName;
+                if (tooltipSessionsEl) {
+                    const countNum = parseInt(sessions, 10);
+                    tooltipSessionsEl.textContent = sessions + (countNum === 1 ? ' session' : ' sessions');
+                    tooltipSessionsEl.className = isAlert
+                        ? 'font-extrabold text-red-400 text-xs'
+                        : 'font-extrabold text-indigo-300 text-xs';
+                }
+                if (tooltipHoursEl) tooltipHoursEl.textContent = hours + ' / ' + goal;
+                if (tooltipBadgeEl) {
+                    tooltipBadgeEl.textContent = isAlert ? pct + ' Alert' : pct;
+                    tooltipBadgeEl.className = isAlert
+                        ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40'
+                        : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
+                }
+
+                positionTooltipForBar(mainBar);
+            }
+
+            subjectElements.forEach((el) => {
+                const subject = el.getAttribute('data-subject');
+                if (!subject) return;
+
+                el.addEventListener('mouseenter', () => applyHoverState(subject));
+                el.addEventListener('focus', () => applyHoverState(subject));
+                el.addEventListener('blur', clearHoverState);
+            });
+
+            chartSvg.addEventListener('mouseleave', clearHoverState);
+            chartSvg.addEventListener('mousemove', (event) => {
+                const targetSubjectEl = event.target.closest ? event.target.closest('[data-subject]') : null;
+                if (!targetSubjectEl) {
+                    if (activeHoveredSubject !== null) {
+                        clearHoverState();
+                    }
+                }
+            });
+
+            container.querySelectorAll('.subject-filter-checkbox').forEach((checkbox) => {
+                checkbox.addEventListener('change', clearHoverState);
+            });
+            const selectAllBtn = document.getElementById('subjectSelectAllBtn');
+            const clearAllBtn = document.getElementById('subjectClearAllBtn');
+            if (selectAllBtn) selectAllBtn.addEventListener('click', clearHoverState);
+            if (clearAllBtn) clearAllBtn.addEventListener('click', clearHoverState);
         })();
     </script>
 </body>
