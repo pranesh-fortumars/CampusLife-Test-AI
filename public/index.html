@@ -203,7 +203,7 @@
                 </div>
 
                 <!-- Subject SVG Chart -->
-                <div id="subjectChartContainer" class="w-full overflow-x-auto">
+                <div id="subjectChartContainer" class="w-full relative">
                     <!-- Low Study Hours Alert Banner -->
                     <div class="mb-4 bg-red-950/50 border border-red-800/60 rounded-xl p-3 flex items-center justify-between text-xs">
                         <div class="flex items-center space-x-2.5">
@@ -235,7 +235,85 @@
                             </div>
                         </div>
                     </div>
-                    <svg viewBox="0 0 650 220" class="w-full h-56 min-w-[500px]">
+
+                    <!-- Subject Multi-Select Filter Dropdown -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 relative z-20" id="subjectFilterWrapper">
+                        <div class="relative inline-block text-left">
+                            <button type="button"
+                                    id="subjectFilterDropdownBtn"
+                                    aria-haspopup="true"
+                                    aria-expanded="false"
+                                    class="inline-flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-900 border border-slate-700 hover:border-indigo-500/60 text-xs font-semibold text-slate-200 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                                <span class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                                    </svg>
+                                    <span>Filter Subjects:</span>
+                                    <span id="subjectFilterSummary" class="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">All (5/5)</span>
+                                </span>
+                                <svg id="subjectFilterChevron" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+
+                            <!-- Dropdown Checkbox Menu -->
+                            <div id="subjectFilterMenu"
+                                 role="menu"
+                                 aria-labelledby="subjectFilterDropdownBtn"
+                                 class="hidden absolute left-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl shadow-black/50 p-3 space-y-2 z-30">
+                                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Visible Chart Subjects</span>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" id="subjectSelectAllBtn" class="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 transition">Select All</button>
+                                        <span class="text-slate-700">|</span>
+                                        <button type="button" id="subjectClearAllBtn" class="text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition">Clear</button>
+                                    </div>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                        <span class="flex items-center gap-2.5">
+                                            <input type="checkbox" value="CS201" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                            <span class="text-xs font-bold text-slate-200">CS201</span>
+                                        </span>
+                                        <span class="text-[11px] text-indigo-300 font-medium">5.5h / 6h (92%)</span>
+                                    </label>
+                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                        <span class="flex items-center gap-2.5">
+                                            <input type="checkbox" value="MATH204" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                            <span class="text-xs font-bold text-slate-200">MATH204</span>
+                                        </span>
+                                        <span class="text-[11px] text-indigo-300 font-medium">4.0h / 5h (80%)</span>
+                                    </label>
+                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                        <span class="flex items-center gap-2.5">
+                                            <input type="checkbox" value="CS310" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                            <span class="text-xs font-bold text-slate-200">CS310</span>
+                                        </span>
+                                        <span class="text-[11px] text-indigo-300 font-medium">3.5h / 4.5h (78%)</span>
+                                    </label>
+                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                        <span class="flex items-center gap-2.5">
+                                            <input type="checkbox" value="PHY102" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                            <span class="text-xs font-bold text-slate-200">PHY102</span>
+                                        </span>
+                                        <span class="text-[11px] text-indigo-300 font-medium">2.5h / 4h (63%)</span>
+                                    </label>
+                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                        <span class="flex items-center gap-2.5">
+                                            <input type="checkbox" value="ENG215" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                            <span class="text-xs font-bold text-red-300">ENG215 ⚠️</span>
+                                        </span>
+                                        <span class="text-[11px] text-red-400 font-medium">1.5h / 3.5h (43%)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <span id="subjectFilterActiveHint" class="text-[11px] text-slate-400">Showing all 5 subjects</span>
+                    </div>
+
+                    <div class="w-full overflow-x-auto">
+                    <svg id="subjectChartSvg" viewBox="0 0 650 220" class="w-full h-56 min-w-[500px]">
                         <!-- Grid Lines -->
                         <line x1="40" y1="30" x2="620" y2="30" stroke="#334155" stroke-dasharray="3 3" />
                         <line x1="40" y1="75" x2="620" y2="75" stroke="#334155" stroke-dasharray="3 3" />
@@ -250,36 +328,36 @@
 
                         <!-- Bars with individual target ratios -->
                         <!-- CS201: 5.5h of 6.0h goal (92%) -->
-                        <rect x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
-                        <text x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
-                        <text x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
-                        <text x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
+                        <rect data-subject="CS201" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="CS201" x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
+                        <text data-subject="CS201" x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
+                        <text data-subject="CS201" x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
 
                         <!-- MATH204: 4.0h of 5.0h goal (80%) -->
-                        <rect x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
-                        <text x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
-                        <text x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
-                        <text x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
+                        <rect data-subject="MATH204" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="MATH204" x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
+                        <text data-subject="MATH204" x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
+                        <text data-subject="MATH204" x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
 
                         <!-- CS310: 3.5h of 4.5h goal (78%) -->
-                        <rect x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
-                        <text x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
-                        <text x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
-                        <text x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
+                        <rect data-subject="CS310" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="CS310" x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
+                        <text data-subject="CS310" x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
+                        <text data-subject="CS310" x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
 
                         <!-- PHY102: 2.5h of 4.0h goal (63%) -->
-                        <rect x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
-                        <text x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
-                        <text x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
-                        <text x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
+                        <rect data-subject="PHY102" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
+                        <text data-subject="PHY102" x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
+                        <text data-subject="PHY102" x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
+                        <text data-subject="PHY102" x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
 
                         <!-- ENG215: 1.5h of 3.5h goal (43% - Below 50% Alert) -->
-                        <rect x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
-                        <text x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
-                        <text x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
-                        <text x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
-                        <text x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
+                        <rect data-subject="ENG215" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="ENG215" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="ENG215" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
+                        <text data-subject="ENG215" x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
+                        <text data-subject="ENG215" x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
+                        <text data-subject="ENG215" x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
 
                         <defs>
                             <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -292,6 +370,7 @@
                             </linearGradient>
                         </defs>
                     </svg>
+                    </div>
                 </div>
 
                 <!-- Weekly Trend SVG Chart (Mon to Sun) -->
@@ -461,6 +540,120 @@
                 scoreEl.textContent = pct + '% (' + daysMet + '/7 Met)';
             }
         }
+
+        (function initSubjectFilterDropdown() {
+            const container = document.getElementById('subjectChartContainer');
+            if (!container) return;
+
+            const dropdownBtn = document.getElementById('subjectFilterDropdownBtn');
+            const dropdownMenu = document.getElementById('subjectFilterMenu');
+            const chevron = document.getElementById('subjectFilterChevron');
+            const summaryBadge = document.getElementById('subjectFilterSummary');
+            const activeHint = document.getElementById('subjectFilterActiveHint');
+            const selectAllBtn = document.getElementById('subjectSelectAllBtn');
+            const clearAllBtn = document.getElementById('subjectClearAllBtn');
+            const checkboxes = Array.from(container.querySelectorAll('.subject-filter-checkbox'));
+            const chartSvg = document.getElementById('subjectChartSvg');
+
+            function updateSubjectChartVisibility() {
+                if (!chartSvg) return;
+
+                const selectedSubjects = [];
+                checkboxes.forEach((checkbox) => {
+                    const subject = checkbox.value;
+                    const isVisible = checkbox.checked;
+                    if (isVisible) {
+                        selectedSubjects.push(subject);
+                    }
+
+                    const chartElements = chartSvg.querySelectorAll(
+                        'rect[data-subject="' + subject + '"], text[data-subject="' + subject + '"]'
+                    );
+                    chartElements.forEach((el) => {
+                        el.style.display = isVisible ? '' : 'none';
+                        el.setAttribute('visibility', isVisible ? 'visible' : 'hidden');
+                        el.setAttribute('aria-hidden', String(!isVisible));
+                    });
+                });
+
+                if (summaryBadge) {
+                    if (selectedSubjects.length === checkboxes.length) {
+                        summaryBadge.textContent = 'All (' + checkboxes.length + '/' + checkboxes.length + ')';
+                    } else if (selectedSubjects.length === 0) {
+                        summaryBadge.textContent = 'None (0/' + checkboxes.length + ')';
+                    } else if (selectedSubjects.length <= 2) {
+                        summaryBadge.textContent = selectedSubjects.join(', ');
+                    } else {
+                        summaryBadge.textContent = selectedSubjects.length + ' of ' + checkboxes.length + ' Selected';
+                    }
+                }
+
+                if (activeHint) {
+                    if (selectedSubjects.length === checkboxes.length) {
+                        activeHint.textContent = 'Showing all ' + checkboxes.length + ' subjects';
+                    } else if (selectedSubjects.length === 0) {
+                        activeHint.textContent = 'All subjects hidden — select a subject to display its bar';
+                    } else {
+                        activeHint.textContent = 'Showing: ' + selectedSubjects.join(', ');
+                    }
+                }
+            }
+
+            function setDropdownOpen(isOpen) {
+                if (!dropdownMenu || !dropdownBtn) return;
+                dropdownMenu.classList.toggle('hidden', !isOpen);
+                dropdownBtn.setAttribute('aria-expanded', String(isOpen));
+                if (chevron) {
+                    chevron.classList.toggle('rotate-180', isOpen);
+                }
+            }
+
+            if (dropdownBtn && dropdownMenu) {
+                dropdownBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const isCurrentlyHidden = dropdownMenu.classList.contains('hidden');
+                    setDropdownOpen(isCurrentlyHidden);
+                });
+
+                dropdownMenu.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                });
+
+                document.addEventListener('click', () => {
+                    setDropdownOpen(false);
+                });
+
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') {
+                        setDropdownOpen(false);
+                    }
+                });
+            }
+
+            checkboxes.forEach((checkbox) => {
+                checkbox.addEventListener('change', updateSubjectChartVisibility);
+            });
+
+            if (selectAllBtn) {
+                selectAllBtn.addEventListener('click', () => {
+                    checkboxes.forEach((checkbox) => {
+                        checkbox.checked = true;
+                    });
+                    updateSubjectChartVisibility();
+                });
+            }
+
+            if (clearAllBtn) {
+                clearAllBtn.addEventListener('click', () => {
+                    checkboxes.forEach((checkbox) => {
+                        checkbox.checked = false;
+                    });
+                    updateSubjectChartVisibility();
+                });
+            }
+
+            updateSubjectChartVisibility();
+        })();
     </script>
 </body>
 </html>
