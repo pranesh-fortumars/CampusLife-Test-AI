@@ -469,6 +469,10 @@
                             <span class="text-slate-400">Hours / Goal:</span>
                             <span id="tooltipHoursSummary" class="font-semibold text-slate-200">5.5h / 6.0h</span>
                         </div>
+                        <div class="mt-1 flex items-center justify-between text-[11px]">
+                            <span class="text-slate-400">vs. Last Week:</span>
+                            <span id="tooltipWeeklyTrend" class="font-bold text-emerald-400">▲ +22% (4.2h → 5.5h)</span>
+                        </div>
                     </div>
 
                     <div class="w-full overflow-x-auto">
@@ -486,50 +490,60 @@
                         <text x="30" y="169" fill="#94a3b8" font-size="10" text-anchor="end">0h</text>
 
                         <!-- Bars with individual target ratios -->
-                        <!-- CS201: 5.5h of 6.0h goal (92%) -->
+                        <!-- CS201: 5.5h of 6.0h goal (92%, last week 4.2h -> +22%) -->
                         <rect data-subject="CS201" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="85" y="29" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="CS201" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="102" y="39" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="CS201" data-course="Data Structures" data-sessions="11" data-logged="5.5" data-hours="5.5h" data-goal="6h" data-pct="92%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
+                        <rect data-subject="CS201" data-course="Data Structures" data-sessions="11" data-logged="5.5" data-prev-logged="4.2" data-hours="5.5h" data-goal="6h" data-pct="92%" data-trend="▲ +22%" data-trend-dir="up" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
                         <line data-subject="CS201" data-role="goal-line" x1="71" y1="57" x2="134" y2="57" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
                         <text data-subject="CS201" data-role="ratio" class="subject-bar-interact" x="102" y="51" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
                         <text data-subject="CS201" data-role="name" class="subject-bar-interact" x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
-                        <text data-subject="CS201" data-role="pct" class="subject-bar-interact" x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
+                        <text data-subject="CS201" data-role="pct" class="subject-bar-interact" x="107" y="200" fill="#a5b4fc" font-size="8.5" text-anchor="end">92% of Goal</text>
+                        <rect data-subject="CS201" data-role="trend-bg" class="subject-bar-interact" x="110" y="190" width="35" height="13" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="0.9" />
+                        <text data-subject="CS201" data-role="trend-text" class="subject-bar-interact" x="127.5" y="199" fill="#34d399" font-size="7.5" font-weight="bold" text-anchor="middle">▲ +22%</text>
 
-                        <!-- MATH204: 4.0h of 5.0h goal (80%) -->
+                        <!-- MATH204: 4.0h of 5.0h goal (80%, last week 3.5h -> +10%) -->
                         <rect data-subject="MATH204" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="195" y="55" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="MATH204" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="212" y="65" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="MATH204" data-course="Linear Algebra" data-sessions="8" data-logged="4.0" data-hours="4.0h" data-goal="5h" data-pct="80%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
+                        <rect data-subject="MATH204" data-course="Linear Algebra" data-sessions="8" data-logged="4.0" data-prev-logged="3.5" data-hours="4.0h" data-goal="5h" data-pct="80%" data-trend="▲ +10%" data-trend-dir="up" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
                         <line data-subject="MATH204" data-role="goal-line" x1="181" y1="75" x2="244" y2="75" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
                         <text data-subject="MATH204" data-role="ratio" class="subject-bar-interact" x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
                         <text data-subject="MATH204" data-role="name" class="subject-bar-interact" x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
-                        <text data-subject="MATH204" data-role="pct" class="subject-bar-interact" x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
+                        <text data-subject="MATH204" data-role="pct" class="subject-bar-interact" x="217" y="200" fill="#a5b4fc" font-size="8.5" text-anchor="end">80% of Goal</text>
+                        <rect data-subject="MATH204" data-role="trend-bg" class="subject-bar-interact" x="220" y="190" width="35" height="13" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="0.9" />
+                        <text data-subject="MATH204" data-role="trend-text" class="subject-bar-interact" x="237.5" y="199" fill="#34d399" font-size="7.5" font-weight="bold" text-anchor="middle">▲ +10%</text>
 
-                        <!-- CS310: 3.5h of 4.5h goal (78%) -->
+                        <!-- CS310: 3.5h of 4.5h goal (78%, last week 3.8h -> -7%) -->
                         <rect data-subject="CS310" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="305" y="64" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="CS310" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="322" y="74" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="CS310" data-course="Operating Systems" data-sessions="7" data-logged="3.5" data-hours="3.5h" data-goal="4.5h" data-pct="78%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
+                        <rect data-subject="CS310" data-course="Operating Systems" data-sessions="7" data-logged="3.5" data-prev-logged="3.8" data-hours="3.5h" data-goal="4.5h" data-pct="78%" data-trend="▼ -7%" data-trend-dir="down" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
                         <line data-subject="CS310" data-role="goal-line" x1="291" y1="84" x2="354" y2="84" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
                         <text data-subject="CS310" data-role="ratio" class="subject-bar-interact" x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
                         <text data-subject="CS310" data-role="name" class="subject-bar-interact" x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
-                        <text data-subject="CS310" data-role="pct" class="subject-bar-interact" x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
+                        <text data-subject="CS310" data-role="pct" class="subject-bar-interact" x="327" y="200" fill="#a5b4fc" font-size="8.5" text-anchor="end">78% of Goal</text>
+                        <rect data-subject="CS310" data-role="trend-bg" class="subject-bar-interact" x="330" y="190" width="35" height="13" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="0.9" />
+                        <text data-subject="CS310" data-role="trend-text" class="subject-bar-interact" x="347.5" y="199" fill="#f87171" font-size="7.5" font-weight="bold" text-anchor="middle">▼ -7%</text>
 
-                        <!-- PHY102: 2.5h of 4.0h goal (63%) -->
+                        <!-- PHY102: 2.5h of 4.0h goal (63%, last week 2.0h -> +13%) -->
                         <rect data-subject="PHY102" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="415" y="82" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="PHY102" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="432" y="92" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="PHY102" data-course="Engineering Physics" data-sessions="5" data-logged="2.5" data-hours="2.5h" data-goal="4h" data-pct="63%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
+                        <rect data-subject="PHY102" data-course="Engineering Physics" data-sessions="5" data-logged="2.5" data-prev-logged="2.0" data-hours="2.5h" data-goal="4h" data-pct="63%" data-trend="▲ +13%" data-trend-dir="up" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
                         <line data-subject="PHY102" data-role="goal-line" x1="401" y1="93" x2="464" y2="93" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
                         <text data-subject="PHY102" data-role="ratio" class="subject-bar-interact" x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
                         <text data-subject="PHY102" data-role="name" class="subject-bar-interact" x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
-                        <text data-subject="PHY102" data-role="pct" class="subject-bar-interact" x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
+                        <text data-subject="PHY102" data-role="pct" class="subject-bar-interact" x="437" y="200" fill="#a5b4fc" font-size="8.5" text-anchor="end">63% of Goal</text>
+                        <rect data-subject="PHY102" data-role="trend-bg" class="subject-bar-interact" x="440" y="190" width="35" height="13" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="0.9" />
+                        <text data-subject="PHY102" data-role="trend-text" class="subject-bar-interact" x="457.5" y="199" fill="#34d399" font-size="7.5" font-weight="bold" text-anchor="middle">▲ +13%</text>
 
-                        <!-- ENG215: 1.5h of 3.5h goal (43% - Below 50% Alert) -->
+                        <!-- ENG215: 1.5h of 3.5h goal (43% - Below 50% Alert, last week 2.3h -> -23%) -->
                         <rect data-subject="ENG215" data-role="alert-badge-bg" data-alert-active="true" class="subject-bar-interact" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="ENG215" data-role="alert-badge-text" data-alert-active="true" class="subject-bar-interact" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="ENG215" data-course="Technical Writing" data-sessions="3" data-logged="1.5" data-hours="1.5h" data-goal="3.5h" data-pct="43%" data-status="alert" tabindex="0" class="subject-bar-interact subject-main-bar" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
+                        <rect data-subject="ENG215" data-course="Technical Writing" data-sessions="3" data-logged="1.5" data-prev-logged="2.3" data-hours="1.5h" data-goal="3.5h" data-pct="43%" data-trend="▼ -23%" data-trend-dir="down" data-status="alert" tabindex="0" class="subject-bar-interact subject-main-bar" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
                         <line data-subject="ENG215" data-role="goal-line" x1="511" y1="102" x2="574" y2="102" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
                         <text data-subject="ENG215" data-role="ratio" class="subject-bar-interact" x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
                         <text data-subject="ENG215" data-role="name" class="subject-bar-interact" x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
-                        <text data-subject="ENG215" data-role="pct" class="subject-bar-interact" x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
+                        <text data-subject="ENG215" data-role="pct" class="subject-bar-interact" x="547" y="200" fill="#f87171" font-size="8.5" text-anchor="end">43% (3.5h)</text>
+                        <rect data-subject="ENG215" data-role="trend-bg" class="subject-bar-interact" x="550" y="190" width="35" height="13" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="0.9" />
+                        <text data-subject="ENG215" data-role="trend-text" class="subject-bar-interact" x="567.5" y="199" fill="#f87171" font-size="7.5" font-weight="bold" text-anchor="middle">▼ -23%</text>
 
                         <defs>
                             <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -844,6 +858,7 @@
             const tooltipBadgeEl = document.getElementById('tooltipProgressBadge');
             const tooltipSessionsEl = document.getElementById('tooltipSessionsCount');
             const tooltipHoursEl = document.getElementById('tooltipHoursSummary');
+            const tooltipTrendEl = document.getElementById('tooltipWeeklyTrend');
 
             const subjectElements = Array.from(chartSvg.querySelectorAll('[data-subject]'));
             let activeHoveredSubject = null;
@@ -867,7 +882,7 @@
                 tooltip.setAttribute('aria-hidden', 'false');
 
                 const tipWidth = tooltip.offsetWidth || 224;
-                const tipHeight = tooltip.offsetHeight || 96;
+                const tipHeight = tooltip.offsetHeight || 110;
 
                 let left = (barRect.left - containerRect.left) + (barRect.width / 2) - (tipWidth / 2);
                 const maxLeft = Math.max(8, containerRect.width - tipWidth - 8);
@@ -900,8 +915,11 @@
                 const courseName = mainBar.getAttribute('data-course') || subject;
                 const sessions = mainBar.getAttribute('data-sessions') || '0';
                 const hours = mainBar.getAttribute('data-hours') || '0h';
+                const prevHours = mainBar.getAttribute('data-prev-logged') || '0';
                 const goal = mainBar.getAttribute('data-goal') || '0h';
                 const pct = mainBar.getAttribute('data-pct') || '0%';
+                const trendLabel = mainBar.getAttribute('data-trend') || '▲ +0%';
+                const trendDir = mainBar.getAttribute('data-trend-dir') || 'up';
                 const status = mainBar.getAttribute('data-status') || 'normal';
                 const isAlert = status === 'alert';
                 const isMet = status === 'met';
@@ -918,6 +936,12 @@
                             : 'font-extrabold text-indigo-300 text-xs';
                 }
                 if (tooltipHoursEl) tooltipHoursEl.textContent = hours + ' / ' + goal;
+                if (tooltipTrendEl) {
+                    tooltipTrendEl.textContent = trendLabel + ' (' + prevHours + 'h → ' + hours + ')';
+                    tooltipTrendEl.className = trendDir === 'down'
+                        ? 'font-bold text-red-400'
+                        : 'font-bold text-emerald-400';
+                }
                 if (tooltipBadgeEl) {
                     tooltipBadgeEl.textContent = isAlert ? pct + ' Alert' : (isMet ? pct + ' Met' : pct);
                     tooltipBadgeEl.className = isAlert
@@ -984,11 +1008,11 @@
             };
 
             const SUBJECT_META = [
-                { code: 'CS201', title: 'Data Structures', logged: 5.5, loggedStr: '5.5h' },
-                { code: 'MATH204', title: 'Linear Algebra', logged: 4.0, loggedStr: '4.0h' },
-                { code: 'CS310', title: 'Operating Systems', logged: 3.5, loggedStr: '3.5h' },
-                { code: 'PHY102', title: 'Engineering Physics', logged: 2.5, loggedStr: '2.5h' },
-                { code: 'ENG215', title: 'Technical Writing', logged: 1.5, loggedStr: '1.5h' }
+                { code: 'CS201', title: 'Data Structures', logged: 5.5, prevLogged: 4.2, loggedStr: '5.5h' },
+                { code: 'MATH204', title: 'Linear Algebra', logged: 4.0, prevLogged: 3.5, loggedStr: '4.0h' },
+                { code: 'CS310', title: 'Operating Systems', logged: 3.5, prevLogged: 3.8, loggedStr: '3.5h' },
+                { code: 'PHY102', title: 'Engineering Physics', logged: 2.5, prevLogged: 2.0, loggedStr: '2.5h' },
+                { code: 'ENG215', title: 'Technical Writing', logged: 1.5, prevLogged: 2.3, loggedStr: '1.5h' }
             ];
 
             const currentGoals = Object.assign({}, DEFAULT_GOALS);
@@ -1007,6 +1031,10 @@
                     const goal = Math.max(0.5, Math.min(20, currentGoals[code] || DEFAULT_GOALS[code]));
                     const goalStr = formatHours(goal);
                     const pct = Math.round((subj.logged / goal) * 100);
+                    const prevPct = Math.round((subj.prevLogged / goal) * 100);
+                    const deltaPct = pct - prevPct;
+                    const isTrendingDown = deltaPct < 0;
+                    const trendLabel = isTrendingDown ? ('▼ ' + deltaPct + '%') : ('▲ +' + deltaPct + '%');
                     const isAlert = pct < 50;
                     const isMet = pct >= 100;
                     const status = isAlert ? 'alert' : (isMet ? 'met' : 'normal');
@@ -1053,12 +1081,14 @@
                                 : 'text-[11px] text-indigo-300 font-medium';
                     }
 
-                    // 3. Update SVG bar, target goal line, text labels, and alert badge
+                    // 3. Update SVG bar, target goal line, text labels, trend badge, and alert badge
                     const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
                     const goalLine = chartSvg.querySelector('line[data-subject="' + code + '"][data-role="goal-line"]');
                     const ratioText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="ratio"]');
                     const nameText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="name"]');
                     const pctText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="pct"]');
+                    const trendBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="trend-bg"]');
+                    const trendText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="trend-text"]');
                     const badgeBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]');
                     const badgeText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="alert-badge-text"]');
 
@@ -1068,6 +1098,8 @@
                     if (mainBar) {
                         mainBar.setAttribute('data-goal', goalStr);
                         mainBar.setAttribute('data-pct', pct + '%');
+                        mainBar.setAttribute('data-trend', trendLabel);
+                        mainBar.setAttribute('data-trend-dir', isTrendingDown ? 'down' : 'up');
                         mainBar.setAttribute('data-status', status);
 
                         if (isAlert) {
@@ -1110,15 +1142,22 @@
 
                     if (pctText) {
                         if (isAlert) {
-                            pctText.textContent = pct + '% (Goal: ' + goalStr + ')';
+                            pctText.textContent = pct + '% (' + goalStr + ')';
                             pctText.setAttribute('fill', '#f87171');
                         } else if (isMet) {
-                            pctText.textContent = pct + '% Met ✓';
+                            pctText.textContent = pct + '% Met';
                             pctText.setAttribute('fill', '#34d399');
                         } else {
                             pctText.textContent = pct + '% of Goal';
                             pctText.setAttribute('fill', '#a5b4fc');
                         }
+                    }
+
+                    if (trendBg && trendText) {
+                        trendBg.setAttribute('fill', isTrendingDown ? '#7f1d1d' : '#064e3b');
+                        trendBg.setAttribute('stroke', isTrendingDown ? '#ef4444' : '#10b981');
+                        trendText.setAttribute('fill', isTrendingDown ? '#f87171' : '#34d399');
+                        trendText.textContent = trendLabel;
                     }
 
                     if (badgeBg && badgeText) {
@@ -1288,6 +1327,8 @@
                     const ratioText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="ratio"]');
                     const nameText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="name"]');
                     const pctText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="pct"]');
+                    const trendBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="trend-bg"]');
+                    const trendText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="trend-text"]');
 
                     if (mainBar) mainBar.setAttribute('x', barX);
                     if (badgeBg) badgeBg.setAttribute('x', badgeX);
@@ -1298,7 +1339,9 @@
                     }
                     if (ratioText) ratioText.setAttribute('x', centerX);
                     if (nameText) nameText.setAttribute('x', centerX);
-                    if (pctText) pctText.setAttribute('x', centerX);
+                    if (pctText) pctText.setAttribute('x', centerX + 5);
+                    if (trendBg) trendBg.setAttribute('x', centerX + 8);
+                    if (trendText) trendText.setAttribute('x', centerX + 25.5);
                 });
             }
 
