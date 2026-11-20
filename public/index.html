@@ -33,12 +33,48 @@
             stroke: #a7f3d0;
             stroke-width: 1.8px;
         }
+        body.chart-focus-mode #mainNavbar,
+        body.chart-focus-mode #heroSection,
+        body.chart-focus-mode #featuresGridHeading,
+        body.chart-focus-mode #featuresCardsGrid,
+        body.chart-focus-mode #mainFooter {
+            display: none !important;
+        }
+        body.chart-focus-mode #mainContent {
+            max-width: 80rem;
+            width: 100%;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        body.chart-focus-mode #featuresSection {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            border-top-width: 0 !important;
+        }
+        body.chart-focus-mode #analyticsChartCard {
+            margin-top: 0 !important;
+            padding: 1.75rem 2rem;
+            border-color: rgba(99, 102, 241, 0.45);
+            box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.9), 0 0 40px rgba(99, 102, 241, 0.14);
+        }
+        body.chart-focus-mode #subjectChartSvg {
+            height: 24rem;
+            min-height: 360px;
+        }
+        @media (min-width: 768px) {
+            body.chart-focus-mode #subjectChartSvg {
+                height: 28rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between antialiased selection:bg-indigo-500 selection:text-white">
 
     <!-- Navbar -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <header id="mainNavbar" class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -60,8 +96,8 @@
     </header>
 
     <!-- Hero Content -->
-    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-12 md:py-20 flex-1">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+    <main id="mainContent" class="max-w-6xl mx-auto px-4 sm:px-6 py-12 md:py-20 flex-1">
+        <div id="heroSection" class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             
             <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
                 <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">
@@ -144,9 +180,9 @@
         </div>
 
         <!-- Features Grid -->
-        <section class="mt-20 pt-12 border-t border-slate-800">
-            <h3 class="text-xl font-bold text-white text-center mb-8">What's Packed Inside CampusLife</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section id="featuresSection" class="mt-20 pt-12 border-t border-slate-800">
+            <h3 id="featuresGridHeading" class="text-xl font-bold text-white text-center mb-8">What's Packed Inside CampusLife</h3>
+            <div id="featuresCardsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 <div class="p-6 rounded-2xl bg-slate-800/40 border border-slate-700/60 hover:border-slate-600 transition">
                     <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-lg mb-4">
@@ -181,7 +217,7 @@
             </div>
 
             <!-- Recharts Bar Chart Live Visualization Preview with Weekly Trend Toggle -->
-            <div class="mt-12 bg-slate-800/60 border border-slate-700/80 rounded-3xl p-6 md:p-8">
+            <div id="analyticsChartCard" class="mt-12 bg-slate-800/60 border border-slate-700/80 rounded-3xl p-6 md:p-8 transition-all duration-200">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div>
                         <div class="flex items-center space-x-2">
@@ -253,6 +289,19 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                 </svg>
                                 <span>Edit Goals</span>
+                            </button>
+                            <button type="button"
+                                    id="focusModeBtn"
+                                    aria-pressed="false"
+                                    title="Hide page distractions and maximize chart view (Press Esc to exit)"
+                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-indigo-200 font-semibold text-[11px] border border-indigo-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                <svg id="focusModeIconExpand" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"/>
+                                </svg>
+                                <svg id="focusModeIconCollapse" class="w-3 h-3 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9L4 4m0 0v4m0-4h4m7 5l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4m7-5l5 5m0 0v-4m0 4h-4"/>
+                                </svg>
+                                <span id="focusModeBtnLabel">Focus Mode</span>
                             </button>
                         </div>
                         <div class="flex items-center space-x-4">
@@ -659,7 +708,7 @@
 
 
     <!-- Footer -->
-    <footer class="border-t border-slate-800 bg-slate-900/60 py-6 text-center text-xs text-slate-500">
+    <footer id="mainFooter" class="border-t border-slate-800 bg-slate-900/60 py-6 text-center text-xs text-slate-500">
         <div class="max-w-6xl mx-auto px-4">
             <p>CampusLife Android APK Distribution Hub • Hosted seamlessly on Vercel • Automated via GitHub Actions</p>
         </div>
@@ -816,8 +865,9 @@
                 });
 
                 document.addEventListener('keydown', (event) => {
-                    if (event.key === 'Escape') {
+                    if (event.key === 'Escape' && !dropdownMenu.classList.contains('hidden')) {
                         setDropdownOpen(false);
+                        event.stopImmediatePropagation();
                     }
                 });
             }
@@ -1359,6 +1409,53 @@
 
             document.addEventListener('subjectChartDataUpdated', sortSubjectChart);
             sortSubjectChart();
+        })();
+
+        (function initSubjectFocusMode() {
+            const focusBtn = document.getElementById('focusModeBtn');
+            const focusLabel = document.getElementById('focusModeBtnLabel');
+            const iconExpand = document.getElementById('focusModeIconExpand');
+            const iconCollapse = document.getElementById('focusModeIconCollapse');
+            const chartCard = document.getElementById('analyticsChartCard');
+            if (!focusBtn) return;
+
+            function setFocusMode(isActive) {
+                document.body.classList.toggle('chart-focus-mode', isActive);
+                focusBtn.setAttribute('aria-pressed', String(isActive));
+
+                if (focusLabel) {
+                    focusLabel.textContent = isActive ? 'Exit Focus Mode' : 'Focus Mode';
+                }
+                if (iconExpand && iconCollapse) {
+                    iconExpand.classList.toggle('hidden', isActive);
+                    iconCollapse.classList.toggle('hidden', !isActive);
+                }
+
+                if (isActive) {
+                    focusBtn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] border border-emerald-400/40 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    focusBtn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-indigo-200 font-semibold text-[11px] border border-indigo-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400';
+                    if (chartCard && typeof chartCard.scrollIntoView === 'function') {
+                        chartCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }
+
+            focusBtn.addEventListener('click', () => {
+                const isCurrentlyActive = document.body.classList.contains('chart-focus-mode');
+                setFocusMode(!isCurrentlyActive);
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && document.body.classList.contains('chart-focus-mode')) {
+                    const filterMenu = document.getElementById('subjectFilterMenu');
+                    if (filterMenu && !filterMenu.classList.contains('hidden')) {
+                        return;
+                    }
+                    setFocusMode(false);
+                }
+            });
         })();
     </script>
 </body>
