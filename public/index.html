@@ -23,9 +23,14 @@
             stroke: #e0e7ff;
             stroke-width: 1.8px;
         }
-        #subjectChartSvg rect.subject-bar-highlighted[data-subject="ENG215"] {
+        #subjectChartSvg rect.subject-bar-highlighted[data-status="alert"] {
             filter: drop-shadow(0 0 10px rgba(248, 113, 113, 0.75)) brightness(1.12);
             stroke: #fecaca;
+            stroke-width: 1.8px;
+        }
+        #subjectChartSvg rect.subject-bar-highlighted[data-status="met"] {
+            filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.75)) brightness(1.12);
+            stroke: #a7f3d0;
             stroke-width: 1.8px;
         }
     </style>
@@ -225,20 +230,30 @@
                 <!-- Subject SVG Chart -->
                 <div id="subjectChartContainer" class="w-full relative">
                     <!-- Low Study Hours Alert Banner -->
-                    <div class="mb-4 bg-red-950/50 border border-red-800/60 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <div id="subjectLowGoalAlertBanner" class="mb-4 bg-red-950/50 border border-red-800/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs transition-colors">
                         <div class="flex items-center space-x-2.5">
-                            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                            <span class="font-bold text-red-200">1 Subject Below 50% Custom Goal:</span>
-                            <span class="text-slate-300">ENG215 Technical Writing has only 1.5h logged towards its 3.5h custom weekly goal (43% &lt; 50% target)</span>
+                            <span id="subjectAlertPulseDot" class="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0"></span>
+                            <span id="subjectAlertTitle" class="font-bold text-red-200">1 Subject Below 50% Custom Goal:</span>
+                            <span id="subjectAlertMessage" class="text-slate-300">ENG215 Technical Writing has only 1.5h logged towards its 3.5h custom weekly goal (43% &lt; 50% target)</span>
                         </div>
-                        <span class="px-2 py-0.5 rounded-full bg-red-600 text-[10px] font-bold text-white uppercase tracking-wider">Alert</span>
+                        <span id="subjectAlertBadge" class="px-2 py-0.5 rounded-full bg-red-600 text-[10px] font-bold text-white uppercase tracking-wider shrink-0">Alert</span>
                     </div>
 
                     <!-- Custom Goals Info Bar -->
                     <div class="flex flex-wrap items-center justify-between text-xs mb-3 gap-2">
-                        <div class="flex items-center space-x-2 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-xl">
+                        <div class="flex flex-wrap items-center gap-2 bg-indigo-950/60 border border-indigo-800/60 px-3 py-1.5 rounded-xl">
                             <span class="text-indigo-300 font-bold">🎯 Custom Subject Goals:</span>
-                            <span class="text-slate-300">CS201 (6h) • MATH204 (5h) • CS310 (4.5h) • PHY102 (4h) • ENG215 (3.5h)</span>
+                            <span id="customGoalsSummaryText" class="text-slate-300">CS201 (6h) • MATH204 (5h) • CS310 (4.5h) • PHY102 (4h) • ENG215 (3.5h)</span>
+                            <button type="button"
+                                    id="editSubjectGoalsBtn"
+                                    aria-expanded="false"
+                                    aria-controls="editGoalsPanel"
+                                    class="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-semibold text-[11px] border border-indigo-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                                <span>Edit Goals</span>
+                            </button>
                         </div>
                         <div class="flex items-center space-x-4">
                             <div class="flex items-center space-x-1.5">
@@ -256,76 +271,178 @@
                         </div>
                     </div>
 
-                    <!-- Subject Multi-Select Filter Dropdown -->
-                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 relative z-20" id="subjectFilterWrapper">
-                        <div class="relative inline-block text-left">
-                            <button type="button"
-                                    id="subjectFilterDropdownBtn"
-                                    aria-haspopup="true"
-                                    aria-expanded="false"
-                                    class="inline-flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-900 border border-slate-700 hover:border-indigo-500/60 text-xs font-semibold text-slate-200 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
-                                <span class="flex items-center gap-2">
-                                    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-                                    </svg>
-                                    <span>Filter Subjects:</span>
-                                    <span id="subjectFilterSummary" class="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">All (5/5)</span>
-                                </span>
-                                <svg id="subjectFilterChevron" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                </svg>
+                    <!-- Inline Custom Subject Goals Editor Panel -->
+                    <form id="editGoalsPanel" class="hidden mb-4 bg-slate-900/90 border border-indigo-500/40 rounded-2xl p-4 shadow-xl space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                            <div>
+                                <h5 class="text-xs font-bold text-white flex items-center gap-1.5">
+                                    <span>✏️ Customize Weekly Study Hour Goals</span>
+                                </h5>
+                                <p class="text-[11px] text-slate-400">Set target weekly hours per subject (0.5h – 20h) to recalculate progress bars and &lt;50% alerts in real time.</p>
+                            </div>
+                            <button type="button" id="resetSubjectGoalsBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 border border-slate-700 transition">
+                                Reset Defaults
                             </button>
+                        </div>
 
-                            <!-- Dropdown Checkbox Menu -->
-                            <div id="subjectFilterMenu"
-                                 role="menu"
-                                 aria-labelledby="subjectFilterDropdownBtn"
-                                 class="hidden absolute left-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl shadow-black/50 p-3 space-y-2 z-30">
-                                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-                                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Visible Chart Subjects</span>
-                                    <div class="flex items-center gap-2">
-                                        <button type="button" id="subjectSelectAllBtn" class="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 transition">Select All</button>
-                                        <span class="text-slate-700">|</span>
-                                        <button type="button" id="subjectClearAllBtn" class="text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition">Clear</button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <label for="goalInputCS201" class="text-xs font-bold text-white">CS201</label>
+                                    <span id="goalPreviewCS201" class="text-[10px] font-semibold text-indigo-300">5.5h (92%)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <input id="goalInputCS201" data-goal-subject="CS201" type="number" step="0.5" min="0.5" max="20" value="6"
+                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
+                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <label for="goalInputMATH204" class="text-xs font-bold text-white">MATH204</label>
+                                    <span id="goalPreviewMATH204" class="text-[10px] font-semibold text-indigo-300">4.0h (80%)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <input id="goalInputMATH204" data-goal-subject="MATH204" type="number" step="0.5" min="0.5" max="20" value="5"
+                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
+                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <label for="goalInputCS310" class="text-xs font-bold text-white">CS310</label>
+                                    <span id="goalPreviewCS310" class="text-[10px] font-semibold text-indigo-300">3.5h (78%)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <input id="goalInputCS310" data-goal-subject="CS310" type="number" step="0.5" min="0.5" max="20" value="4.5"
+                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
+                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <label for="goalInputPHY102" class="text-xs font-bold text-white">PHY102</label>
+                                    <span id="goalPreviewPHY102" class="text-[10px] font-semibold text-indigo-300">2.5h (63%)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <input id="goalInputPHY102" data-goal-subject="PHY102" type="number" step="0.5" min="0.5" max="20" value="4"
+                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
+                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
+                                </div>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <label for="goalInputENG215" class="text-xs font-bold text-white">ENG215</label>
+                                    <span id="goalPreviewENG215" class="text-[10px] font-semibold text-red-400">1.5h (43%)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <input id="goalInputENG215" data-goal-subject="ENG215" type="number" step="0.5" min="0.5" max="20" value="3.5"
+                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
+                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2 pt-1">
+                            <button type="button" id="cancelEditGoalsBtn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition">
+                                Close
+                            </button>
+                            <button type="submit" id="applySubjectGoalsBtn" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition">
+                                Apply Goals
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Subject Multi-Select Filter & Sort Controls -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-4 relative z-20" id="subjectFilterWrapper">
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <div class="relative inline-block text-left">
+                                <button type="button"
+                                        id="subjectFilterDropdownBtn"
+                                        aria-haspopup="true"
+                                        aria-expanded="false"
+                                        class="inline-flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-900 border border-slate-700 hover:border-indigo-500/60 text-xs font-semibold text-slate-200 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
+                                    <span class="flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                                        </svg>
+                                        <span>Filter Subjects:</span>
+                                        <span id="subjectFilterSummary" class="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">All (5/5)</span>
+                                    </span>
+                                    <svg id="subjectFilterChevron" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                </button>
+
+                                <!-- Dropdown Checkbox Menu -->
+                                <div id="subjectFilterMenu"
+                                     role="menu"
+                                     aria-labelledby="subjectFilterDropdownBtn"
+                                     class="hidden absolute left-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl shadow-black/50 p-3 space-y-2 z-30">
+                                    <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Visible Chart Subjects</span>
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" id="subjectSelectAllBtn" class="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 transition">Select All</button>
+                                            <span class="text-slate-700">|</span>
+                                            <button type="button" id="subjectClearAllBtn" class="text-[11px] font-semibold text-slate-400 hover:text-slate-200 transition">Clear</button>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                            <span class="flex items-center gap-2.5">
+                                                <input type="checkbox" value="CS201" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                                <span data-filter-label="CS201" class="text-xs font-bold text-slate-200">CS201</span>
+                                            </span>
+                                            <span data-filter-summary="CS201" class="text-[11px] text-indigo-300 font-medium">5.5h / 6h (92%)</span>
+                                        </label>
+                                        <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                            <span class="flex items-center gap-2.5">
+                                                <input type="checkbox" value="MATH204" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                                <span data-filter-label="MATH204" class="text-xs font-bold text-slate-200">MATH204</span>
+                                            </span>
+                                            <span data-filter-summary="MATH204" class="text-[11px] text-indigo-300 font-medium">4.0h / 5h (80%)</span>
+                                        </label>
+                                        <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                            <span class="flex items-center gap-2.5">
+                                                <input type="checkbox" value="CS310" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                                <span data-filter-label="CS310" class="text-xs font-bold text-slate-200">CS310</span>
+                                            </span>
+                                            <span data-filter-summary="CS310" class="text-[11px] text-indigo-300 font-medium">3.5h / 4.5h (78%)</span>
+                                        </label>
+                                        <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                            <span class="flex items-center gap-2.5">
+                                                <input type="checkbox" value="PHY102" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                                <span data-filter-label="PHY102" class="text-xs font-bold text-slate-200">PHY102</span>
+                                            </span>
+                                            <span data-filter-summary="PHY102" class="text-[11px] text-indigo-300 font-medium">2.5h / 4h (63%)</span>
+                                        </label>
+                                        <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
+                                            <span class="flex items-center gap-2.5">
+                                                <input type="checkbox" value="ENG215" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                                <span data-filter-label="ENG215" class="text-xs font-bold text-red-300">ENG215 ⚠️</span>
+                                            </span>
+                                            <span data-filter-summary="ENG215" class="text-[11px] text-red-400 font-medium">1.5h / 3.5h (43%)</span>
+                                        </label>
                                     </div>
                                 </div>
-                                <div class="space-y-1">
-                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
-                                        <span class="flex items-center gap-2.5">
-                                            <input type="checkbox" value="CS201" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
-                                            <span class="text-xs font-bold text-slate-200">CS201</span>
-                                        </span>
-                                        <span class="text-[11px] text-indigo-300 font-medium">5.5h / 6h (92%)</span>
-                                    </label>
-                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
-                                        <span class="flex items-center gap-2.5">
-                                            <input type="checkbox" value="MATH204" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
-                                            <span class="text-xs font-bold text-slate-200">MATH204</span>
-                                        </span>
-                                        <span class="text-[11px] text-indigo-300 font-medium">4.0h / 5h (80%)</span>
-                                    </label>
-                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
-                                        <span class="flex items-center gap-2.5">
-                                            <input type="checkbox" value="CS310" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
-                                            <span class="text-xs font-bold text-slate-200">CS310</span>
-                                        </span>
-                                        <span class="text-[11px] text-indigo-300 font-medium">3.5h / 4.5h (78%)</span>
-                                    </label>
-                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
-                                        <span class="flex items-center gap-2.5">
-                                            <input type="checkbox" value="PHY102" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
-                                            <span class="text-xs font-bold text-slate-200">PHY102</span>
-                                        </span>
-                                        <span class="text-[11px] text-indigo-300 font-medium">2.5h / 4h (63%)</span>
-                                    </label>
-                                    <label class="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-slate-800/80 cursor-pointer transition">
-                                        <span class="flex items-center gap-2.5">
-                                            <input type="checkbox" value="ENG215" checked class="subject-filter-checkbox w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
-                                            <span class="text-xs font-bold text-red-300">ENG215 ⚠️</span>
-                                        </span>
-                                        <span class="text-[11px] text-red-400 font-medium">1.5h / 3.5h (43%)</span>
-                                    </label>
-                                </div>
+                            </div>
+
+                            <!-- Subject Sort Dropdown -->
+                            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 hover:border-indigo-500/60 transition">
+                                <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/>
+                                </svg>
+                                <label for="subjectSortSelect" class="text-xs font-semibold text-slate-300 whitespace-nowrap">Sort by:</label>
+                                <select id="subjectSortSelect"
+                                        aria-label="Sort subjects in chart"
+                                        class="bg-transparent text-xs font-bold text-indigo-300 focus:outline-none cursor-pointer pr-1">
+                                    <option value="hours-desc" class="bg-slate-900 text-slate-100">Hours Logged (High → Low)</option>
+                                    <option value="hours-asc" class="bg-slate-900 text-slate-100">Hours Logged (Low → High)</option>
+                                    <option value="progress-desc" class="bg-slate-900 text-slate-100">Progress % (High → Low)</option>
+                                    <option value="progress-asc" class="bg-slate-900 text-slate-100">Progress % (Low → High)</option>
+                                    <option value="name-asc" class="bg-slate-900 text-slate-100">Name (A → Z)</option>
+                                    <option value="name-desc" class="bg-slate-900 text-slate-100">Name (Z → A)</option>
+                                </select>
                             </div>
                         </div>
 
@@ -370,41 +487,58 @@
 
                         <!-- Bars with individual target ratios -->
                         <!-- CS201: 5.5h of 6.0h goal (92%) -->
-                        <rect data-subject="CS201" data-course="Data Structures" data-sessions="11" data-hours="5.5h" data-goal="6.0h" data-pct="92%" tabindex="0" class="subject-bar-interact subject-main-bar" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="CS201" class="subject-bar-interact" x="102" y="58" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
-                        <text data-subject="CS201" class="subject-bar-interact" x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
-                        <text data-subject="CS201" class="subject-bar-interact" x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
+                        <rect data-subject="CS201" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="85" y="29" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="CS201" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="102" y="39" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="CS201" data-course="Data Structures" data-sessions="11" data-logged="5.5" data-hours="5.5h" data-goal="6h" data-pct="92%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="75" y="67" width="55" height="98" rx="6" fill="url(#barGrad)" />
+                        <line data-subject="CS201" data-role="goal-line" x1="71" y1="57" x2="134" y2="57" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
+                        <text data-subject="CS201" data-role="ratio" class="subject-bar-interact" x="102" y="51" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">5.5h / 6h</text>
+                        <text data-subject="CS201" data-role="name" class="subject-bar-interact" x="102" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS201</text>
+                        <text data-subject="CS201" data-role="pct" class="subject-bar-interact" x="102" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">92% of Goal</text>
 
                         <!-- MATH204: 4.0h of 5.0h goal (80%) -->
-                        <rect data-subject="MATH204" data-course="Linear Algebra" data-sessions="8" data-hours="4.0h" data-goal="5.0h" data-pct="80%" tabindex="0" class="subject-bar-interact subject-main-bar" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="MATH204" class="subject-bar-interact" x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
-                        <text data-subject="MATH204" class="subject-bar-interact" x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
-                        <text data-subject="MATH204" class="subject-bar-interact" x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
+                        <rect data-subject="MATH204" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="195" y="55" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="MATH204" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="212" y="65" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="MATH204" data-course="Linear Algebra" data-sessions="8" data-logged="4.0" data-hours="4.0h" data-goal="5h" data-pct="80%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="185" y="93" width="55" height="72" rx="6" fill="url(#barGrad)" />
+                        <line data-subject="MATH204" data-role="goal-line" x1="181" y1="75" x2="244" y2="75" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
+                        <text data-subject="MATH204" data-role="ratio" class="subject-bar-interact" x="212" y="84" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">4.0h / 5h</text>
+                        <text data-subject="MATH204" data-role="name" class="subject-bar-interact" x="212" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">MATH204</text>
+                        <text data-subject="MATH204" data-role="pct" class="subject-bar-interact" x="212" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">80% of Goal</text>
 
                         <!-- CS310: 3.5h of 4.5h goal (78%) -->
-                        <rect data-subject="CS310" data-course="Operating Systems" data-sessions="7" data-hours="3.5h" data-goal="4.5h" data-pct="78%" tabindex="0" class="subject-bar-interact subject-main-bar" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="CS310" class="subject-bar-interact" x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
-                        <text data-subject="CS310" class="subject-bar-interact" x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
-                        <text data-subject="CS310" class="subject-bar-interact" x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
+                        <rect data-subject="CS310" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="305" y="64" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="CS310" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="322" y="74" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="CS310" data-course="Operating Systems" data-sessions="7" data-logged="3.5" data-hours="3.5h" data-goal="4.5h" data-pct="78%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="295" y="102" width="55" height="63" rx="6" fill="url(#barGrad)" />
+                        <line data-subject="CS310" data-role="goal-line" x1="291" y1="84" x2="354" y2="84" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
+                        <text data-subject="CS310" data-role="ratio" class="subject-bar-interact" x="322" y="93" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">3.5h / 4.5h</text>
+                        <text data-subject="CS310" data-role="name" class="subject-bar-interact" x="322" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">CS310</text>
+                        <text data-subject="CS310" data-role="pct" class="subject-bar-interact" x="322" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">78% of Goal</text>
 
                         <!-- PHY102: 2.5h of 4.0h goal (63%) -->
-                        <rect data-subject="PHY102" data-course="Engineering Physics" data-sessions="5" data-hours="2.5h" data-goal="4.0h" data-pct="63%" tabindex="0" class="subject-bar-interact subject-main-bar" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
-                        <text data-subject="PHY102" class="subject-bar-interact" x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
-                        <text data-subject="PHY102" class="subject-bar-interact" x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
-                        <text data-subject="PHY102" class="subject-bar-interact" x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
+                        <rect data-subject="PHY102" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="415" y="82" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="PHY102" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="432" y="92" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="PHY102" data-course="Engineering Physics" data-sessions="5" data-logged="2.5" data-hours="2.5h" data-goal="4h" data-pct="63%" data-status="normal" tabindex="0" class="subject-bar-interact subject-main-bar" x="405" y="120" width="55" height="45" rx="6" fill="url(#barGrad)" />
+                        <line data-subject="PHY102" data-role="goal-line" x1="401" y1="93" x2="464" y2="93" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
+                        <text data-subject="PHY102" data-role="ratio" class="subject-bar-interact" x="432" y="111" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">2.5h / 4h</text>
+                        <text data-subject="PHY102" data-role="name" class="subject-bar-interact" x="432" y="185" fill="#e2e8f0" font-size="11" font-weight="bold" text-anchor="middle">PHY102</text>
+                        <text data-subject="PHY102" data-role="pct" class="subject-bar-interact" x="432" y="200" fill="#a5b4fc" font-size="9" text-anchor="middle">63% of Goal</text>
 
                         <!-- ENG215: 1.5h of 3.5h goal (43% - Below 50% Alert) -->
-                        <rect data-subject="ENG215" class="subject-bar-interact" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
-                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
-                        <rect data-subject="ENG215" data-course="Technical Writing" data-sessions="3" data-hours="1.5h" data-goal="3.5h" data-pct="43%" tabindex="0" class="subject-bar-interact subject-main-bar" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
-                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
-                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
-                        <text data-subject="ENG215" class="subject-bar-interact" x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
+                        <rect data-subject="ENG215" data-role="alert-badge-bg" data-alert-active="true" class="subject-bar-interact" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
+                        <text data-subject="ENG215" data-role="alert-badge-text" data-alert-active="true" class="subject-bar-interact" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
+                        <rect data-subject="ENG215" data-course="Technical Writing" data-sessions="3" data-logged="1.5" data-hours="1.5h" data-goal="3.5h" data-pct="43%" data-status="alert" tabindex="0" class="subject-bar-interact subject-main-bar" x="515" y="138" width="55" height="27" rx="6" fill="url(#alertGrad)" stroke="#ef4444" stroke-width="1.2" />
+                        <line data-subject="ENG215" data-role="goal-line" x1="511" y1="102" x2="574" y2="102" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="3 2" opacity="0.8" />
+                        <text data-subject="ENG215" data-role="ratio" class="subject-bar-interact" x="542" y="132" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">1.5h / 3.5h</text>
+                        <text data-subject="ENG215" data-role="name" class="subject-bar-interact" x="542" y="185" fill="#f87171" font-size="11" font-weight="bold" text-anchor="middle">ENG215 ⚠️</text>
+                        <text data-subject="ENG215" data-role="pct" class="subject-bar-interact" x="542" y="200" fill="#f87171" font-size="9" text-anchor="middle">43% (Goal: 3.5h)</text>
 
                         <defs>
                             <linearGradient id="barGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                                 <stop offset="0%" stop-color="#818cf8" />
                                 <stop offset="100%" stop-color="#4f46e5" />
+                            </linearGradient>
+                            <linearGradient id="metGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#34d399" />
+                                <stop offset="100%" stop-color="#059669" />
                             </linearGradient>
                             <linearGradient id="alertGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                                 <stop offset="0%" stop-color="#fb923c" />
@@ -609,12 +743,14 @@
                     }
 
                     const chartElements = chartSvg.querySelectorAll(
-                        'rect[data-subject="' + subject + '"], text[data-subject="' + subject + '"]'
+                        'rect[data-subject="' + subject + '"], text[data-subject="' + subject + '"], line[data-subject="' + subject + '"]'
                     );
                     chartElements.forEach((el) => {
-                        el.style.display = isVisible ? '' : 'none';
-                        el.setAttribute('visibility', isVisible ? 'visible' : 'hidden');
-                        el.setAttribute('aria-hidden', String(!isVisible));
+                        const isInactiveBadge = el.getAttribute('data-alert-active') === 'false';
+                        const shouldShow = isVisible && !isInactiveBadge;
+                        el.style.display = shouldShow ? '' : 'none';
+                        el.setAttribute('visibility', shouldShow ? 'visible' : 'hidden');
+                        el.setAttribute('aria-hidden', String(!shouldShow));
                     });
                 });
 
@@ -766,7 +902,9 @@
                 const hours = mainBar.getAttribute('data-hours') || '0h';
                 const goal = mainBar.getAttribute('data-goal') || '0h';
                 const pct = mainBar.getAttribute('data-pct') || '0%';
-                const isAlert = subject === 'ENG215';
+                const status = mainBar.getAttribute('data-status') || 'normal';
+                const isAlert = status === 'alert';
+                const isMet = status === 'met';
 
                 if (tooltipCodeEl) tooltipCodeEl.textContent = subject;
                 if (tooltipCourseEl) tooltipCourseEl.textContent = courseName;
@@ -775,14 +913,18 @@
                     tooltipSessionsEl.textContent = sessions + (countNum === 1 ? ' session' : ' sessions');
                     tooltipSessionsEl.className = isAlert
                         ? 'font-extrabold text-red-400 text-xs'
-                        : 'font-extrabold text-indigo-300 text-xs';
+                        : isMet
+                            ? 'font-extrabold text-emerald-400 text-xs'
+                            : 'font-extrabold text-indigo-300 text-xs';
                 }
                 if (tooltipHoursEl) tooltipHoursEl.textContent = hours + ' / ' + goal;
                 if (tooltipBadgeEl) {
-                    tooltipBadgeEl.textContent = isAlert ? pct + ' Alert' : pct;
+                    tooltipBadgeEl.textContent = isAlert ? pct + ' Alert' : (isMet ? pct + ' Met' : pct);
                     tooltipBadgeEl.className = isAlert
                         ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40'
-                        : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
+                        : isMet
+                            ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
                 }
 
                 positionTooltipForBar(mainBar);
@@ -814,6 +956,366 @@
             const clearAllBtn = document.getElementById('subjectClearAllBtn');
             if (selectAllBtn) selectAllBtn.addEventListener('click', clearHoverState);
             if (clearAllBtn) clearAllBtn.addEventListener('click', clearHoverState);
+        })();
+
+        (function initSubjectGoalEditor() {
+            const container = document.getElementById('subjectChartContainer');
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const editBtn = document.getElementById('editSubjectGoalsBtn');
+            const panel = document.getElementById('editGoalsPanel');
+            const resetBtn = document.getElementById('resetSubjectGoalsBtn');
+            const cancelBtn = document.getElementById('cancelEditGoalsBtn');
+            const summaryTextEl = document.getElementById('customGoalsSummaryText');
+
+            const alertBanner = document.getElementById('subjectLowGoalAlertBanner');
+            const alertDot = document.getElementById('subjectAlertPulseDot');
+            const alertTitle = document.getElementById('subjectAlertTitle');
+            const alertMsg = document.getElementById('subjectAlertMessage');
+            const alertBadge = document.getElementById('subjectAlertBadge');
+
+            if (!container || !chartSvg || !editBtn || !panel) return;
+
+            const DEFAULT_GOALS = {
+                CS201: 6.0,
+                MATH204: 5.0,
+                CS310: 4.5,
+                PHY102: 4.0,
+                ENG215: 3.5
+            };
+
+            const SUBJECT_META = [
+                { code: 'CS201', title: 'Data Structures', logged: 5.5, loggedStr: '5.5h' },
+                { code: 'MATH204', title: 'Linear Algebra', logged: 4.0, loggedStr: '4.0h' },
+                { code: 'CS310', title: 'Operating Systems', logged: 3.5, loggedStr: '3.5h' },
+                { code: 'PHY102', title: 'Engineering Physics', logged: 2.5, loggedStr: '2.5h' },
+                { code: 'ENG215', title: 'Technical Writing', logged: 1.5, loggedStr: '1.5h' }
+            ];
+
+            const currentGoals = Object.assign({}, DEFAULT_GOALS);
+
+            function formatHours(val) {
+                const rounded = Math.round(val * 10) / 10;
+                return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '')) + 'h';
+            }
+
+            function renderAllSubjectGoals() {
+                const alertList = [];
+                const summaryParts = [];
+
+                SUBJECT_META.forEach((subj) => {
+                    const code = subj.code;
+                    const goal = Math.max(0.5, Math.min(20, currentGoals[code] || DEFAULT_GOALS[code]));
+                    const goalStr = formatHours(goal);
+                    const pct = Math.round((subj.logged / goal) * 100);
+                    const isAlert = pct < 50;
+                    const isMet = pct >= 100;
+                    const status = isAlert ? 'alert' : (isMet ? 'met' : 'normal');
+
+                    summaryParts.push(code + ' (' + goalStr + ')');
+                    if (isAlert) {
+                        alertList.push({
+                            code: code,
+                            title: subj.title,
+                            loggedStr: subj.loggedStr,
+                            goalStr: goalStr,
+                            pct: pct
+                        });
+                    }
+
+                    // 1. Update editor preview pill
+                    const previewEl = document.getElementById('goalPreview' + code);
+                    if (previewEl) {
+                        previewEl.textContent = subj.loggedStr + ' (' + pct + '%)';
+                        previewEl.className = isAlert
+                            ? 'text-[10px] font-semibold text-red-400'
+                            : isMet
+                                ? 'text-[10px] font-semibold text-emerald-400'
+                                : 'text-[10px] font-semibold text-indigo-300';
+                    }
+
+                    // 2. Update filter dropdown option label & summary
+                    const filterLabel = container.querySelector('[data-filter-label="' + code + '"]');
+                    const filterSummary = container.querySelector('[data-filter-summary="' + code + '"]');
+                    if (filterLabel) {
+                        filterLabel.textContent = isAlert ? code + ' ⚠️' : (isMet ? code + ' ✓' : code);
+                        filterLabel.className = isAlert
+                            ? 'text-xs font-bold text-red-300'
+                            : isMet
+                                ? 'text-xs font-bold text-emerald-300'
+                                : 'text-xs font-bold text-slate-200';
+                    }
+                    if (filterSummary) {
+                        filterSummary.textContent = subj.loggedStr + ' / ' + goalStr + ' (' + pct + '%)';
+                        filterSummary.className = isAlert
+                            ? 'text-[11px] text-red-400 font-medium'
+                            : isMet
+                                ? 'text-[11px] text-emerald-400 font-medium'
+                                : 'text-[11px] text-indigo-300 font-medium';
+                    }
+
+                    // 3. Update SVG bar, target goal line, text labels, and alert badge
+                    const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
+                    const goalLine = chartSvg.querySelector('line[data-subject="' + code + '"][data-role="goal-line"]');
+                    const ratioText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="ratio"]');
+                    const nameText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="name"]');
+                    const pctText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="pct"]');
+                    const badgeBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]');
+                    const badgeText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="alert-badge-text"]');
+
+                    const checkbox = container.querySelector('.subject-filter-checkbox[value="' + code + '"]');
+                    const isSubjectChecked = !checkbox || checkbox.checked;
+
+                    if (mainBar) {
+                        mainBar.setAttribute('data-goal', goalStr);
+                        mainBar.setAttribute('data-pct', pct + '%');
+                        mainBar.setAttribute('data-status', status);
+
+                        if (isAlert) {
+                            mainBar.setAttribute('fill', 'url(#alertGrad)');
+                            mainBar.setAttribute('stroke', '#ef4444');
+                            mainBar.setAttribute('stroke-width', '1.2');
+                        } else if (isMet) {
+                            mainBar.setAttribute('fill', 'url(#metGrad)');
+                            mainBar.setAttribute('stroke', '#10b981');
+                            mainBar.setAttribute('stroke-width', '1.2');
+                        } else {
+                            mainBar.setAttribute('fill', 'url(#barGrad)');
+                            mainBar.removeAttribute('stroke');
+                            mainBar.removeAttribute('stroke-width');
+                        }
+                    }
+
+                    const barY = mainBar ? parseFloat(mainBar.getAttribute('y') || '100') : 100;
+                    const goalLineY = Math.max(22, Math.min(160, Math.round(165 - goal * 18)));
+                    if (goalLine) {
+                        goalLine.setAttribute('y1', goalLineY);
+                        goalLine.setAttribute('y2', goalLineY);
+                        goalLine.setAttribute('stroke', isAlert ? '#f87171' : (isMet ? '#34d399' : '#fbbf24'));
+                    }
+
+                    if (ratioText) {
+                        ratioText.textContent = subj.loggedStr + ' / ' + goalStr;
+                        ratioText.setAttribute('fill', isAlert ? '#f87171' : (isMet ? '#34d399' : '#e2e8f0'));
+                        const defaultRatioY = barY - 9;
+                        const adjustedRatioY = (goalLineY <= defaultRatioY && defaultRatioY - goalLineY < 10)
+                            ? Math.max(20, goalLineY - 6)
+                            : defaultRatioY;
+                        ratioText.setAttribute('y', adjustedRatioY);
+                    }
+
+                    if (nameText) {
+                        nameText.textContent = isAlert ? code + ' ⚠️' : code;
+                        nameText.setAttribute('fill', isAlert ? '#f87171' : (isMet ? '#34d399' : '#e2e8f0'));
+                    }
+
+                    if (pctText) {
+                        if (isAlert) {
+                            pctText.textContent = pct + '% (Goal: ' + goalStr + ')';
+                            pctText.setAttribute('fill', '#f87171');
+                        } else if (isMet) {
+                            pctText.textContent = pct + '% Met ✓';
+                            pctText.setAttribute('fill', '#34d399');
+                        } else {
+                            pctText.textContent = pct + '% of Goal';
+                            pctText.setAttribute('fill', '#a5b4fc');
+                        }
+                    }
+
+                    if (badgeBg && badgeText) {
+                        badgeBg.setAttribute('data-alert-active', String(isAlert));
+                        badgeText.setAttribute('data-alert-active', String(isAlert));
+                        const showBadge = isAlert && isSubjectChecked;
+                        const ratioYNow = ratioText ? parseFloat(ratioText.getAttribute('y') || String(barY - 9)) : (barY - 9);
+                        const badgeY = Math.max(8, Math.min(goalLineY, ratioYNow) - 22);
+                        badgeBg.setAttribute('y', badgeY);
+                        badgeText.setAttribute('y', badgeY + 10);
+
+                        [badgeBg, badgeText].forEach((el) => {
+                            el.style.display = showBadge ? '' : 'none';
+                            el.setAttribute('visibility', showBadge ? 'visible' : 'hidden');
+                            el.setAttribute('aria-hidden', String(!showBadge));
+                        });
+                    }
+                });
+
+                // 4. Update Custom Goals Summary text in info bar
+                if (summaryTextEl) {
+                    summaryTextEl.textContent = summaryParts.join(' • ');
+                }
+
+                // 5. Update Alert Status Banner
+                if (alertBanner && alertTitle && alertMsg && alertBadge && alertDot) {
+                    if (alertList.length === 0) {
+                        alertBanner.className = 'mb-4 bg-emerald-950/40 border border-emerald-700/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs transition-colors';
+                        alertDot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
+                        alertTitle.className = 'font-bold text-emerald-200';
+                        alertTitle.textContent = 'All Subjects On Track (0 Below 50%):';
+                        alertMsg.textContent = 'Every subject is at or above 50% of its custom weekly study goal.';
+                        alertBadge.className = 'px-2 py-0.5 rounded-full bg-emerald-600 text-[10px] font-bold text-white uppercase tracking-wider shrink-0';
+                        alertBadge.textContent = 'On Track';
+                    } else if (alertList.length === 1) {
+                        const a = alertList[0];
+                        alertBanner.className = 'mb-4 bg-red-950/50 border border-red-800/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs transition-colors';
+                        alertDot.className = 'w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0';
+                        alertTitle.className = 'font-bold text-red-200';
+                        alertTitle.textContent = '1 Subject Below 50% Custom Goal:';
+                        alertMsg.textContent = a.code + ' ' + a.title + ' has only ' + a.loggedStr + ' logged towards its ' + a.goalStr + ' custom weekly goal (' + a.pct + '% < 50% target)';
+                        alertBadge.className = 'px-2 py-0.5 rounded-full bg-red-600 text-[10px] font-bold text-white uppercase tracking-wider shrink-0';
+                        alertBadge.textContent = 'Alert';
+                    } else {
+                        alertBanner.className = 'mb-4 bg-red-950/50 border border-red-800/60 rounded-xl p-3 flex items-center justify-between gap-3 text-xs transition-colors';
+                        alertDot.className = 'w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0';
+                        alertTitle.className = 'font-bold text-red-200';
+                        alertTitle.textContent = alertList.length + ' Subjects Below 50% Custom Goal:';
+                        alertMsg.textContent = alertList.map((a) => a.code + ' (' + a.pct + '% of ' + a.goalStr + ')').join(' • ') + ' are below the 50% target threshold';
+                        alertBadge.className = 'px-2 py-0.5 rounded-full bg-red-600 text-[10px] font-bold text-white uppercase tracking-wider shrink-0';
+                        alertBadge.textContent = alertList.length + ' Alerts';
+                    }
+                }
+
+                document.dispatchEvent(new CustomEvent('subjectChartDataUpdated'));
+            }
+
+            function setPanelOpen(isOpen) {
+                panel.classList.toggle('hidden', !isOpen);
+                editBtn.setAttribute('aria-expanded', String(isOpen));
+            }
+
+            editBtn.addEventListener('click', () => {
+                const isHidden = panel.classList.contains('hidden');
+                setPanelOpen(isHidden);
+            });
+
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => setPanelOpen(false));
+            }
+
+            const inputs = Array.from(panel.querySelectorAll('.subject-goal-input'));
+            inputs.forEach((input) => {
+                input.addEventListener('input', () => {
+                    const code = input.getAttribute('data-goal-subject');
+                    const val = parseFloat(input.value);
+                    if (code && !Number.isNaN(val) && val >= 0.5) {
+                        currentGoals[code] = Math.min(20, Math.round(val * 10) / 10);
+                        renderAllSubjectGoals();
+                    }
+                });
+            });
+
+            panel.addEventListener('submit', (event) => {
+                event.preventDefault();
+                inputs.forEach((input) => {
+                    const code = input.getAttribute('data-goal-subject');
+                    const parsed = parseFloat(input.value);
+                    if (code) {
+                        const clamped = (!Number.isNaN(parsed) && parsed >= 0.5)
+                            ? Math.min(20, Math.round(parsed * 10) / 10)
+                            : DEFAULT_GOALS[code];
+                        currentGoals[code] = clamped;
+                        input.value = String(clamped);
+                    }
+                });
+                renderAllSubjectGoals();
+                setPanelOpen(false);
+            });
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    Object.keys(DEFAULT_GOALS).forEach((code) => {
+                        currentGoals[code] = DEFAULT_GOALS[code];
+                    });
+                    inputs.forEach((input) => {
+                        const code = input.getAttribute('data-goal-subject');
+                        if (code) input.value = String(DEFAULT_GOALS[code]);
+                    });
+                    renderAllSubjectGoals();
+                });
+            }
+
+            renderAllSubjectGoals();
+        })();
+
+        (function initSubjectChartSort() {
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const sortSelect = document.getElementById('subjectSortSelect');
+            if (!chartSvg || !sortSelect) return;
+
+            function getSubjectMetrics(code) {
+                const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
+                if (!mainBar) {
+                    return { code: code, logged: 0, pct: 0 };
+                }
+                const logged = parseFloat(mainBar.getAttribute('data-logged') || '0');
+                const pct = parseFloat((mainBar.getAttribute('data-pct') || '0').replace('%', ''));
+                return { code: code, logged: logged, pct: pct };
+            }
+
+            function sortSubjectChart() {
+                const mode = sortSelect.value || 'hours-desc';
+                const bars = Array.from(chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]'));
+                const subjects = bars.map((bar) => getSubjectMetrics(bar.getAttribute('data-subject') || ''));
+
+                subjects.sort((a, b) => {
+                    switch (mode) {
+                        case 'name-asc':
+                            return a.code.localeCompare(b.code);
+                        case 'name-desc':
+                            return b.code.localeCompare(a.code);
+                        case 'progress-desc':
+                            return (b.pct - a.pct) || (b.logged - a.logged) || a.code.localeCompare(b.code);
+                        case 'progress-asc':
+                            return (a.pct - b.pct) || (a.logged - b.logged) || a.code.localeCompare(b.code);
+                        case 'hours-asc':
+                            return (a.logged - b.logged) || (a.pct - b.pct) || a.code.localeCompare(b.code);
+                        case 'hours-desc':
+                        default:
+                            return (b.logged - a.logged) || (b.pct - a.pct) || a.code.localeCompare(b.code);
+                    }
+                });
+
+                subjects.forEach((subj, index) => {
+                    const code = subj.code;
+                    const barX = 75 + index * 110;
+                    const centerX = barX + 27;
+                    const lineX1 = barX - 4;
+                    const lineX2 = barX + 59;
+                    const badgeX = barX + 10;
+
+                    const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
+                    const badgeBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]');
+                    const badgeText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="alert-badge-text"]');
+                    const goalLine = chartSvg.querySelector('line[data-subject="' + code + '"][data-role="goal-line"]');
+                    const ratioText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="ratio"]');
+                    const nameText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="name"]');
+                    const pctText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="pct"]');
+
+                    if (mainBar) mainBar.setAttribute('x', barX);
+                    if (badgeBg) badgeBg.setAttribute('x', badgeX);
+                    if (badgeText) badgeText.setAttribute('x', centerX);
+                    if (goalLine) {
+                        goalLine.setAttribute('x1', lineX1);
+                        goalLine.setAttribute('x2', lineX2);
+                    }
+                    if (ratioText) ratioText.setAttribute('x', centerX);
+                    if (nameText) nameText.setAttribute('x', centerX);
+                    if (pctText) pctText.setAttribute('x', centerX);
+                });
+            }
+
+            sortSelect.addEventListener('change', () => {
+                const tooltip = document.getElementById('subjectChartTooltip');
+                if (tooltip) {
+                    tooltip.classList.add('hidden');
+                    tooltip.setAttribute('aria-hidden', 'true');
+                }
+                chartSvg.querySelectorAll('[data-subject]').forEach((el) => {
+                    el.classList.remove('subject-bar-dimmed', 'subject-bar-highlighted');
+                });
+                sortSubjectChart();
+            });
+
+            document.addEventListener('subjectChartDataUpdated', sortSubjectChart);
+            sortSubjectChart();
         })();
     </script>
 </body>
