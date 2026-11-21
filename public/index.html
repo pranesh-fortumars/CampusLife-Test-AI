@@ -12,8 +12,22 @@
             transition: opacity 180ms ease, filter 180ms ease, transform 180ms ease, stroke-width 180ms ease;
         }
         #subjectChartSvg .subject-bar-interact {
-            cursor: pointer;
+            cursor: grab;
             outline: none;
+            touch-action: none;
+            user-select: none;
+        }
+        #subjectChartSvg.is-dragging-bar,
+        #subjectChartSvg.is-dragging-bar .subject-bar-interact {
+            cursor: grabbing !important;
+        }
+        #subjectChartSvg .subject-bar-dragging {
+            opacity: 0.92;
+            filter: drop-shadow(0 8px 18px rgba(56, 189, 248, 0.45));
+        }
+        #subjectChartSvg rect.subject-bar-dragging {
+            stroke: #ffffff !important;
+            stroke-width: 2.2px !important;
         }
         #subjectChartSvg .subject-bar-dimmed {
             opacity: 0.22;
@@ -499,11 +513,21 @@
                                     <option value="progress-asc" class="bg-slate-900 text-slate-100">Progress % (Low → High)</option>
                                     <option value="name-asc" class="bg-slate-900 text-slate-100">Name (A → Z)</option>
                                     <option value="name-desc" class="bg-slate-900 text-slate-100">Name (Z → A)</option>
+                                    <option value="custom" class="bg-slate-900 text-sky-300">Custom Priority (Drag &amp; Drop)</option>
                                 </select>
                             </div>
                         </div>
 
-                        <span id="subjectFilterActiveHint" class="text-[11px] text-slate-400">Showing all 5 subjects</span>
+                        <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                            <span id="subjectDragPriorityHint" class="inline-flex items-center gap-1 text-slate-400">
+                                <svg class="w-3.5 h-3.5 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/>
+                                </svg>
+                                <span>Drag bars left/right to prioritize</span>
+                            </span>
+                            <span class="text-slate-700 hidden sm:inline">•</span>
+                            <span id="subjectFilterActiveHint">Showing all 5 subjects</span>
+                        </div>
                     </div>
 
                     <!-- Floating Interactive Chart Tooltip -->
@@ -562,6 +586,9 @@
                         <text x="30" y="79" fill="#94a3b8" font-size="10" text-anchor="end">5h</text>
                         <text x="30" y="124" fill="#94a3b8" font-size="9" text-anchor="end">2.5h</text>
                         <text x="30" y="169" fill="#94a3b8" font-size="10" text-anchor="end">0h</text>
+
+                        <!-- Drag-and-Drop Target Slot Indicator -->
+                        <rect id="dragSlotIndicator" x="67" y="24" width="71" height="184" rx="10" fill="rgba(56, 189, 248, 0.08)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 3" class="hidden pointer-events-none" />
 
                         <!-- Bars with unique per-subject high-contrast palettes -->
                         <!-- CS201 (Indigo): 5.5h of 6.0h goal (92%, last week 4.2h -> +22%) -->
@@ -1096,6 +1123,10 @@
             }
 
             function applyHoverState(subject) {
+                if (chartSvg.classList.contains('is-dragging-bar')) {
+                    clearHoverState();
+                    return;
+                }
                 const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + subject + '"]');
                 if (!mainBar || mainBar.style.display === 'none') {
                     clearHoverState();
@@ -1572,7 +1603,13 @@
         (function initSubjectChartSort() {
             const chartSvg = document.getElementById('subjectChartSvg');
             const sortSelect = document.getElementById('subjectSortSelect');
+            const slotIndicator = document.getElementById('dragSlotIndicator');
+            const dragHintEl = document.getElementById('subjectDragPriorityHint');
             if (!chartSvg || !sortSelect) return;
+
+            let currentOrder = Array.from(chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]'))
+                .map((bar) => bar.getAttribute('data-subject') || '')
+                .filter(Boolean);
 
             function getSubjectMetrics(code) {
                 const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
@@ -1584,31 +1621,22 @@
                 return { code: code, logged: logged, pct: pct };
             }
 
-            function sortSubjectChart() {
-                const mode = sortSelect.value || 'hours-desc';
-                const bars = Array.from(chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]'));
-                const subjects = bars.map((bar) => getSubjectMetrics(bar.getAttribute('data-subject') || ''));
+            function getSubjectElements(code) {
+                return [
+                    chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]'),
+                    chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]'),
+                    chartSvg.querySelector('text[data-subject="' + code + '"][data-role="alert-badge-text"]'),
+                    chartSvg.querySelector('line[data-subject="' + code + '"][data-role="goal-line"]'),
+                    chartSvg.querySelector('text[data-subject="' + code + '"][data-role="ratio"]'),
+                    chartSvg.querySelector('text[data-subject="' + code + '"][data-role="name"]'),
+                    chartSvg.querySelector('text[data-subject="' + code + '"][data-role="pct"]'),
+                    chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="trend-bg"]'),
+                    chartSvg.querySelector('text[data-subject="' + code + '"][data-role="trend-text"]')
+                ].filter(Boolean);
+            }
 
-                subjects.sort((a, b) => {
-                    switch (mode) {
-                        case 'name-asc':
-                            return a.code.localeCompare(b.code);
-                        case 'name-desc':
-                            return b.code.localeCompare(a.code);
-                        case 'progress-desc':
-                            return (b.pct - a.pct) || (b.logged - a.logged) || a.code.localeCompare(b.code);
-                        case 'progress-asc':
-                            return (a.pct - b.pct) || (a.logged - b.logged) || a.code.localeCompare(b.code);
-                        case 'hours-asc':
-                            return (a.logged - b.logged) || (a.pct - b.pct) || a.code.localeCompare(b.code);
-                        case 'hours-desc':
-                        default:
-                            return (b.logged - a.logged) || (b.pct - a.pct) || a.code.localeCompare(b.code);
-                    }
-                });
-
-                subjects.forEach((subj, index) => {
-                    const code = subj.code;
+            function applySubjectOrder(orderedCodes) {
+                orderedCodes.forEach((code, index) => {
                     const barX = 75 + index * 110;
                     const centerX = barX + 27;
                     const lineX1 = barX - 4;
@@ -1640,6 +1668,43 @@
                 });
             }
 
+            function updateSlotIndicator(index) {
+                if (!slotIndicator) return;
+                const slotX = 67 + index * 110;
+                slotIndicator.setAttribute('x', String(slotX));
+            }
+
+            function sortSubjectChart() {
+                const mode = sortSelect.value || 'hours-desc';
+                if (mode === 'custom') {
+                    applySubjectOrder(currentOrder);
+                    return;
+                }
+
+                const subjects = currentOrder.map((code) => getSubjectMetrics(code));
+
+                subjects.sort((a, b) => {
+                    switch (mode) {
+                        case 'name-asc':
+                            return a.code.localeCompare(b.code);
+                        case 'name-desc':
+                            return b.code.localeCompare(a.code);
+                        case 'progress-desc':
+                            return (b.pct - a.pct) || (b.logged - a.logged) || a.code.localeCompare(b.code);
+                        case 'progress-asc':
+                            return (a.pct - b.pct) || (a.logged - b.logged) || a.code.localeCompare(b.code);
+                        case 'hours-asc':
+                            return (a.logged - b.logged) || (a.pct - b.pct) || a.code.localeCompare(b.code);
+                        case 'hours-desc':
+                        default:
+                            return (b.logged - a.logged) || (b.pct - a.pct) || a.code.localeCompare(b.code);
+                    }
+                });
+
+                currentOrder = subjects.map((s) => s.code);
+                applySubjectOrder(currentOrder);
+            }
+
             sortSelect.addEventListener('change', () => {
                 const tooltip = document.getElementById('subjectChartTooltip');
                 if (tooltip) {
@@ -1650,10 +1715,172 @@
                     el.classList.remove('subject-bar-dimmed', 'subject-bar-highlighted');
                 });
                 sortSubjectChart();
+                if (dragHintEl && sortSelect.value !== 'custom') {
+                    dragHintEl.querySelector('span').textContent = 'Drag bars left/right to prioritize';
+                    dragHintEl.className = 'inline-flex items-center gap-1 text-slate-400';
+                }
             });
 
             document.addEventListener('subjectChartDataUpdated', sortSubjectChart);
             sortSubjectChart();
+
+            // Pointer & Keyboard Drag-and-Drop Reordering
+            let dragState = null;
+            let suppressNextClickUntil = 0;
+
+            function clientXToSvgX(clientX) {
+                const rect = chartSvg.getBoundingClientRect();
+                if (!rect.width) return 0;
+                return ((clientX - rect.left) / rect.width) * 650;
+            }
+
+            function slotCenterX(index) {
+                return 102 + index * 110;
+            }
+
+            function clearTooltipAndHover() {
+                const tooltip = document.getElementById('subjectChartTooltip');
+                if (tooltip) {
+                    tooltip.classList.add('hidden');
+                    tooltip.setAttribute('aria-hidden', 'true');
+                }
+                chartSvg.querySelectorAll('[data-subject]').forEach((el) => {
+                    el.classList.remove('subject-bar-dimmed', 'subject-bar-highlighted');
+                });
+            }
+
+            function setCustomOrderMode(movedSubject) {
+                sortSelect.value = 'custom';
+                if (dragHintEl) {
+                    dragHintEl.querySelector('span').textContent = 'Priority updated (' + currentOrder.join(' → ') + ')';
+                    dragHintEl.className = 'inline-flex items-center gap-1 text-sky-300 font-semibold';
+                }
+                chartSvg.dispatchEvent(new CustomEvent('subjectBarsReordered', {
+                    detail: { order: currentOrder.slice(), movedSubject: movedSubject }
+                }));
+            }
+
+            chartSvg.addEventListener('click', (event) => {
+                if (Date.now() < suppressNextClickUntil) {
+                    event.stopImmediatePropagation();
+                    event.preventDefault();
+                }
+            }, true);
+
+            chartSvg.addEventListener('pointerdown', (event) => {
+                if (event.button !== undefined && event.button !== 0) return;
+                const target = event.target && event.target.closest ? event.target.closest('[data-subject]') : null;
+                if (!target) return;
+
+                const subject = target.getAttribute('data-subject');
+                const startIndex = currentOrder.indexOf(subject);
+                if (!subject || startIndex === -1) return;
+
+                const startSvgX = clientXToSvgX(event.clientX);
+                dragState = {
+                    subject: subject,
+                    pointerId: event.pointerId,
+                    startIndex: startIndex,
+                    currentIndex: startIndex,
+                    startSvgX: startSvgX,
+                    grabOffset: startSvgX - slotCenterX(startIndex),
+                    elements: getSubjectElements(subject),
+                    active: false
+                };
+            });
+
+            window.addEventListener('pointermove', (event) => {
+                if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+                const svgX = clientXToSvgX(event.clientX);
+                const movedDist = Math.abs(svgX - dragState.startSvgX);
+
+                if (!dragState.active) {
+                    if (movedDist < 6) return;
+                    dragState.active = true;
+                    chartSvg.classList.add('is-dragging-bar');
+                    clearTooltipAndHover();
+                    dragState.elements.forEach((el) => el.classList.add('subject-bar-dragging'));
+                    if (slotIndicator) {
+                        updateSlotIndicator(dragState.currentIndex);
+                        slotIndicator.classList.remove('hidden');
+                    }
+                }
+
+                event.preventDefault();
+
+                // Determine nearest target column slot
+                const rawSlot = Math.round((svgX - dragState.grabOffset - 102) / 110);
+                const targetIndex = Math.max(0, Math.min(currentOrder.length - 1, rawSlot));
+
+                if (targetIndex !== dragState.currentIndex) {
+                    const [moved] = currentOrder.splice(dragState.currentIndex, 1);
+                    currentOrder.splice(targetIndex, 0, moved);
+                    dragState.currentIndex = targetIndex;
+                    applySubjectOrder(currentOrder);
+                    updateSlotIndicator(targetIndex);
+                }
+
+                // Translate dragged subject elements smoothly to track cursor
+                const minVisualCenter = 60;
+                const maxVisualCenter = 590;
+                const desiredCenter = Math.max(minVisualCenter, Math.min(maxVisualCenter, svgX - dragState.grabOffset));
+                const dx = desiredCenter - slotCenterX(dragState.currentIndex);
+                const translateStr = 'translate(' + dx.toFixed(1) + ', 0)';
+                dragState.elements.forEach((el) => {
+                    el.setAttribute('transform', translateStr);
+                });
+            });
+
+            function finishDrag(event) {
+                if (!dragState || (event.pointerId !== undefined && event.pointerId !== dragState.pointerId)) return;
+
+                const wasActive = dragState.active;
+                const didReorder = dragState.currentIndex !== dragState.startIndex;
+                const movedSubject = dragState.subject;
+
+                dragState.elements.forEach((el) => {
+                    el.removeAttribute('transform');
+                    el.classList.remove('subject-bar-dragging');
+                });
+                chartSvg.classList.remove('is-dragging-bar');
+                if (slotIndicator) {
+                    slotIndicator.classList.add('hidden');
+                }
+
+                dragState = null;
+
+                if (wasActive) {
+                    suppressNextClickUntil = Date.now() + 80;
+                    applySubjectOrder(currentOrder);
+                    if (didReorder) {
+                        setCustomOrderMode(movedSubject);
+                    }
+                }
+            }
+
+            window.addEventListener('pointerup', finishDrag);
+            window.addEventListener('pointercancel', finishDrag);
+
+            // Keyboard left/right priority reordering on focused subject bars
+            chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]').forEach((bar) => {
+                bar.addEventListener('keydown', (event) => {
+                    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                    const subject = bar.getAttribute('data-subject');
+                    const idx = currentOrder.indexOf(subject);
+                    if (idx === -1) return;
+
+                    const delta = event.key === 'ArrowLeft' ? -1 : 1;
+                    const nextIdx = Math.max(0, Math.min(currentOrder.length - 1, idx + delta));
+                    if (nextIdx === idx) return;
+
+                    event.preventDefault();
+                    const [moved] = currentOrder.splice(idx, 1);
+                    currentOrder.splice(nextIdx, 0, moved);
+                    applySubjectOrder(currentOrder);
+                    setCustomOrderMode(subject);
+                });
+            });
         })();
 
         (function initSubjectFocusMode() {
