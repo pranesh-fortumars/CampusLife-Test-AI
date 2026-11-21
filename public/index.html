@@ -502,7 +502,7 @@
                     <div id="subjectChartTooltip"
                          role="tooltip"
                          aria-hidden="true"
-                         class="pointer-events-none hidden absolute z-30 w-56 rounded-2xl bg-slate-950/95 border border-indigo-500/40 shadow-2xl shadow-black/70 px-3.5 py-2.5 text-xs text-slate-100 backdrop-blur-md transition-opacity duration-150">
+                         class="pointer-events-none hidden absolute z-30 w-64 rounded-2xl bg-slate-950/95 border border-indigo-500/40 shadow-2xl shadow-black/70 px-3.5 py-2.5 text-xs text-slate-100 backdrop-blur-md transition-opacity duration-150">
                         <div class="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800">
                             <div>
                                 <div id="tooltipSubjectCode" class="font-extrabold text-white text-sm tracking-tight">CS201</div>
@@ -516,11 +516,28 @@
                         </div>
                         <div class="mt-1 flex items-center justify-between text-[11px]">
                             <span class="text-slate-400">Hours / Goal:</span>
-                            <span id="tooltipHoursSummary" class="font-semibold text-slate-200">5.5h / 6.0h</span>
+                            <span id="tooltipHoursSummary" class="font-semibold text-slate-200">5.5h / 6h</span>
                         </div>
-                        <div class="mt-1 flex items-center justify-between text-[11px]">
-                            <span class="text-slate-400">vs. Last Week:</span>
-                            <span id="tooltipWeeklyTrend" class="font-bold text-emerald-400">▲ +22% (4.2h → 5.5h)</span>
+                        <div id="tooltipTrendSection" class="mt-2 pt-1.5 border-t border-slate-800/80">
+                            <div class="flex items-center justify-between gap-2 text-[11px]">
+                                <span class="text-slate-400">Duration Trend:</span>
+                                <span id="tooltipTrendPill"
+                                      data-duration-trend="up"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    <svg id="tooltipTrendArrowUp" class="w-3.5 h-3.5 text-emerald-400 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 14l5.5-5.5 3.5 3.5L17 6.5" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12.5 6.5H17V11" />
+                                    </svg>
+                                    <svg id="tooltipTrendArrowDown" class="hidden w-3.5 h-3.5 text-red-400 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l5.5 5.5 3.5-3.5L17 13.5" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12.5 13.5H17V9" />
+                                    </svg>
+                                    <span id="tooltipWeeklyTrend">Increasing +1.3h</span>
+                                </span>
+                            </div>
+                            <div id="tooltipDurationComparison" class="mt-1 text-[10px] text-slate-400 text-right font-medium">
+                                Prev week: 4.2h → Current: 5.5h (+31%)
+                            </div>
                         </div>
                     </div>
 
@@ -908,7 +925,11 @@
             const tooltipBadgeEl = document.getElementById('tooltipProgressBadge');
             const tooltipSessionsEl = document.getElementById('tooltipSessionsCount');
             const tooltipHoursEl = document.getElementById('tooltipHoursSummary');
+            const tooltipTrendPillEl = document.getElementById('tooltipTrendPill');
+            const tooltipTrendArrowUpEl = document.getElementById('tooltipTrendArrowUp');
+            const tooltipTrendArrowDownEl = document.getElementById('tooltipTrendArrowDown');
             const tooltipTrendEl = document.getElementById('tooltipWeeklyTrend');
+            const tooltipDurationComparisonEl = document.getElementById('tooltipDurationComparison');
 
             const subjectElements = Array.from(chartSvg.querySelectorAll('[data-subject]'));
             let activeHoveredSubject = null;
@@ -931,8 +952,8 @@
                 tooltip.classList.remove('hidden');
                 tooltip.setAttribute('aria-hidden', 'false');
 
-                const tipWidth = tooltip.offsetWidth || 224;
-                const tipHeight = tooltip.offsetHeight || 110;
+                const tipWidth = tooltip.offsetWidth || 256;
+                const tipHeight = tooltip.offsetHeight || 136;
 
                 let left = (barRect.left - containerRect.left) + (barRect.width / 2) - (tipWidth / 2);
                 const maxLeft = Math.max(8, containerRect.width - tipWidth - 8);
@@ -965,14 +986,20 @@
                 const courseName = mainBar.getAttribute('data-course') || subject;
                 const sessions = mainBar.getAttribute('data-sessions') || '0';
                 const hours = mainBar.getAttribute('data-hours') || '0h';
+                const loggedNum = parseFloat(mainBar.getAttribute('data-logged') || '0');
                 const prevHours = mainBar.getAttribute('data-prev-logged') || '0';
+                const prevNum = parseFloat(prevHours);
                 const goal = mainBar.getAttribute('data-goal') || '0h';
                 const pct = mainBar.getAttribute('data-pct') || '0%';
-                const trendLabel = mainBar.getAttribute('data-trend') || '▲ +0%';
-                const trendDir = mainBar.getAttribute('data-trend-dir') || 'up';
                 const status = mainBar.getAttribute('data-status') || 'normal';
                 const isAlert = status === 'alert';
                 const isMet = status === 'met';
+
+                const durationDelta = Math.round((loggedNum - prevNum) * 10) / 10;
+                const isDurationDecreasing = durationDelta < 0;
+                const deltaFormatted = (durationDelta >= 0 ? '+' : '') + durationDelta.toFixed(1) + 'h';
+                const pctDelta = prevNum > 0 ? Math.round(((loggedNum - prevNum) / prevNum) * 100) : 0;
+                const pctDeltaFormatted = (pctDelta >= 0 ? '+' : '') + pctDelta + '%';
 
                 if (tooltipCodeEl) tooltipCodeEl.textContent = subject;
                 if (tooltipCourseEl) tooltipCourseEl.textContent = courseName;
@@ -986,12 +1013,26 @@
                             : 'font-extrabold text-indigo-300 text-xs';
                 }
                 if (tooltipHoursEl) tooltipHoursEl.textContent = hours + ' / ' + goal;
-                if (tooltipTrendEl) {
-                    tooltipTrendEl.textContent = trendLabel + ' (' + prevHours + 'h → ' + hours + ')';
-                    tooltipTrendEl.className = trendDir === 'down'
-                        ? 'font-bold text-red-400'
-                        : 'font-bold text-emerald-400';
+
+                if (tooltipTrendArrowUpEl) {
+                    tooltipTrendArrowUpEl.classList.toggle('hidden', isDurationDecreasing);
                 }
+                if (tooltipTrendArrowDownEl) {
+                    tooltipTrendArrowDownEl.classList.toggle('hidden', !isDurationDecreasing);
+                }
+                if (tooltipTrendPillEl) {
+                    tooltipTrendPillEl.setAttribute('data-duration-trend', isDurationDecreasing ? 'down' : 'up');
+                    tooltipTrendPillEl.className = isDurationDecreasing
+                        ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-500/15 text-red-400 border border-red-500/30'
+                        : 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+                }
+                if (tooltipTrendEl) {
+                    tooltipTrendEl.textContent = (isDurationDecreasing ? 'Decreasing ' : 'Increasing ') + deltaFormatted;
+                }
+                if (tooltipDurationComparisonEl) {
+                    tooltipDurationComparisonEl.textContent = 'Prev week: ' + prevHours + 'h → Current: ' + hours + ' (' + pctDeltaFormatted + ')';
+                }
+
                 if (tooltipBadgeEl) {
                     tooltipBadgeEl.textContent = isAlert ? pct + ' Alert' : (isMet ? pct + ' Met' : pct);
                     tooltipBadgeEl.className = isAlert
