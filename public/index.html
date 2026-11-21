@@ -69,6 +69,55 @@
                 height: 28rem;
             }
         }
+        .goal-range-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            border-radius: 9999px;
+            outline: none;
+            cursor: pointer;
+        }
+        .goal-range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 9999px;
+            background: #ffffff;
+            border: 3px solid #6366f1;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+            cursor: grab;
+            transition: transform 150ms ease, border-color 150ms ease;
+        }
+        .goal-range-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.12);
+        }
+        .goal-range-slider::-webkit-slider-thumb:active {
+            cursor: grabbing;
+            transform: scale(1.18);
+        }
+        .goal-range-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 9999px;
+            background: #ffffff;
+            border: 3px solid #6366f1;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+            cursor: grab;
+            transition: transform 150ms ease, border-color 150ms ease;
+        }
+        .goal-range-slider[data-status="met"]::-webkit-slider-thumb {
+            border-color: #10b981;
+        }
+        .goal-range-slider[data-status="met"]::-moz-range-thumb {
+            border-color: #10b981;
+        }
+        .goal-range-slider[data-status="alert"]::-webkit-slider-thumb {
+            border-color: #ef4444;
+        }
+        .goal-range-slider[data-status="alert"]::-moz-range-thumb {
+            border-color: #ef4444;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between antialiased selection:bg-indigo-500 selection:text-white">
@@ -282,11 +331,13 @@
                             <span id="customGoalsSummaryText" class="text-slate-300">CS201 (6h) • MATH204 (5h) • CS310 (4.5h) • PHY102 (4h) • ENG215 (3.5h)</span>
                             <button type="button"
                                     id="editSubjectGoalsBtn"
+                                    aria-haspopup="dialog"
                                     aria-expanded="false"
-                                    aria-controls="editGoalsPanel"
-                                    class="ml-1 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-semibold text-[11px] border border-indigo-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    aria-controls="bulkGoalsModal"
+                                    title="Open modal to bulk-set weekly study goals with sliders"
+                                    class="ml-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-600/85 hover:bg-indigo-500 text-white font-semibold text-[11px] border border-indigo-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
                                 </svg>
                                 <span>Edit Goals</span>
                             </button>
@@ -319,88 +370,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Inline Custom Subject Goals Editor Panel -->
-                    <form id="editGoalsPanel" class="hidden mb-4 bg-slate-900/90 border border-indigo-500/40 rounded-2xl p-4 shadow-xl space-y-3">
-                        <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
-                            <div>
-                                <h5 class="text-xs font-bold text-white flex items-center gap-1.5">
-                                    <span>✏️ Customize Weekly Study Hour Goals</span>
-                                </h5>
-                                <p class="text-[11px] text-slate-400">Set target weekly hours per subject (0.5h – 20h) to recalculate progress bars and &lt;50% alerts in real time.</p>
-                            </div>
-                            <button type="button" id="resetSubjectGoalsBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 border border-slate-700 transition">
-                                Reset Defaults
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                    <label for="goalInputCS201" class="text-xs font-bold text-white">CS201</label>
-                                    <span id="goalPreviewCS201" class="text-[10px] font-semibold text-indigo-300">5.5h (92%)</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <input id="goalInputCS201" data-goal-subject="CS201" type="number" step="0.5" min="0.5" max="20" value="6"
-                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
-                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
-                                </div>
-                            </div>
-                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                    <label for="goalInputMATH204" class="text-xs font-bold text-white">MATH204</label>
-                                    <span id="goalPreviewMATH204" class="text-[10px] font-semibold text-indigo-300">4.0h (80%)</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <input id="goalInputMATH204" data-goal-subject="MATH204" type="number" step="0.5" min="0.5" max="20" value="5"
-                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
-                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
-                                </div>
-                            </div>
-                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                    <label for="goalInputCS310" class="text-xs font-bold text-white">CS310</label>
-                                    <span id="goalPreviewCS310" class="text-[10px] font-semibold text-indigo-300">3.5h (78%)</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <input id="goalInputCS310" data-goal-subject="CS310" type="number" step="0.5" min="0.5" max="20" value="4.5"
-                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
-                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
-                                </div>
-                            </div>
-                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                    <label for="goalInputPHY102" class="text-xs font-bold text-white">PHY102</label>
-                                    <span id="goalPreviewPHY102" class="text-[10px] font-semibold text-indigo-300">2.5h (63%)</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <input id="goalInputPHY102" data-goal-subject="PHY102" type="number" step="0.5" min="0.5" max="20" value="4"
-                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
-                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
-                                </div>
-                            </div>
-                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl p-2.5 space-y-1.5">
-                                <div class="flex items-center justify-between">
-                                    <label for="goalInputENG215" class="text-xs font-bold text-white">ENG215</label>
-                                    <span id="goalPreviewENG215" class="text-[10px] font-semibold text-red-400">1.5h (43%)</span>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <input id="goalInputENG215" data-goal-subject="ENG215" type="number" step="0.5" min="0.5" max="20" value="3.5"
-                                           class="subject-goal-input w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-600 focus:border-indigo-400 focus:outline-none text-xs font-bold text-white" />
-                                    <span class="text-[11px] text-slate-400 font-semibold">h</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center justify-end gap-2 pt-1">
-                            <button type="button" id="cancelEditGoalsBtn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition">
-                                Close
-                            </button>
-                            <button type="submit" id="applySubjectGoalsBtn" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition">
-                                Apply Goals
-                            </button>
-                        </div>
-                    </form>
 
                     <!-- Subject Multi-Select Filter & Sort Controls -->
                     <div class="flex flex-wrap items-center justify-between gap-3 mb-4 relative z-20" id="subjectFilterWrapper">
@@ -1077,9 +1046,12 @@
             const container = document.getElementById('subjectChartContainer');
             const chartSvg = document.getElementById('subjectChartSvg');
             const editBtn = document.getElementById('editSubjectGoalsBtn');
-            const panel = document.getElementById('editGoalsPanel');
+            const modal = document.getElementById('bulkGoalsModal');
+            const form = document.getElementById('bulkGoalsForm');
+            const closeBtn = document.getElementById('closeBulkGoalsModalBtn');
             const resetBtn = document.getElementById('resetSubjectGoalsBtn');
             const cancelBtn = document.getElementById('cancelEditGoalsBtn');
+            const totalTargetEl = document.getElementById('bulkGoalsTotalHours');
             const summaryTextEl = document.getElementById('customGoalsSummaryText');
 
             const alertBanner = document.getElementById('subjectLowGoalAlertBanner');
@@ -1088,7 +1060,7 @@
             const alertMsg = document.getElementById('subjectAlertMessage');
             const alertBadge = document.getElementById('subjectAlertBadge');
 
-            if (!container || !chartSvg || !editBtn || !panel) return;
+            if (!container || !chartSvg || !editBtn || !modal || !form) return;
 
             const DEFAULT_GOALS = {
                 CS201: 6.0,
@@ -1107,19 +1079,37 @@
             ];
 
             const currentGoals = Object.assign({}, DEFAULT_GOALS);
+            let snapshotBeforeOpen = Object.assign({}, DEFAULT_GOALS);
+            const sliders = Array.from(form.querySelectorAll('.subject-goal-slider'));
 
             function formatHours(val) {
                 const rounded = Math.round(val * 10) / 10;
                 return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '')) + 'h';
             }
 
+            function updateSliderVisual(slider, goalVal, status) {
+                if (!slider) return;
+                const min = parseFloat(slider.min || '0.5');
+                const max = parseFloat(slider.max || '20');
+                const fillPct = Math.max(0, Math.min(100, ((goalVal - min) / (max - min)) * 100));
+                const fillColor = status === 'alert'
+                    ? '#ef4444'
+                    : status === 'met'
+                        ? '#10b981'
+                        : '#6366f1';
+                slider.setAttribute('data-status', status);
+                slider.style.background = 'linear-gradient(to right, ' + fillColor + ' 0%, ' + fillColor + ' ' + fillPct.toFixed(1) + '%, #1e293b ' + fillPct.toFixed(1) + '%, #1e293b 100%)';
+            }
+
             function renderAllSubjectGoals() {
                 const alertList = [];
                 const summaryParts = [];
+                let totalTargetHours = 0;
 
                 SUBJECT_META.forEach((subj) => {
                     const code = subj.code;
                     const goal = Math.max(0.5, Math.min(20, currentGoals[code] || DEFAULT_GOALS[code]));
+                    totalTargetHours += goal;
                     const goalStr = formatHours(goal);
                     const pct = Math.round((subj.logged / goal) * 100);
                     const prevPct = Math.round((subj.prevLogged / goal) * 100);
@@ -1141,15 +1131,31 @@
                         });
                     }
 
-                    // 1. Update editor preview pill
+                    // 1. Update slider modal row value, fill track, & preview badge
+                    const sliderEl = form.querySelector('.subject-goal-slider[data-goal-subject="' + code + '"]');
+                    if (sliderEl) {
+                        if (parseFloat(sliderEl.value) !== goal) {
+                            sliderEl.value = String(goal);
+                        }
+                        sliderEl.setAttribute('aria-valuetext', goalStr);
+                        updateSliderVisual(sliderEl, goal, status);
+                    }
+
+                    const valueBadgeEl = document.getElementById('goalValue' + code);
+                    if (valueBadgeEl) {
+                        valueBadgeEl.textContent = goalStr;
+                    }
+
                     const previewEl = document.getElementById('goalPreview' + code);
                     if (previewEl) {
-                        previewEl.textContent = subj.loggedStr + ' (' + pct + '%)';
+                        previewEl.textContent = isAlert
+                            ? (pct + '% Alert ⚠️')
+                            : (isMet ? (pct + '% Met ✓') : (pct + '% of goal'));
                         previewEl.className = isAlert
-                            ? 'text-[10px] font-semibold text-red-400'
+                            ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30'
                             : isMet
-                                ? 'text-[10px] font-semibold text-emerald-400'
-                                : 'text-[10px] font-semibold text-indigo-300';
+                                ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30';
                     }
 
                     // 2. Update filter dropdown option label & summary
@@ -1268,6 +1274,10 @@
                     }
                 });
 
+                if (totalTargetEl) {
+                    totalTargetEl.textContent = formatHours(totalTargetHours);
+                }
+
                 // 4. Update Custom Goals Summary text in info bar
                 if (summaryTextEl) {
                     summaryTextEl.textContent = summaryParts.join(' • ');
@@ -1306,25 +1316,63 @@
                 document.dispatchEvent(new CustomEvent('subjectChartDataUpdated'));
             }
 
-            function setPanelOpen(isOpen) {
-                panel.classList.toggle('hidden', !isOpen);
-                editBtn.setAttribute('aria-expanded', String(isOpen));
+            function openModal() {
+                snapshotBeforeOpen = Object.assign({}, currentGoals);
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                editBtn.setAttribute('aria-expanded', 'true');
+                document.body.classList.add('overflow-hidden');
+                if (sliders[0]) {
+                    sliders[0].focus();
+                }
+            }
+
+            function closeModal(restoreSnapshot) {
+                if (restoreSnapshot) {
+                    Object.keys(snapshotBeforeOpen).forEach((code) => {
+                        currentGoals[code] = snapshotBeforeOpen[code];
+                    });
+                    renderAllSubjectGoals();
+                }
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                editBtn.setAttribute('aria-expanded', 'false');
+                document.body.classList.remove('overflow-hidden');
+                editBtn.focus();
             }
 
             editBtn.addEventListener('click', () => {
-                const isHidden = panel.classList.contains('hidden');
-                setPanelOpen(isHidden);
+                if (modal.classList.contains('hidden')) {
+                    openModal();
+                } else {
+                    closeModal(true);
+                }
             });
 
             if (cancelBtn) {
-                cancelBtn.addEventListener('click', () => setPanelOpen(false));
+                cancelBtn.addEventListener('click', () => closeModal(true));
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => closeModal(true));
             }
 
-            const inputs = Array.from(panel.querySelectorAll('.subject-goal-input'));
-            inputs.forEach((input) => {
-                input.addEventListener('input', () => {
-                    const code = input.getAttribute('data-goal-subject');
-                    const val = parseFloat(input.value);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) {
+                    closeModal(true);
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    event.stopImmediatePropagation();
+                    closeModal(true);
+                }
+            });
+
+            sliders.forEach((slider) => {
+                slider.addEventListener('input', () => {
+                    const code = slider.getAttribute('data-goal-subject');
+                    const val = parseFloat(slider.value);
                     if (code && !Number.isNaN(val) && val >= 0.5) {
                         currentGoals[code] = Math.min(20, Math.round(val * 10) / 10);
                         renderAllSubjectGoals();
@@ -1332,21 +1380,21 @@
                 });
             });
 
-            panel.addEventListener('submit', (event) => {
+            form.addEventListener('submit', (event) => {
                 event.preventDefault();
-                inputs.forEach((input) => {
-                    const code = input.getAttribute('data-goal-subject');
-                    const parsed = parseFloat(input.value);
+                sliders.forEach((slider) => {
+                    const code = slider.getAttribute('data-goal-subject');
+                    const parsed = parseFloat(slider.value);
                     if (code) {
                         const clamped = (!Number.isNaN(parsed) && parsed >= 0.5)
                             ? Math.min(20, Math.round(parsed * 10) / 10)
                             : DEFAULT_GOALS[code];
                         currentGoals[code] = clamped;
-                        input.value = String(clamped);
+                        slider.value = String(clamped);
                     }
                 });
                 renderAllSubjectGoals();
-                setPanelOpen(false);
+                closeModal(false);
             });
 
             if (resetBtn) {
@@ -1354,9 +1402,9 @@
                     Object.keys(DEFAULT_GOALS).forEach((code) => {
                         currentGoals[code] = DEFAULT_GOALS[code];
                     });
-                    inputs.forEach((input) => {
-                        const code = input.getAttribute('data-goal-subject');
-                        if (code) input.value = String(DEFAULT_GOALS[code]);
+                    sliders.forEach((slider) => {
+                        const code = slider.getAttribute('data-goal-subject');
+                        if (code) slider.value = String(DEFAULT_GOALS[code]);
                     });
                     renderAllSubjectGoals();
                 });
@@ -1491,7 +1539,8 @@
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape' && document.body.classList.contains('chart-focus-mode')) {
                     const filterMenu = document.getElementById('subjectFilterMenu');
-                    if (filterMenu && !filterMenu.classList.contains('hidden')) {
+                    const goalsModal = document.getElementById('bulkGoalsModal');
+                    if ((filterMenu && !filterMenu.classList.contains('hidden')) || (goalsModal && !goalsModal.classList.contains('hidden'))) {
                         return;
                     }
                     setFocusMode(false);
@@ -1499,5 +1548,203 @@
             });
         })();
     </script>
+
+    <!-- Bulk Weekly Study Goals Slider Modal -->
+    <div id="bulkGoalsModal"
+         role="dialog"
+         aria-modal="true"
+         aria-hidden="true"
+         aria-labelledby="bulkGoalsModalTitle"
+         class="hidden fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <form id="bulkGoalsForm" class="w-full max-w-2xl bg-slate-900 border border-indigo-500/40 rounded-3xl shadow-2xl shadow-black/70 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between gap-4 px-6 py-4 bg-slate-900/95 border-b border-slate-800">
+                <div>
+                    <h4 id="bulkGoalsModalTitle" class="text-base font-extrabold text-white flex items-center gap-2">
+                        <span>🎯 Bulk-Set Weekly Study Goals</span>
+                    </h4>
+                    <p class="text-xs text-slate-400 mt-0.5">Drag each subject slider (0.5h – 20h) to adjust target weekly study hours and update alerts in real time.</p>
+                </div>
+                <button type="button"
+                        id="closeBulkGoalsModalBtn"
+                        aria-label="Close weekly study goals modal"
+                        class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Total Weekly Target Summary Strip -->
+            <div class="px-6 py-2.5 bg-indigo-950/40 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-400 font-medium">Total Weekly Target Across All Subjects:</span>
+                    <span id="bulkGoalsTotalHours" class="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-extrabold">23h</span>
+                </div>
+                <button type="button"
+                        id="resetSubjectGoalsBtn"
+                        class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
+                    Reset Defaults
+                </button>
+            </div>
+
+            <!-- Sliders List -->
+            <div class="p-6 space-y-3.5 max-h-[65vh] overflow-y-auto">
+                <!-- CS201 -->
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label for="goalSliderCS201" class="flex items-center gap-2 text-sm font-bold text-white cursor-pointer">
+                            <span>CS201</span>
+                            <span class="text-xs font-medium text-slate-400">· Data Structures</span>
+                            <span class="text-[11px] font-semibold text-slate-500">(5.5h logged)</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span id="goalPreviewCS201" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">92% of goal</span>
+                            <span id="goalValueCS201" class="min-w-[3.2rem] text-right text-sm font-extrabold text-white">6h</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-semibold text-slate-500 w-7">0.5h</span>
+                        <input id="goalSliderCS201"
+                               data-goal-subject="CS201"
+                               type="range"
+                               min="0.5"
+                               max="20"
+                               step="0.5"
+                               value="6"
+                               aria-label="CS201 Data Structures weekly study goal hours"
+                               class="subject-goal-slider goal-range-slider w-full" />
+                        <span class="text-[10px] font-semibold text-slate-500 w-7 text-right">20h</span>
+                    </div>
+                </div>
+
+                <!-- MATH204 -->
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label for="goalSliderMATH204" class="flex items-center gap-2 text-sm font-bold text-white cursor-pointer">
+                            <span>MATH204</span>
+                            <span class="text-xs font-medium text-slate-400">· Linear Algebra</span>
+                            <span class="text-[11px] font-semibold text-slate-500">(4.0h logged)</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span id="goalPreviewMATH204" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">80% of goal</span>
+                            <span id="goalValueMATH204" class="min-w-[3.2rem] text-right text-sm font-extrabold text-white">5h</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-semibold text-slate-500 w-7">0.5h</span>
+                        <input id="goalSliderMATH204"
+                               data-goal-subject="MATH204"
+                               type="range"
+                               min="0.5"
+                               max="20"
+                               step="0.5"
+                               value="5"
+                               aria-label="MATH204 Linear Algebra weekly study goal hours"
+                               class="subject-goal-slider goal-range-slider w-full" />
+                        <span class="text-[10px] font-semibold text-slate-500 w-7 text-right">20h</span>
+                    </div>
+                </div>
+
+                <!-- CS310 -->
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label for="goalSliderCS310" class="flex items-center gap-2 text-sm font-bold text-white cursor-pointer">
+                            <span>CS310</span>
+                            <span class="text-xs font-medium text-slate-400">· Operating Systems</span>
+                            <span class="text-[11px] font-semibold text-slate-500">(3.5h logged)</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span id="goalPreviewCS310" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">78% of goal</span>
+                            <span id="goalValueCS310" class="min-w-[3.2rem] text-right text-sm font-extrabold text-white">4.5h</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-semibold text-slate-500 w-7">0.5h</span>
+                        <input id="goalSliderCS310"
+                               data-goal-subject="CS310"
+                               type="range"
+                               min="0.5"
+                               max="20"
+                               step="0.5"
+                               value="4.5"
+                               aria-label="CS310 Operating Systems weekly study goal hours"
+                               class="subject-goal-slider goal-range-slider w-full" />
+                        <span class="text-[10px] font-semibold text-slate-500 w-7 text-right">20h</span>
+                    </div>
+                </div>
+
+                <!-- PHY102 -->
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label for="goalSliderPHY102" class="flex items-center gap-2 text-sm font-bold text-white cursor-pointer">
+                            <span>PHY102</span>
+                            <span class="text-xs font-medium text-slate-400">· Engineering Physics</span>
+                            <span class="text-[11px] font-semibold text-slate-500">(2.5h logged)</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span id="goalPreviewPHY102" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">63% of goal</span>
+                            <span id="goalValuePHY102" class="min-w-[3.2rem] text-right text-sm font-extrabold text-white">4h</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-semibold text-slate-500 w-7">0.5h</span>
+                        <input id="goalSliderPHY102"
+                               data-goal-subject="PHY102"
+                               type="range"
+                               min="0.5"
+                               max="20"
+                               step="0.5"
+                               value="4"
+                               aria-label="PHY102 Engineering Physics weekly study goal hours"
+                               class="subject-goal-slider goal-range-slider w-full" />
+                        <span class="text-[10px] font-semibold text-slate-500 w-7 text-right">20h</span>
+                    </div>
+                </div>
+
+                <!-- ENG215 -->
+                <div class="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-3.5 space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label for="goalSliderENG215" class="flex items-center gap-2 text-sm font-bold text-white cursor-pointer">
+                            <span>ENG215</span>
+                            <span class="text-xs font-medium text-slate-400">· Technical Writing</span>
+                            <span class="text-[11px] font-semibold text-slate-500">(1.5h logged)</span>
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span id="goalPreviewENG215" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-400 border border-red-500/30">43% Alert ⚠️</span>
+                            <span id="goalValueENG215" class="min-w-[3.2rem] text-right text-sm font-extrabold text-white">3.5h</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-semibold text-slate-500 w-7">0.5h</span>
+                        <input id="goalSliderENG215"
+                               data-goal-subject="ENG215"
+                               type="range"
+                               min="0.5"
+                               max="20"
+                               step="0.5"
+                               value="3.5"
+                               aria-label="ENG215 Technical Writing weekly study goal hours"
+                               class="subject-goal-slider goal-range-slider w-full" />
+                        <span class="text-[10px] font-semibold text-slate-500 w-7 text-right">20h</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 bg-slate-900/95 border-t border-slate-800 flex items-center justify-end gap-2.5">
+                <button type="button"
+                        id="cancelEditGoalsBtn"
+                        class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="submit"
+                        id="applySubjectGoalsBtn"
+                        class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 transition cursor-pointer">
+                    Apply Goals
+                </button>
+            </div>
+        </form>
+    </div>
 </body>
 </html>
