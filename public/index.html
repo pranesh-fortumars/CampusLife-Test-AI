@@ -437,6 +437,16 @@
                                 <span class="w-3 h-3 rounded bg-slate-400/30 border border-dashed border-slate-300 inline-block"></span>
                                 <span class="text-slate-300 font-semibold">Last Week</span>
                             </div>
+                            <div id="heatmapDensityLegend"
+                                 class="flex items-center space-x-1.5"
+                                 title="Background cells color-code Mon–Sun weekly study activity density (darker blue = peak study days/hours)">
+                                <span class="inline-flex items-center gap-0.5" aria-hidden="true">
+                                    <span class="w-2 h-2.5 rounded-sm bg-blue-400/20 inline-block"></span>
+                                    <span class="w-2 h-2.5 rounded-sm bg-blue-600/45 inline-block"></span>
+                                    <span class="w-2 h-2.5 rounded-sm bg-blue-900/90 border border-blue-500/40 inline-block"></span>
+                                </span>
+                                <span class="text-slate-400 font-medium">Activity Density</span>
+                            </div>
                         </div>
                     </div>
 
@@ -606,6 +616,44 @@
 
                     <div class="w-full overflow-x-auto">
                     <svg id="subjectChartSvg" viewBox="0 0 650 242" class="w-full h-60 min-w-[500px]">
+                        <!-- Weekly Activity Density Heat-Map Background Layer (Mon–Sun × 3 Intensity Bands, darker blue = peak study) -->
+                        <g id="weeklyActivityHeatmapLayer" class="pointer-events-none" aria-hidden="true">
+                            <!-- Mon (2.2h) -->
+                            <rect data-day="Mon" data-band="5h-8h" data-density="0.45" x="44" y="32" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.14" />
+                            <rect data-day="Mon" data-band="2.5h-5h" data-density="0.52" x="44" y="77" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.16" />
+                            <rect data-day="Mon" data-band="0h-2.5h" data-density="0.28" x="44" y="122" width="79" height="41" rx="4" fill="#60a5fa" fill-opacity="0.08" />
+
+                            <!-- Tue (1.8h) -->
+                            <rect data-day="Tue" data-band="5h-8h" data-density="0.18" x="126" y="32" width="79" height="41" rx="4" fill="#60a5fa" fill-opacity="0.06" />
+                            <rect data-day="Tue" data-band="2.5h-5h" data-density="0.26" x="126" y="77" width="79" height="41" rx="4" fill="#60a5fa" fill-opacity="0.08" />
+                            <rect data-day="Tue" data-band="0h-2.5h" data-density="0.40" x="126" y="122" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.13" />
+
+                            <!-- Wed (3.1h - Peak Weekday) -->
+                            <rect data-day="Wed" data-band="5h-8h" data-density="0.90" x="208" y="32" width="79" height="41" rx="4" fill="#1e3a8a" fill-opacity="0.56" stroke="#2563eb" stroke-opacity="0.32" stroke-width="0.8" />
+                            <rect data-day="Wed" data-band="2.5h-5h" data-density="0.82" x="208" y="77" width="79" height="41" rx="4" fill="#1e3a8a" fill-opacity="0.48" stroke="#2563eb" stroke-opacity="0.28" stroke-width="0.8" />
+                            <rect data-day="Wed" data-band="0h-2.5h" data-density="0.64" x="208" y="122" width="79" height="41" rx="4" fill="#1d4ed8" fill-opacity="0.26" />
+
+                            <!-- Thu (2.5h) -->
+                            <rect data-day="Thu" data-band="5h-8h" data-density="0.55" x="290" y="32" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.18" />
+                            <rect data-day="Thu" data-band="2.5h-5h" data-density="0.68" x="290" y="77" width="79" height="41" rx="4" fill="#1d4ed8" fill-opacity="0.28" />
+                            <rect data-day="Thu" data-band="0h-2.5h" data-density="0.48" x="290" y="122" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.15" />
+
+                            <!-- Fri (2.0h) -->
+                            <rect data-day="Fri" data-band="5h-8h" data-density="0.22" x="372" y="32" width="79" height="41" rx="4" fill="#60a5fa" fill-opacity="0.07" />
+                            <rect data-day="Fri" data-band="2.5h-5h" data-density="0.44" x="372" y="77" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.14" />
+                            <rect data-day="Fri" data-band="0h-2.5h" data-density="0.44" x="372" y="122" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.14" />
+
+                            <!-- Sat (3.4h - Peak Weekend) -->
+                            <rect data-day="Sat" data-band="5h-8h" data-density="0.96" x="454" y="32" width="79" height="41" rx="4" fill="#1e3a8a" fill-opacity="0.62" stroke="#2563eb" stroke-opacity="0.36" stroke-width="0.8" />
+                            <rect data-day="Sat" data-band="2.5h-5h" data-density="0.88" x="454" y="77" width="79" height="41" rx="4" fill="#1e3a8a" fill-opacity="0.54" stroke="#2563eb" stroke-opacity="0.32" stroke-width="0.8" />
+                            <rect data-day="Sat" data-band="0h-2.5h" data-density="0.72" x="454" y="122" width="79" height="41" rx="4" fill="#1d4ed8" fill-opacity="0.32" />
+
+                            <!-- Sun (1.9h) -->
+                            <rect data-day="Sun" data-band="5h-8h" data-density="0.38" x="536" y="32" width="79" height="41" rx="4" fill="#3b82f6" fill-opacity="0.12" />
+                            <rect data-day="Sun" data-band="2.5h-5h" data-density="0.26" x="536" y="77" width="79" height="41" rx="4" fill="#60a5fa" fill-opacity="0.08" />
+                            <rect data-day="Sun" data-band="0h-2.5h" data-density="0.18" x="536" y="122" width="79" height="41" rx="4" fill="#60a5fa" fill-opacity="0.06" />
+                        </g>
+
                         <!-- Grid Lines -->
                         <line x1="40" y1="30" x2="620" y2="30" stroke="#334155" stroke-dasharray="3 3" />
                         <line x1="40" y1="75" x2="620" y2="75" stroke="#334155" stroke-dasharray="3 3" />
