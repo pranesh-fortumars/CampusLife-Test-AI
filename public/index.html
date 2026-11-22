@@ -324,7 +324,7 @@
                 </div>
 
                 <!-- Consistency Highlights Bar (Visible for Weekly Trend) -->
-                <div id="weeklyConsistencyBar" class="hidden mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div id="weeklyConsistencyBar" class="hidden mb-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div class="bg-indigo-950/40 border border-indigo-800/50 rounded-xl p-3 flex items-center justify-between">
                         <div>
                             <span class="text-[10px] uppercase font-bold text-indigo-300">Active Streak</span>
@@ -345,6 +345,61 @@
                             <p class="text-sm font-bold text-purple-300">2.4h / day</p>
                         </div>
                         <span class="text-xl">⏱️</span>
+                    </div>
+                </div>
+
+                <!-- Multi-week Goal Streak Counter (Consistency Highlights Companion) -->
+                <div id="multiWeekGoalStreakCard"
+                     class="mb-5 bg-slate-900/75 border border-slate-700/80 rounded-2xl px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div id="multiWeekStreakIconWrap"
+                             class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 flex items-center justify-center text-lg shrink-0 transition-colors"
+                             aria-hidden="true">
+                            🔥
+                        </div>
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-[11px] uppercase tracking-wider font-bold text-amber-300">Multi-week Goal Streak</span>
+                                <span id="multiWeekStreakBadge"
+                                      class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-800 text-slate-300 border border-slate-700">
+                                    0 / 5 Subjects Active
+                                </span>
+                            </div>
+                            <p id="multiWeekStreakSummary" class="text-xs text-slate-300 mt-0.5 font-medium">
+                                Longest streak: <span id="multiWeekStreakLongest" class="font-extrabold text-white">0 wks</span> across custom weekly subject goals (4-wk window)
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="multiWeekSubjectStreaks"
+                         class="flex flex-wrap items-center gap-1.5"
+                         role="group"
+                         aria-label="Consecutive weeks meeting custom goal for each subject">
+                        <button type="button" data-streak-subject="CS201" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-300 hover:border-indigo-400/60 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <span class="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                            <span class="font-bold text-slate-200">CS201</span>
+                            <span data-streak-count="CS201" class="font-extrabold text-slate-400">0 wks</span>
+                        </button>
+                        <button type="button" data-streak-subject="MATH204" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-300 hover:border-violet-400/60 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400">
+                            <span class="w-2 h-2 rounded-full bg-violet-500 shrink-0"></span>
+                            <span class="font-bold text-slate-200">MATH204</span>
+                            <span data-streak-count="MATH204" class="font-extrabold text-slate-400">0 wks</span>
+                        </button>
+                        <button type="button" data-streak-subject="CS310" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-300 hover:border-cyan-400/60 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400">
+                            <span class="w-2 h-2 rounded-full bg-cyan-500 shrink-0"></span>
+                            <span class="font-bold text-slate-200">CS310</span>
+                            <span data-streak-count="CS310" class="font-extrabold text-slate-400">0 wks</span>
+                        </button>
+                        <button type="button" data-streak-subject="PHY102" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-300 hover:border-amber-400/60 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400">
+                            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                            <span class="font-bold text-slate-200">PHY102</span>
+                            <span data-streak-count="PHY102" class="font-extrabold text-slate-400">0 wks</span>
+                        </button>
+                        <button type="button" data-streak-subject="ENG215" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-300 hover:border-rose-400/60 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-400">
+                            <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                            <span class="font-bold text-slate-200">ENG215</span>
+                            <span data-streak-count="ENG215" class="font-extrabold text-slate-400">0 wks</span>
+                        </button>
                     </div>
                 </div>
 
@@ -2254,6 +2309,54 @@
             });
         })();
 
+        const SHARED_SUBJECT_HISTORY = {
+            CS201: {
+                title: 'Data Structures',
+                weeks: [
+                    { label: 'Week 1 (Wk -3)', hours: 3.4 },
+                    { label: 'Week 2 (Wk -2)', hours: 3.9 },
+                    { label: 'Week 3 (Last Wk)', hours: 4.2 },
+                    { label: 'Week 4 (Current)', hours: 5.5 }
+                ]
+            },
+            MATH204: {
+                title: 'Linear Algebra',
+                weeks: [
+                    { label: 'Week 1 (Wk -3)', hours: 2.8 },
+                    { label: 'Week 2 (Wk -2)', hours: 3.2 },
+                    { label: 'Week 3 (Last Wk)', hours: 3.5 },
+                    { label: 'Week 4 (Current)', hours: 4.0 }
+                ]
+            },
+            CS310: {
+                title: 'Operating Systems',
+                weeks: [
+                    { label: 'Week 1 (Wk -3)', hours: 3.1 },
+                    { label: 'Week 2 (Wk -2)', hours: 4.0 },
+                    { label: 'Week 3 (Last Wk)', hours: 3.8 },
+                    { label: 'Week 4 (Current)', hours: 3.5 }
+                ]
+            },
+            PHY102: {
+                title: 'Engineering Physics',
+                weeks: [
+                    { label: 'Week 1 (Wk -3)', hours: 1.6 },
+                    { label: 'Week 2 (Wk -2)', hours: 2.2 },
+                    { label: 'Week 3 (Last Wk)', hours: 2.0 },
+                    { label: 'Week 4 (Current)', hours: 2.5 }
+                ]
+            },
+            ENG215: {
+                title: 'Technical Writing',
+                weeks: [
+                    { label: 'Week 1 (Wk -3)', hours: 2.6 },
+                    { label: 'Week 2 (Wk -2)', hours: 2.1 },
+                    { label: 'Week 3 (Last Wk)', hours: 2.3 },
+                    { label: 'Week 4 (Current)', hours: 1.5 }
+                ]
+            }
+        };
+
         (function initSubjectProgressHistory() {
             const container = document.getElementById('subjectChartContainer');
             const chartSvg = document.getElementById('subjectChartSvg');
@@ -2277,53 +2380,7 @@
 
             if (!container || !chartSvg || !toggleBtn || !panel || !areaFill || !lineStroke || !pointsLayer) return;
 
-            const SUBJECT_HISTORY = {
-                CS201: {
-                    title: 'Data Structures',
-                    weeks: [
-                        { label: 'Week 1 (Wk -3)', hours: 3.4 },
-                        { label: 'Week 2 (Wk -2)', hours: 3.9 },
-                        { label: 'Week 3 (Last Wk)', hours: 4.2 },
-                        { label: 'Week 4 (Current)', hours: 5.5 }
-                    ]
-                },
-                MATH204: {
-                    title: 'Linear Algebra',
-                    weeks: [
-                        { label: 'Week 1 (Wk -3)', hours: 2.8 },
-                        { label: 'Week 2 (Wk -2)', hours: 3.2 },
-                        { label: 'Week 3 (Last Wk)', hours: 3.5 },
-                        { label: 'Week 4 (Current)', hours: 4.0 }
-                    ]
-                },
-                CS310: {
-                    title: 'Operating Systems',
-                    weeks: [
-                        { label: 'Week 1 (Wk -3)', hours: 3.1 },
-                        { label: 'Week 2 (Wk -2)', hours: 4.0 },
-                        { label: 'Week 3 (Last Wk)', hours: 3.8 },
-                        { label: 'Week 4 (Current)', hours: 3.5 }
-                    ]
-                },
-                PHY102: {
-                    title: 'Engineering Physics',
-                    weeks: [
-                        { label: 'Week 1 (Wk -3)', hours: 1.6 },
-                        { label: 'Week 2 (Wk -2)', hours: 2.2 },
-                        { label: 'Week 3 (Last Wk)', hours: 2.0 },
-                        { label: 'Week 4 (Current)', hours: 2.5 }
-                    ]
-                },
-                ENG215: {
-                    title: 'Technical Writing',
-                    weeks: [
-                        { label: 'Week 1 (Wk -3)', hours: 2.6 },
-                        { label: 'Week 2 (Wk -2)', hours: 2.1 },
-                        { label: 'Week 3 (Last Wk)', hours: 2.3 },
-                        { label: 'Week 4 (Current)', hours: 1.5 }
-                    ]
-                }
-            };
+            const SUBJECT_HISTORY = SHARED_SUBJECT_HISTORY;
 
             let selectedSubject = 'CS201';
             const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -2618,8 +2675,156 @@
                 }
             });
 
+            document.addEventListener('selectProgressHistorySubject', (event) => {
+                const subj = event && event.detail && event.detail.subject;
+                if (!subj || !SUBJECT_HISTORY[subj]) return;
+                selectSubject(subj);
+                if (panel.classList.contains('hidden')) {
+                    setHistoryOpen(true);
+                }
+            });
+
             syncSelectedSubjectHighlight();
             renderAreaChart();
+        })();
+
+        (function initMultiWeekGoalStreak() {
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const streakCard = document.getElementById('multiWeekGoalStreakCard');
+            const iconWrap = document.getElementById('multiWeekStreakIconWrap');
+            const badgeEl = document.getElementById('multiWeekStreakBadge');
+            const summaryEl = document.getElementById('multiWeekStreakSummary');
+            const pillContainer = document.getElementById('multiWeekSubjectStreaks');
+            if (!chartSvg || !streakCard || !pillContainer || typeof SHARED_SUBJECT_HISTORY === 'undefined') return;
+
+            const SUBJECT_ORDER = ['CS201', 'MATH204', 'CS310', 'PHY102', 'ENG215'];
+
+            function formatHours(val) {
+                const rounded = Math.round(val * 10) / 10;
+                return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '')) + 'h';
+            }
+
+            function computeSubjectStreak(code) {
+                const history = SHARED_SUBJECT_HISTORY[code];
+                const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
+                if (!history || !mainBar) {
+                    return { code: code, streak: 0, goal: 0, breakdown: '' };
+                }
+
+                const goalStr = mainBar.getAttribute('data-goal') || '4h';
+                const goalVal = Math.max(0.5, parseFloat(goalStr.replace('h', '')) || 4);
+                const loggedAttr = parseFloat(mainBar.getAttribute('data-logged') || '');
+                const weeklyHours = history.weeks.map((w, idx) => {
+                    if (idx === history.weeks.length - 1 && !Number.isNaN(loggedAttr)) {
+                        return loggedAttr;
+                    }
+                    return w.hours;
+                });
+
+                let consecutive = 0;
+                for (let i = weeklyHours.length - 1; i >= 0; i--) {
+                    if (weeklyHours[i] + 1e-9 >= goalVal) {
+                        consecutive++;
+                    } else {
+                        break;
+                    }
+                }
+
+                const breakdown = weeklyHours
+                    .map((h, i) => 'Wk' + (i + 1) + ': ' + h.toFixed(1) + 'h')
+                    .join(' | ');
+
+                return {
+                    code: code,
+                    streak: consecutive,
+                    goal: goalVal,
+                    breakdown: breakdown
+                };
+            }
+
+            function updateMultiWeekGoalStreak() {
+                const results = SUBJECT_ORDER.map(computeSubjectStreak);
+                let longest = 0;
+                let topSubjects = [];
+                let activeCount = 0;
+                let multiWeekCount = 0;
+
+                results.forEach((res) => {
+                    if (res.streak > 0) activeCount++;
+                    if (res.streak >= 2) multiWeekCount++;
+                    if (res.streak > longest) {
+                        longest = res.streak;
+                        topSubjects = [res.code];
+                    } else if (res.streak === longest && res.streak > 0) {
+                        topSubjects.push(res.code);
+                    }
+
+                    const pillBtn = pillContainer.querySelector('[data-streak-subject="' + res.code + '"]');
+                    const countEl = pillContainer.querySelector('[data-streak-count="' + res.code + '"]');
+                    if (pillBtn && countEl) {
+                        const unitLabel = res.streak === 1 ? '1 wk ✓' : (res.streak >= 2 ? res.streak + ' wks 🔥' : '0 wks');
+                        countEl.textContent = unitLabel;
+                        pillBtn.title = res.code + ' vs ' + formatHours(res.goal) + ' goal (' + res.breakdown + ') → ' + res.streak + ' consecutive wk' + (res.streak === 1 ? '' : 's');
+
+                        if (res.streak >= 2) {
+                            pillBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-950/50 border border-amber-500/50 text-[11px] font-semibold text-amber-100 hover:border-amber-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400';
+                            countEl.className = 'font-extrabold text-amber-300';
+                        } else if (res.streak === 1) {
+                            pillBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/50 border border-emerald-600/50 text-[11px] font-semibold text-emerald-100 hover:border-emerald-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400';
+                            countEl.className = 'font-extrabold text-emerald-300';
+                        } else {
+                            pillBtn.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-[11px] font-semibold text-slate-300 hover:border-indigo-400/60 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400';
+                            countEl.className = 'font-extrabold text-slate-400';
+                        }
+                    }
+                });
+
+                if (badgeEl) {
+                    if (multiWeekCount > 0) {
+                        badgeEl.textContent = activeCount + ' / ' + SUBJECT_ORDER.length + ' Active (' + multiWeekCount + ' Multi-wk)';
+                        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                    } else if (activeCount > 0) {
+                        badgeEl.textContent = activeCount + ' / ' + SUBJECT_ORDER.length + ' Subjects Active';
+                        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+                    } else {
+                        badgeEl.textContent = '0 / ' + SUBJECT_ORDER.length + ' Subjects Active';
+                        badgeEl.className = 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-800 text-slate-300 border border-slate-700';
+                    }
+                }
+
+                if (iconWrap) {
+                    if (longest >= 2) {
+                        iconWrap.className = 'w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/45 text-amber-300 flex items-center justify-center text-lg shrink-0 transition-colors';
+                    } else if (longest === 1) {
+                        iconWrap.className = 'w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex items-center justify-center text-lg shrink-0 transition-colors';
+                    } else {
+                        iconWrap.className = 'w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 flex items-center justify-center text-lg shrink-0 transition-colors';
+                    }
+                }
+
+                if (summaryEl) {
+                    const longestText = longest === 1 ? '1 wk' : (longest + ' wks');
+                    if (longest > 0) {
+                        summaryEl.innerHTML = 'Longest streak: <span id="multiWeekStreakLongest" class="font-extrabold text-amber-300">' + longestText + '</span> <span class="text-slate-400">(' + topSubjects.join(', ') + ') • Consecutive weeks meeting custom goals</span>';
+                    } else {
+                        summaryEl.innerHTML = 'Longest streak: <span id="multiWeekStreakLongest" class="font-extrabold text-white">0 wks</span> <span class="text-slate-400">across custom weekly subject goals (4-wk window)</span>';
+                    }
+                }
+            }
+
+            pillContainer.querySelectorAll('[data-streak-subject]').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const subj = btn.getAttribute('data-streak-subject');
+                    if (subj) {
+                        document.dispatchEvent(new CustomEvent('selectProgressHistorySubject', {
+                            detail: { subject: subj }
+                        }));
+                    }
+                });
+            });
+
+            document.addEventListener('subjectChartDataUpdated', updateMultiWeekGoalStreak);
+            updateMultiWeekGoalStreak();
         })();
     </script>
 
