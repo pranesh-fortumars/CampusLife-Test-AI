@@ -25,29 +25,29 @@
             opacity: 0.92;
             filter: drop-shadow(0 8px 18px rgba(56, 189, 248, 0.45));
         }
-        #subjectChartSvg rect.subject-bar-dragging {
+        #subjectChartSvg rect.subject-main-bar.subject-bar-dragging {
             stroke: #ffffff !important;
             stroke-width: 2.2px !important;
         }
         #subjectChartSvg .subject-bar-dimmed {
             opacity: 0.22;
         }
-        #subjectChartSvg rect.subject-bar-highlighted {
+        #subjectChartSvg rect.subject-main-bar.subject-bar-highlighted {
             filter: drop-shadow(0 0 10px rgba(129, 140, 248, 0.7)) brightness(1.14);
             stroke: #e0e7ff;
             stroke-width: 1.8px;
         }
-        #subjectChartSvg rect.subject-bar-highlighted[data-status="alert"] {
+        #subjectChartSvg rect.subject-main-bar.subject-bar-highlighted[data-status="alert"] {
             filter: drop-shadow(0 0 10px rgba(248, 113, 113, 0.75)) brightness(1.12);
             stroke: #fecaca;
             stroke-width: 1.8px;
         }
-        #subjectChartSvg rect.subject-bar-highlighted[data-status="met"] {
+        #subjectChartSvg rect.subject-main-bar.subject-bar-highlighted[data-status="met"] {
             filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.75)) brightness(1.12);
             stroke: #a7f3d0;
             stroke-width: 1.8px;
         }
-        #subjectChartSvg rect.subject-bar-selected {
+        #subjectChartSvg rect.subject-main-bar.subject-bar-selected {
             stroke: #38bdf8;
             stroke-width: 2px;
             filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.55));
@@ -416,6 +416,10 @@
                                 <span class="w-3 h-3 rounded border-2 border-red-500 inline-block"></span>
                                 <span class="text-red-400 font-semibold">&lt;50% Alert ⚠️</span>
                             </div>
+                            <div id="comparePrevWeekLegend" class="hidden flex items-center space-x-1.5">
+                                <span class="w-3 h-3 rounded bg-slate-400/30 border border-dashed border-slate-300 inline-block"></span>
+                                <span class="text-slate-300 font-semibold">Last Week</span>
+                            </div>
                         </div>
                     </div>
 
@@ -516,6 +520,16 @@
                                     <option value="custom" class="bg-slate-900 text-sky-300">Custom Priority (Drag &amp; Drop)</option>
                                 </select>
                             </div>
+
+                            <!-- Compare with Last Week's Goal Toggle -->
+                            <label for="compareLastWeekCheckbox"
+                                   class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700 hover:border-indigo-500/60 transition cursor-pointer select-none">
+                                <input type="checkbox"
+                                       id="compareLastWeekCheckbox"
+                                       aria-controls="subjectChartSvg"
+                                       class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 accent-indigo-500 cursor-pointer" />
+                                <span class="text-xs font-semibold text-slate-300 whitespace-nowrap">Compare with last week's goal</span>
+                            </label>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
@@ -592,6 +606,7 @@
 
                         <!-- Bars with unique per-subject high-contrast palettes -->
                         <!-- CS201 (Indigo): 5.5h of 6.0h goal (92%, last week 4.2h -> +22%) -->
+                        <rect data-subject="CS201" data-role="prev-week-bar" data-compare-active="false" style="display: none;" class="pointer-events-none" x="68" y="89" width="69" height="76" rx="6" fill="url(#gradCS201)" fill-opacity="0.28" stroke="#a5b4fc" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.7" />
                         <rect data-subject="CS201" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="85" y="29" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="CS201" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="102" y="39" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
                         <rect data-subject="CS201" data-course="Data Structures" data-sessions="11" data-logged="5.5" data-prev-logged="4.2" data-hours="5.5h" data-goal="6h" data-pct="92%" data-trend="▲ +22%" data-trend-dir="up" data-status="normal" data-color="#6366f1" tabindex="0" class="subject-bar-interact subject-main-bar" x="75" y="67" width="55" height="98" rx="6" fill="url(#gradCS201)" />
@@ -603,6 +618,7 @@
                         <text data-subject="CS201" data-role="trend-text" class="subject-bar-interact" x="127.5" y="199" fill="#34d399" font-size="7.5" font-weight="bold" text-anchor="middle">▲ +22%</text>
 
                         <!-- MATH204 (Violet): 4.0h of 5.0h goal (80%, last week 3.5h -> +10%) -->
+                        <rect data-subject="MATH204" data-role="prev-week-bar" data-compare-active="false" style="display: none;" class="pointer-events-none" x="178" y="102" width="69" height="63" rx="6" fill="url(#gradMATH204)" fill-opacity="0.28" stroke="#d8b4fe" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.7" />
                         <rect data-subject="MATH204" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="195" y="55" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="MATH204" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="212" y="65" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
                         <rect data-subject="MATH204" data-course="Linear Algebra" data-sessions="8" data-logged="4.0" data-prev-logged="3.5" data-hours="4.0h" data-goal="5h" data-pct="80%" data-trend="▲ +10%" data-trend-dir="up" data-status="normal" data-color="#8b5cf6" tabindex="0" class="subject-bar-interact subject-main-bar" x="185" y="93" width="55" height="72" rx="6" fill="url(#gradMATH204)" />
@@ -614,6 +630,7 @@
                         <text data-subject="MATH204" data-role="trend-text" class="subject-bar-interact" x="237.5" y="199" fill="#34d399" font-size="7.5" font-weight="bold" text-anchor="middle">▲ +10%</text>
 
                         <!-- CS310 (Cyan): 3.5h of 4.5h goal (78%, last week 3.8h -> -7%) -->
+                        <rect data-subject="CS310" data-role="prev-week-bar" data-compare-active="false" style="display: none;" class="pointer-events-none" x="288" y="97" width="69" height="68" rx="6" fill="url(#gradCS310)" fill-opacity="0.28" stroke="#67e8f9" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.7" />
                         <rect data-subject="CS310" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="305" y="64" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="CS310" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="322" y="74" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
                         <rect data-subject="CS310" data-course="Operating Systems" data-sessions="7" data-logged="3.5" data-prev-logged="3.8" data-hours="3.5h" data-goal="4.5h" data-pct="78%" data-trend="▼ -7%" data-trend-dir="down" data-status="normal" data-color="#06b6d4" tabindex="0" class="subject-bar-interact subject-main-bar" x="295" y="102" width="55" height="63" rx="6" fill="url(#gradCS310)" />
@@ -625,6 +642,7 @@
                         <text data-subject="CS310" data-role="trend-text" class="subject-bar-interact" x="347.5" y="199" fill="#f87171" font-size="7.5" font-weight="bold" text-anchor="middle">▼ -7%</text>
 
                         <!-- PHY102 (Amber): 2.5h of 4.0h goal (63%, last week 2.0h -> +13%) -->
+                        <rect data-subject="PHY102" data-role="prev-week-bar" data-compare-active="false" style="display: none;" class="pointer-events-none" x="398" y="129" width="69" height="36" rx="6" fill="url(#gradPHY102)" fill-opacity="0.28" stroke="#fcd34d" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.7" />
                         <rect data-subject="PHY102" data-role="alert-badge-bg" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="415" y="82" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="PHY102" data-role="alert-badge-text" data-alert-active="false" style="display: none;" class="subject-bar-interact" x="432" y="92" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
                         <rect data-subject="PHY102" data-course="Engineering Physics" data-sessions="5" data-logged="2.5" data-prev-logged="2.0" data-hours="2.5h" data-goal="4h" data-pct="63%" data-trend="▲ +13%" data-trend-dir="up" data-status="normal" data-color="#f59e0b" tabindex="0" class="subject-bar-interact subject-main-bar" x="405" y="120" width="55" height="45" rx="6" fill="url(#gradPHY102)" />
@@ -636,6 +654,7 @@
                         <text data-subject="PHY102" data-role="trend-text" class="subject-bar-interact" x="457.5" y="199" fill="#34d399" font-size="7.5" font-weight="bold" text-anchor="middle">▲ +13%</text>
 
                         <!-- ENG215 (Rose): 1.5h of 3.5h goal (43% - Below 50% Alert, last week 2.3h -> -23%) -->
+                        <rect data-subject="ENG215" data-role="prev-week-bar" data-compare-active="false" style="display: none;" class="pointer-events-none" x="508" y="124" width="69" height="41" rx="6" fill="url(#gradENG215)" fill-opacity="0.28" stroke="#fda4af" stroke-width="1.2" stroke-dasharray="3 2" stroke-opacity="0.7" />
                         <rect data-subject="ENG215" data-role="alert-badge-bg" data-alert-active="true" class="subject-bar-interact" x="525" y="110" width="34" height="14" rx="7" fill="#ef4444" />
                         <text data-subject="ENG215" data-role="alert-badge-text" data-alert-active="true" class="subject-bar-interact" x="542" y="120" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">&lt;50% ⚠️</text>
                         <rect data-subject="ENG215" data-course="Technical Writing" data-sessions="3" data-logged="1.5" data-prev-logged="2.3" data-hours="1.5h" data-goal="3.5h" data-pct="43%" data-trend="▼ -23%" data-trend-dir="down" data-status="alert" data-color="#f43f5e" tabindex="0" class="subject-bar-interact subject-main-bar" x="515" y="138" width="55" height="27" rx="6" fill="url(#gradENG215)" stroke="#ef4444" stroke-width="1.5" />
@@ -963,10 +982,17 @@
             const selectAllBtn = document.getElementById('subjectSelectAllBtn');
             const clearAllBtn = document.getElementById('subjectClearAllBtn');
             const checkboxes = Array.from(container.querySelectorAll('.subject-filter-checkbox'));
+            const compareCheckbox = document.getElementById('compareLastWeekCheckbox');
+            const compareLegend = document.getElementById('comparePrevWeekLegend');
             const chartSvg = document.getElementById('subjectChartSvg');
 
             function updateSubjectChartVisibility() {
                 if (!chartSvg) return;
+
+                const isCompareActive = !!(compareCheckbox && compareCheckbox.checked);
+                if (compareLegend) {
+                    compareLegend.classList.toggle('hidden', !isCompareActive);
+                }
 
                 const selectedSubjects = [];
                 checkboxes.forEach((checkbox) => {
@@ -980,8 +1006,12 @@
                         'rect[data-subject="' + subject + '"], text[data-subject="' + subject + '"], line[data-subject="' + subject + '"]'
                     );
                     chartElements.forEach((el) => {
+                        if (el.getAttribute('data-role') === 'prev-week-bar') {
+                            el.setAttribute('data-compare-active', String(isCompareActive));
+                        }
                         const isInactiveBadge = el.getAttribute('data-alert-active') === 'false';
-                        const shouldShow = isVisible && !isInactiveBadge;
+                        const isInactiveCompare = el.getAttribute('data-compare-active') === 'false';
+                        const shouldShow = isVisible && !isInactiveBadge && !isInactiveCompare;
                         el.style.display = shouldShow ? '' : 'none';
                         el.setAttribute('visibility', shouldShow ? 'visible' : 'hidden');
                         el.setAttribute('aria-hidden', String(!shouldShow));
@@ -1046,6 +1076,10 @@
             checkboxes.forEach((checkbox) => {
                 checkbox.addEventListener('change', updateSubjectChartVisibility);
             });
+
+            if (compareCheckbox) {
+                compareCheckbox.addEventListener('change', updateSubjectChartVisibility);
+            }
 
             if (selectAllBtn) {
                 selectAllBtn.addEventListener('click', () => {
@@ -1623,6 +1657,7 @@
 
             function getSubjectElements(code) {
                 return [
+                    chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="prev-week-bar"]'),
                     chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]'),
                     chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]'),
                     chartSvg.querySelector('text[data-subject="' + code + '"][data-role="alert-badge-text"]'),
@@ -1643,6 +1678,7 @@
                     const lineX2 = barX + 59;
                     const badgeX = barX + 10;
 
+                    const prevWeekBar = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="prev-week-bar"]');
                     const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
                     const badgeBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]');
                     const badgeText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="alert-badge-text"]');
@@ -1653,6 +1689,7 @@
                     const trendBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="trend-bg"]');
                     const trendText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="trend-text"]');
 
+                    if (prevWeekBar) prevWeekBar.setAttribute('x', barX - 7);
                     if (mainBar) mainBar.setAttribute('x', barX);
                     if (badgeBg) badgeBg.setAttribute('x', badgeX);
                     if (badgeText) badgeText.setAttribute('x', centerX);
