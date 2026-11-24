@@ -538,6 +538,13 @@
                                 </span>
                                 <span class="text-slate-400 font-medium">Activity Density</span>
                             </div>
+                            <div id="goalProjectionLegend"
+                                 class="flex items-center space-x-1.5"
+                                 title="Linear regression estimate of Sunday totals based on current week's Mon–Fri progress">
+                                <span class="w-4 h-0 border-t-2 border-dashed border-sky-400 inline-block" aria-hidden="true"></span>
+                                <span class="w-2 h-2 rounded-full bg-sky-400 inline-block -ml-1" aria-hidden="true"></span>
+                                <span class="text-sky-300 font-semibold">Goal Projection (Sun): <span id="goalProjectionLegendSummary" class="text-emerald-300">3/5 On Pace</span></span>
+                            </div>
                         </div>
                     </div>
 
@@ -703,6 +710,18 @@
                                 Prev week: 4.2h → Current: 5.5h (+31%)
                             </div>
                         </div>
+                        <div id="tooltipProjectionSection" class="mt-1.5 pt-1.5 border-t border-slate-800/80">
+                            <div class="flex items-center justify-between gap-2 text-[11px]">
+                                <span class="text-slate-400">Sunday Projection:</span>
+                                <span id="tooltipProjectionBadge"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    7.7h ✓ On Pace
+                                </span>
+                            </div>
+                            <div id="tooltipProjectionDetail" class="mt-0.5 text-[10px] text-slate-400 text-right font-medium">
+                                Linear reg. est. +1.7h vs 6h goal by Sun
+                            </div>
+                        </div>
                     </div>
 
                     <div class="w-full overflow-x-auto">
@@ -845,6 +864,9 @@
                         <text data-subject="ENG215" data-role="pct" class="subject-bar-interact" x="547" y="200" fill="#f87171" font-size="8.5" text-anchor="end">43% (3.5h)</text>
                         <rect data-subject="ENG215" data-role="trend-bg" class="subject-bar-interact" x="550" y="190" width="35" height="13" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="0.9" />
                         <text data-subject="ENG215" data-role="trend-text" class="subject-bar-interact" x="567.5" y="199" fill="#f87171" font-size="7.5" font-weight="bold" text-anchor="middle">▼ -23%</text>
+
+                        <!-- Linear Regression Goal Projection Line (Estimated Sunday Performance) -->
+                        <g id="goalProjectionLayer" class="pointer-events-none" aria-hidden="true"></g>
 
                         <!-- In-SVG Color Legend -->
                         <g id="subjectChartLegend" transform="translate(65, 222)" aria-label="Subject color legend">
@@ -1299,6 +1321,8 @@
             const tooltipTrendArrowDownEl = document.getElementById('tooltipTrendArrowDown');
             const tooltipTrendEl = document.getElementById('tooltipWeeklyTrend');
             const tooltipDurationComparisonEl = document.getElementById('tooltipDurationComparison');
+            const tooltipProjectionBadgeEl = document.getElementById('tooltipProjectionBadge');
+            const tooltipProjectionDetailEl = document.getElementById('tooltipProjectionDetail');
 
             const subjectElements = Array.from(chartSvg.querySelectorAll('[data-subject]'));
             let activeHoveredSubject = null;
@@ -1413,6 +1437,23 @@
                         : isMet
                             ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                             : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30';
+                }
+
+                const projHours = parseFloat(mainBar.getAttribute('data-proj-hours') || '');
+                const goalNum = parseFloat(goal.replace('h', '') || '0');
+                if (!Number.isNaN(projHours) && goalNum > 0) {
+                    const willHit = projHours + 1e-9 >= goalNum;
+                    const projDiff = Math.round((projHours - goalNum) * 10) / 10;
+                    const projDiffStr = (projDiff >= 0 ? '+' : '') + projDiff.toFixed(1) + 'h';
+                    if (tooltipProjectionBadgeEl) {
+                        tooltipProjectionBadgeEl.textContent = projHours.toFixed(1) + 'h ' + (willHit ? '✓ Hits Goal' : '✗ Shortfall');
+                        tooltipProjectionBadgeEl.className = willHit
+                            ? 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-red-500/15 text-red-400 border border-red-500/30';
+                    }
+                    if (tooltipProjectionDetailEl) {
+                        tooltipProjectionDetailEl.textContent = 'Linear reg. est. ' + projDiffStr + ' vs ' + goal + ' goal by Sun';
+                    }
                 }
 
                 positionTooltipForBar(mainBar);
@@ -2933,6 +2974,234 @@
 
             document.addEventListener('subjectChartDataUpdated', updateMultiWeekGoalStreak);
             updateMultiWeekGoalStreak();
+        })();
+
+        (function initGoalProjection() {
+            const container = document.getElementById('subjectChartContainer');
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const layer = document.getElementById('goalProjectionLayer');
+            const legendSummaryEl = document.getElementById('goalProjectionLegendSummary');
+            const sortSelect = document.getElementById('subjectSortSelect');
+            if (!container || !chartSvg || !layer) return;
+
+            const SVG_NS = 'http://www.w3.org/2000/svg';
+
+            // Current week daily study hours logged Mon–Fri (Days 1–5) per subject
+            // Sum of each array matches each subject's current logged hours;
+            // OLS linear regression on cumulative progress extrapolates to Day 7 (Sunday).
+            const CURRENT_WEEK_DAILY_LOGS = {
+                CS201: [1.0, 0.9, 1.3, 1.1, 1.2],   // 5.5h -> Sun est: 7.74h
+                MATH204: [0.7, 0.8, 0.8, 0.9, 0.8], // 4.0h -> Sun est: 5.66h
+                CS310: [0.8, 0.7, 0.7, 0.7, 0.6],   // 3.5h -> Sun est: 4.90h
+                PHY102: [0.6, 0.5, 0.5, 0.5, 0.4],  // 2.5h -> Sun est: 3.50h
+                ENG215: [0.4, 0.3, 0.3, 0.3, 0.2]   // 1.5h -> Sun est: 2.10h
+            };
+
+            function computeLinearRegression(points) {
+                const n = points.length;
+                if (n === 0) return { slope: 0, intercept: 0, predict: () => 0 };
+                if (n === 1) return { slope: 0, intercept: points[0].y, predict: () => points[0].y };
+
+                let sumX = 0;
+                let sumY = 0;
+                let sumXY = 0;
+                let sumXX = 0;
+                for (let i = 0; i < n; i++) {
+                    sumX += points[i].x;
+                    sumY += points[i].y;
+                    sumXY += points[i].x * points[i].y;
+                    sumXX += points[i].x * points[i].x;
+                }
+                const denom = n * sumXX - sumX * sumX;
+                const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+                const intercept = (sumY - slope * sumX) / n;
+                return {
+                    slope: slope,
+                    intercept: intercept,
+                    predict: (x) => Math.max(0, slope * x + intercept)
+                };
+            }
+
+            function projectSubjectToSunday(code, loggedOverride) {
+                const daily = CURRENT_WEEK_DAILY_LOGS[code] || [0.5, 0.5, 0.5, 0.5, 0.5];
+                const baseSum = daily.reduce((a, b) => a + b, 0);
+                const scale = (typeof loggedOverride === 'number' && !Number.isNaN(loggedOverride) && baseSum > 0)
+                    ? (loggedOverride / baseSum)
+                    : 1;
+
+                let cumulative = 0;
+                const points = daily.map((hrs, idx) => {
+                    cumulative += hrs * scale;
+                    return { x: idx + 1, y: cumulative };
+                });
+
+                const regression = computeLinearRegression(points);
+                return Math.round(regression.predict(7) * 100) / 100;
+            }
+
+            function renderGoalProjection() {
+                const bars = Array.from(chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]'));
+                if (!bars.length) return;
+
+                const visibleNodes = [];
+                let totalOnPace = 0;
+                let totalAll = 0;
+
+                bars.forEach((bar) => {
+                    const code = bar.getAttribute('data-subject') || '';
+                    const loggedVal = parseFloat(bar.getAttribute('data-logged') || '0');
+                    const goalVal = Math.max(0.5, parseFloat((bar.getAttribute('data-goal') || '4h').replace('h', '')) || 4);
+                    const projHours = projectSubjectToSunday(code, loggedVal);
+                    const hitsGoal = projHours + 1e-9 >= goalVal;
+
+                    bar.setAttribute('data-proj-hours', projHours.toFixed(1));
+                    bar.setAttribute('data-proj-hit', String(hitsGoal));
+
+                    totalAll++;
+                    if (hitsGoal) totalOnPace++;
+
+                    if (bar.style.display === 'none') return;
+
+                    const barX = parseFloat(bar.getAttribute('x') || '0');
+                    const barY = parseFloat(bar.getAttribute('y') || '165');
+                    const centerX = barX + 27.5;
+                    const yProj = Math.max(15, Math.min(165, Math.round((165 - projHours * 18) * 10) / 10));
+
+                    const ratioText = chartSvg.querySelector('text[data-subject="' + code + '"][data-role="ratio"]');
+                    const badgeBg = chartSvg.querySelector('rect[data-subject="' + code + '"][data-role="alert-badge-bg"]');
+                    const ratioY = ratioText ? parseFloat(ratioText.getAttribute('y') || '999') : 999;
+                    const badgeY = (badgeBg && badgeBg.style.display !== 'none') ? parseFloat(badgeBg.getAttribute('y') || '999') : 999;
+
+                    visibleNodes.push({
+                        code: code,
+                        centerX: centerX,
+                        barY: barY,
+                        yProj: yProj,
+                        projHours: projHours,
+                        goalVal: goalVal,
+                        hitsGoal: hitsGoal,
+                        ratioY: ratioY,
+                        badgeY: badgeY
+                    });
+                });
+
+                visibleNodes.sort((a, b) => a.centerX - b.centerX);
+
+                if (legendSummaryEl) {
+                    const denom = visibleNodes.length > 0 ? visibleNodes.length : totalAll;
+                    const hitVisible = visibleNodes.length > 0
+                        ? visibleNodes.filter((n) => n.hitsGoal).length
+                        : totalOnPace;
+                    legendSummaryEl.textContent = hitVisible + '/' + denom + ' On Pace';
+                    legendSummaryEl.className = hitVisible === denom && denom > 0
+                        ? 'text-emerald-300'
+                        : hitVisible === 0
+                            ? 'text-red-400'
+                            : 'text-sky-200';
+                }
+
+                layer.innerHTML = '';
+                if (!visibleNodes.length) return;
+
+                // 1. Draw vertical dashed pace stems from current bar top to Sunday projection
+                visibleNodes.forEach((node) => {
+                    if (Math.abs(node.barY - node.yProj) >= 4) {
+                        const stem = document.createElementNS(SVG_NS, 'line');
+                        stem.setAttribute('x1', node.centerX.toFixed(1));
+                        stem.setAttribute('y1', node.barY.toFixed(1));
+                        stem.setAttribute('x2', node.centerX.toFixed(1));
+                        stem.setAttribute('y2', node.yProj.toFixed(1));
+                        stem.setAttribute('stroke', node.hitsGoal ? '#34d399' : '#f87171');
+                        stem.setAttribute('stroke-width', '1.1');
+                        stem.setAttribute('stroke-dasharray', '2 2');
+                        stem.setAttribute('opacity', '0.6');
+                        layer.appendChild(stem);
+                    }
+                });
+
+                // 2. Draw continuous 'Goal Projection' line across active columns
+                if (visibleNodes.length >= 2) {
+                    const pathParts = visibleNodes.map((node, idx) =>
+                        (idx === 0 ? 'M ' : 'L ') + node.centerX.toFixed(1) + ' ' + node.yProj.toFixed(1)
+                    );
+                    const linePath = document.createElementNS(SVG_NS, 'path');
+                    linePath.setAttribute('id', 'goalProjectionLine');
+                    linePath.setAttribute('d', pathParts.join(' '));
+                    linePath.setAttribute('fill', 'none');
+                    linePath.setAttribute('stroke', '#38bdf8');
+                    linePath.setAttribute('stroke-width', '2');
+                    linePath.setAttribute('stroke-dasharray', '5 3');
+                    linePath.setAttribute('stroke-linecap', 'round');
+                    linePath.setAttribute('stroke-linejoin', 'round');
+                    linePath.setAttribute('opacity', '0.9');
+                    layer.appendChild(linePath);
+                }
+
+                // 3. Draw projected Sunday marker dots & compact estimate tags
+                visibleNodes.forEach((node) => {
+                    const dot = document.createElementNS(SVG_NS, 'circle');
+                    dot.setAttribute('data-proj-subject', node.code);
+                    dot.setAttribute('cx', node.centerX.toFixed(1));
+                    dot.setAttribute('cy', node.yProj.toFixed(1));
+                    dot.setAttribute('r', '4');
+                    dot.setAttribute('fill', node.hitsGoal ? '#34d399' : '#f87171');
+                    dot.setAttribute('stroke', '#0f172a');
+                    dot.setAttribute('stroke-width', '1.5');
+                    layer.appendChild(dot);
+
+                    const closeToRatio = Math.abs(node.yProj - node.ratioY) < 16;
+                    const closeToBadge = Math.abs(node.yProj - node.badgeY) < 16;
+                    const placeSide = closeToRatio || closeToBadge;
+
+                    const label = document.createElementNS(SVG_NS, 'text');
+                    label.setAttribute('x', (placeSide ? node.centerX + 30 : node.centerX).toFixed(1));
+                    label.setAttribute('y', (placeSide ? Math.max(12, node.yProj + 3) : Math.max(11, node.yProj - 7)).toFixed(1));
+                    label.setAttribute('fill', node.hitsGoal ? '#6ee7b7' : '#fda4af');
+                    label.setAttribute('font-size', '8');
+                    label.setAttribute('font-weight', 'bold');
+                    label.setAttribute('text-anchor', placeSide ? 'start' : 'middle');
+                    label.setAttribute('stroke', '#0f172a');
+                    label.setAttribute('stroke-width', '2.4');
+                    label.setAttribute('paint-order', 'stroke');
+                    label.textContent = node.projHours.toFixed(1) + 'h ' + (node.hitsGoal ? '✓' : '✗');
+                    layer.appendChild(label);
+                });
+            }
+
+            // Re-render projection cleanly after reorder, filter, or goal changes
+            document.addEventListener('subjectChartDataUpdated', () => {
+                requestAnimationFrame(renderGoalProjection);
+            });
+            chartSvg.addEventListener('subjectBarsReordered', () => {
+                requestAnimationFrame(renderGoalProjection);
+            });
+            if (sortSelect) {
+                sortSelect.addEventListener('change', () => {
+                    requestAnimationFrame(renderGoalProjection);
+                });
+            }
+            container.querySelectorAll('.subject-filter-checkbox').forEach((cb) => {
+                cb.addEventListener('change', renderGoalProjection);
+            });
+            const selectAllBtn = document.getElementById('subjectSelectAllBtn');
+            const clearAllBtn = document.getElementById('subjectClearAllBtn');
+            if (selectAllBtn) selectAllBtn.addEventListener('click', () => requestAnimationFrame(renderGoalProjection));
+            if (clearAllBtn) clearAllBtn.addEventListener('click', () => requestAnimationFrame(renderGoalProjection));
+
+            // Dim projection layer slightly while actively dragging a bar, then restore & redraw on release
+            chartSvg.addEventListener('pointerdown', () => {
+                layer.style.opacity = '0.35';
+            });
+            window.addEventListener('pointerup', () => {
+                layer.style.opacity = '1';
+                requestAnimationFrame(renderGoalProjection);
+            });
+            window.addEventListener('pointercancel', () => {
+                layer.style.opacity = '1';
+                requestAnimationFrame(renderGoalProjection);
+            });
+
+            renderGoalProjection();
         })();
     </script>
 
