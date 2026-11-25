@@ -222,10 +222,24 @@
                     <p class="text-xs text-slate-400">College Student Super App</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-3">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div class="flex items-center space-x-2.5">
+                <span class="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     ● v2.2 Live (Custom Subject Goals & Recharts)
                 </span>
+                <button type="button"
+                        id="appSettingsBtn"
+                        aria-haspopup="dialog"
+                        aria-expanded="false"
+                        aria-controls="appSettingsModal"
+                        title="Open App Settings to customize student profile & watermark name"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span>Settings</span>
+                    <span id="navbarStudentNameBadge" class="hidden md:inline px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">Rahul Sharma</span>
+                </button>
             </div>
         </div>
     </header>
@@ -2766,10 +2780,12 @@
                     const goalsModal = document.getElementById('bulkGoalsModal');
                     const shareModal = document.getElementById('shareAnalyticsModal');
                     const qrModal = document.getElementById('shareQrModal');
+                    const settingsModal = document.getElementById('appSettingsModal');
                     if ((filterMenu && !filterMenu.classList.contains('hidden')) ||
                         (goalsModal && !goalsModal.classList.contains('hidden')) ||
                         (shareModal && !shareModal.classList.contains('hidden')) ||
-                        (qrModal && !qrModal.classList.contains('hidden'))) {
+                        (qrModal && !qrModal.classList.contains('hidden')) ||
+                        (settingsModal && !settingsModal.classList.contains('hidden'))) {
                         return;
                     }
                     setFocusMode(false);
@@ -4779,6 +4795,25 @@
 
                 const overallPct = totalGoal > 0 ? Math.round((totalLogged / totalGoal) * 100) : 0;
 
+                const appSettings = typeof window.getAppSettings === 'function'
+                    ? window.getAppSettings()
+                    : { studentName: 'Rahul Sharma' };
+                const studentName = (appSettings && appSettings.studentName && appSettings.studentName.trim())
+                    ? appSettings.studentName.trim()
+                    : 'Rahul Sharma';
+
+                const now = new Date();
+                const day = now.getDay();
+                const diffToMonday = day === 0 ? -6 : 1 - day;
+                const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+                const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+                const sameYear = weekStart.getFullYear() === weekEnd.getFullYear();
+                const startLabel = weekStart.toLocaleDateString('en-US', sameYear
+                    ? { month: 'short', day: 'numeric' }
+                    : { month: 'short', day: 'numeric', year: 'numeric' });
+                const endLabel = weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const weekDateRange = startLabel + ' – ' + endLabel;
+
                 return {
                     subjects: subjects,
                     totalLogged: Math.round(totalLogged * 10) / 10,
@@ -4788,7 +4823,9 @@
                     dailyHours: dailyHours,
                     dailyGoal: dailyGoal,
                     daysMet: daysMet,
-                    streakSummary: streakSummary
+                    streakSummary: streakSummary,
+                    studentName: studentName,
+                    weekDateRange: weekDateRange
                 };
             }
 
@@ -4838,8 +4875,7 @@
 
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '600 15px "Plus Jakarta Sans", system-ui, sans-serif';
-                const dateLabel = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-                ctx.fillText('Generated ' + dateLabel + ' • Subject Mastery & Goal Projection Summary', 88, 110);
+                ctx.fillText('Week of ' + snap.weekDateRange + ' • ' + snap.studentName + ' • Subject Mastery & Goal Projection', 88, 110);
 
                 // Overall Attainment Pill (Top Right)
                 drawRoundedRect(ctx, 880, 54, 260, 46, 23);
@@ -5031,10 +5067,52 @@
                     ctx.textAlign = 'left';
                 });
 
-                // Footer attribution
+                // Footer attribution & Watermark Text Overlay
                 ctx.fillStyle = '#64748b';
                 ctx.font = '600 12px "Plus Jakarta Sans", system-ui, sans-serif';
                 ctx.fillText('CampusLife Study Tracker • Exported from Analytics Dashboard', 56, 706);
+
+                // Subtle diagonal text overlay watermark across the analytics workspace
+                const watermarkText = snap.studentName + '  •  ' + snap.weekDateRange;
+                ctx.save();
+                ctx.translate(600, 448);
+                ctx.rotate(-16 * Math.PI / 180);
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = 'rgba(226, 232, 240, 0.085)';
+                ctx.font = '800 34px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText(watermarkText.toUpperCase(), 0, -16);
+                ctx.fillStyle = 'rgba(129, 140, 248, 0.095)';
+                ctx.font = '700 16px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText('CAMPUSLIFE ANALYTICS SUMMARY', 0, 18);
+                ctx.restore();
+
+                // Translucent corner overlay watermark stamp (high-contrast legible metadata)
+                const stampText = snap.studentName + '  |  Week: ' + snap.weekDateRange;
+                ctx.save();
+                ctx.font = '700 12px "Plus Jakarta Sans", system-ui, sans-serif';
+                const measuredW = Math.ceil(ctx.measureText(stampText).width);
+                const stampW = Math.min(540, Math.max(240, measuredW + 46));
+                const stampH = 28;
+                const stampX = 1144 - stampW;
+                const stampY = 686;
+                drawRoundedRect(ctx, stampX, stampY, stampW, stampH, 14);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(129, 140, 248, 0.48)';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(stampX + 16, stampY + stampH / 2, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(stampText, stampX + 28, stampY + stampH / 2 + 0.5, stampW - 38);
+                ctx.restore();
 
                 return canvas;
             }
@@ -5062,15 +5140,21 @@
                 document.body.removeChild(a);
             }
 
-            function openShareModal() {
+            function renderAndPopulateSharePreview() {
                 const snap = collectAnalyticsSnapshot();
                 const canvas = renderSummaryCanvas(snap);
                 currentDataUrl = canvas.toDataURL('image/png');
                 previewImg.src = currentDataUrl;
 
+                const watermarkMetaEl = document.getElementById('shareWatermarkMetaLabel');
+                if (watermarkMetaEl) {
+                    watermarkMetaEl.textContent = snap.studentName + ' • ' + snap.weekDateRange;
+                }
+
                 const topSubject = snap.subjects[0];
                 currentSummaryText =
-                    '📚 My Weekly Study Analytics (' + snap.totalLogged.toFixed(1) + 'h / ' + snap.totalGoal.toFixed(1) + 'h · ' + snap.overallPct + '% Goal)\n' +
+                    '📚 ' + snap.studentName + ' — Weekly Study Analytics (' + snap.weekDateRange + ')\n' +
+                    '⏱️ Logged: ' + snap.totalLogged.toFixed(1) + 'h / ' + snap.totalGoal.toFixed(1) + 'h (' + snap.overallPct + '% Goal)\n' +
                     '🔥 Consistency: ' + snap.daysMet + '/7 days | Sun Pace: ' + snap.onPaceCount + '/' + snap.subjects.length + ' on track' +
                     (topSubject ? (' | Top Subject: ' + topSubject.code + ' (' + topSubject.logged.toFixed(1) + 'h)') : '');
 
@@ -5087,6 +5171,16 @@
                 if (xBtn) {
                     xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(currentSummaryText);
                 }
+            }
+
+            window.refreshShareAnalyticsPreview = function () {
+                if (!modal.classList.contains('hidden')) {
+                    renderAndPopulateSharePreview();
+                }
+            };
+
+            function openShareModal() {
+                renderAndPopulateSharePreview();
 
                 if (statusBanner) {
                     statusBanner.classList.add('hidden');
@@ -5109,6 +5203,8 @@
                 if (event.target === modal) closeShareModal();
             });
             document.addEventListener('keydown', (event) => {
+                const settingsModal = document.getElementById('appSettingsModal');
+                if (settingsModal && !settingsModal.classList.contains('hidden')) return;
                 if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
                     closeShareModal();
                 }
@@ -5599,6 +5695,118 @@
                 });
             }
         })();
+
+        (function initAppSettings() {
+            const STORAGE_KEY = 'campuslife_app_settings';
+            const DEFAULT_SETTINGS = {
+                studentName: 'Rahul Sharma'
+            };
+
+            const settingsBtn = document.getElementById('appSettingsBtn');
+            const navbarBadge = document.getElementById('navbarStudentNameBadge');
+            const modal = document.getElementById('appSettingsModal');
+            const form = document.getElementById('appSettingsForm');
+            const closeBtn = document.getElementById('closeAppSettingsModalBtn');
+            const cancelBtn = document.getElementById('cancelAppSettingsBtn');
+            const nameInput = document.getElementById('settingsStudentNameInput');
+            const resetBtn = document.getElementById('resetAppSettingsBtn');
+            const shareEditNameBtn = document.getElementById('shareEditStudentNameBtn');
+
+            function loadSettings() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && typeof parsed.studentName === 'string' && parsed.studentName.trim()) {
+                            return { studentName: parsed.studentName.trim() };
+                        }
+                    }
+                } catch (_) {}
+                return { studentName: DEFAULT_SETTINGS.studentName };
+            }
+
+            let currentSettings = loadSettings();
+
+            function syncNavbarBadge() {
+                if (navbarBadge) {
+                    navbarBadge.textContent = currentSettings.studentName;
+                }
+            }
+
+            function saveSettings(nextName) {
+                const cleaned = (typeof nextName === 'string' && nextName.trim())
+                    ? nextName.trim().slice(0, 60)
+                    : DEFAULT_SETTINGS.studentName;
+                currentSettings = { studentName: cleaned };
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSettings));
+                } catch (_) {}
+                syncNavbarBadge();
+                if (typeof window.refreshShareAnalyticsPreview === 'function') {
+                    window.refreshShareAnalyticsPreview();
+                }
+                return currentSettings;
+            }
+
+            window.getAppSettings = function () {
+                return { studentName: currentSettings.studentName };
+            };
+            window.saveAppSettings = saveSettings;
+
+            function openSettingsModal() {
+                if (!modal) return;
+                if (nameInput) {
+                    nameInput.value = currentSettings.studentName;
+                }
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'true');
+                if (nameInput) {
+                    setTimeout(() => nameInput.focus(), 20);
+                }
+            }
+
+            function closeSettingsModal() {
+                if (!modal) return;
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
+            }
+
+            syncNavbarBadge();
+
+            if (settingsBtn) settingsBtn.addEventListener('click', openSettingsModal);
+            if (shareEditNameBtn) shareEditNameBtn.addEventListener('click', openSettingsModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeSettingsModal);
+            if (cancelBtn) cancelBtn.addEventListener('click', closeSettingsModal);
+
+            if (modal) {
+                modal.addEventListener('click', (event) => {
+                    if (event.target === modal) closeSettingsModal();
+                });
+            }
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+                    closeSettingsModal();
+                }
+            });
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (nameInput) nameInput.value = DEFAULT_SETTINGS.studentName;
+                    saveSettings(DEFAULT_SETTINGS.studentName);
+                });
+            }
+
+            if (form) {
+                form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    saveSettings(nameInput ? nameInput.value : DEFAULT_SETTINGS.studentName);
+                    closeSettingsModal();
+                });
+            }
+        })();
     </script>
 
     <!-- Bulk Weekly Study Goals Slider Modal -->
@@ -5834,6 +6042,18 @@
                          class="w-full h-auto block" />
                 </div>
 
+                <div class="rounded-xl bg-slate-950/75 border border-slate-800 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div class="flex items-center gap-2 text-slate-300">
+                        <span class="px-2 py-0.5 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold uppercase tracking-wide text-[10px]">Watermark</span>
+                        <span id="shareWatermarkMetaLabel" class="font-semibold text-slate-200">Rahul Sharma • Current Week</span>
+                    </div>
+                    <button type="button"
+                            id="shareEditStudentNameBtn"
+                            class="text-indigo-300 hover:text-indigo-200 font-semibold underline underline-offset-2 cursor-pointer">
+                        Edit Name in Settings
+                    </button>
+                </div>
+
                 <div id="shareAnalyticsStatus" class="hidden"></div>
 
                 <!-- Primary & Utility Export Actions -->
@@ -5998,6 +6218,73 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- App Settings Modal (Student Profile & Export Watermark Preferences) -->
+    <div id="appSettingsModal"
+         role="dialog"
+         aria-modal="true"
+         aria-hidden="true"
+         aria-labelledby="appSettingsModalTitle"
+         class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <form id="appSettingsForm" class="w-full max-w-md bg-slate-900 border border-indigo-500/40 rounded-3xl shadow-2xl shadow-black/75 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between gap-4 px-6 py-4 bg-slate-900/95 border-b border-slate-800">
+                <div>
+                    <h4 id="appSettingsModalTitle" class="text-base font-extrabold text-white flex items-center gap-2">
+                        <span>⚙️ App Settings</span>
+                    </h4>
+                    <p class="text-xs text-slate-400 mt-0.5">Configure your student profile used across study dashboards and exported image watermarks.</p>
+                </div>
+                <button type="button"
+                        id="closeAppSettingsModalBtn"
+                        aria-label="Close app settings modal"
+                        class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Form Body -->
+            <div class="p-6 space-y-4">
+                <div class="space-y-1.5">
+                    <label for="settingsStudentNameInput" class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                        Student Name
+                    </label>
+                    <input id="settingsStudentNameInput"
+                           type="text"
+                           maxlength="60"
+                           required
+                           placeholder="Enter your full name"
+                           class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                    <p class="text-[11px] text-slate-400">
+                        Displayed in the watermark overlay on exported weekly analytics PNG images alongside the current week's date range.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3.5 bg-slate-900/95 border-t border-slate-800 flex items-center justify-between gap-2">
+                <button type="button"
+                        id="resetAppSettingsBtn"
+                        class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
+                    Reset Default
+                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                            id="cancelAppSettingsBtn"
+                            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            id="saveAppSettingsBtn"
+                            class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-bold text-white shadow-lg shadow-indigo-600/25 transition cursor-pointer">
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </body>
 </html>
