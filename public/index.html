@@ -105,6 +105,19 @@
             stroke-width: 2px;
             filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.55));
         }
+        #subjectChartSvg .subject-overlay-dimmed {
+            opacity: 0.24;
+        }
+        #subjectChartSvg rect.subject-main-bar.subject-overlay-primary {
+            stroke: #f8fafc;
+            stroke-width: 1.8px;
+            filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.45));
+        }
+        #subjectChartSvg rect.subject-main-bar.subject-overlay-secondary {
+            stroke: #cbd5e1;
+            stroke-width: 1.6px;
+            stroke-dasharray: 4 2;
+        }
         body.chart-focus-mode #mainNavbar,
         body.chart-focus-mode #heroSection,
         body.chart-focus-mode #featuresGridHeading,
@@ -493,6 +506,18 @@
                                 </svg>
                                 <span id="viewProgressHistoryLabel">View Progress History</span>
                             </button>
+                            <button type="button"
+                                    id="toggleSubjectOverlayBtn"
+                                    aria-pressed="false"
+                                    aria-expanded="false"
+                                    aria-controls="subjectOverlayPanel"
+                                    title="Toggle an overlaid comparison of two selected subjects on top of each other"
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-600/85 hover:bg-violet-500 text-white font-semibold text-[11px] border border-violet-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m0 0l-3-3m3 3l-3 3m0 4H8m0 0l3 3m-3-3l3-3"/>
+                                </svg>
+                                <span id="toggleSubjectOverlayLabel">Overlay Compare (2)</span>
+                            </button>
                         </div>
                         <div id="subjectChartLegendBar" class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
                             <div class="flex items-center space-x-1.5">
@@ -544,6 +569,15 @@
                                 <span class="w-4 h-0 border-t-2 border-dashed border-sky-400 inline-block" aria-hidden="true"></span>
                                 <span class="w-2 h-2 rounded-full bg-sky-400 inline-block -ml-1" aria-hidden="true"></span>
                                 <span class="text-sky-300 font-semibold">Goal Projection (Sun): <span id="goalProjectionLegendSummary" class="text-emerald-300">3/5 On Pace</span></span>
+                            </div>
+                            <div id="subjectOverlayLegend"
+                                 class="hidden flex items-center space-x-1.5"
+                                 title="Overlaid direct comparison between two selected subjects">
+                                <span id="subjectOverlayLegendSwatches" class="inline-flex items-center -space-x-1" aria-hidden="true">
+                                    <span class="w-2.5 h-2.5 rounded-sm bg-indigo-500 ring-1 ring-white/60 inline-block"></span>
+                                    <span class="w-2.5 h-2.5 rounded-sm bg-violet-500 border border-dashed border-white/80 inline-block"></span>
+                                </span>
+                                <span id="subjectOverlayLegendText" class="text-violet-300 font-semibold">Overlay: CS201 vs MATH204</span>
                             </div>
                         </div>
                     </div>
@@ -865,6 +899,9 @@
                         <rect data-subject="ENG215" data-role="trend-bg" class="subject-bar-interact" x="550" y="190" width="35" height="13" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="0.9" />
                         <text data-subject="ENG215" data-role="trend-text" class="subject-bar-interact" x="567.5" y="199" fill="#f87171" font-size="7.5" font-weight="bold" text-anchor="middle">▼ -23%</text>
 
+                        <!-- Direct Two-Subject Bar Overlay Layer -->
+                        <g id="subjectOverlayLayer" class="pointer-events-none" aria-hidden="true"></g>
+
                         <!-- Linear Regression Goal Projection Line (Estimated Sunday Performance) -->
                         <g id="goalProjectionLayer" class="pointer-events-none" aria-hidden="true"></g>
 
@@ -909,6 +946,140 @@
                             </linearGradient>
                         </defs>
                     </svg>
+                    </div>
+
+                    <!-- Two-Subject Overlaid Comparison Panel -->
+                    <div id="subjectOverlayPanel"
+                         aria-hidden="true"
+                         class="hidden mt-5 rounded-2xl bg-slate-900/90 border border-violet-500/40 p-4 sm:p-5 shadow-xl">
+                        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                            <div class="space-y-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h4 class="text-sm font-extrabold text-white flex items-center gap-1.5">
+                                        <span>🔀 Two-Subject Overlay Comparison</span>
+                                    </h4>
+                                    <span id="subjectOverlayDeltaPill" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-violet-500/20 text-violet-200 border border-violet-500/35">
+                                        CS201 +1.5h ahead of MATH204
+                                    </span>
+                                    <span id="subjectOverlayFilterNote" class="hidden px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                        Hidden in bar filter
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-400">Select two subjects to overlay directly on top of each other—both on the weekly bars above and on the shared time-series axes below.</p>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                <!-- Subject A Selector -->
+                                <label for="overlaySubjectASelect" class="sr-only">Primary subject for overlay</label>
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-xs">
+                                    <span id="overlaySubjectADot" class="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" aria-hidden="true"></span>
+                                    <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">A</span>
+                                    <select id="overlaySubjectASelect"
+                                            aria-label="Primary subject A for overlay"
+                                            class="bg-transparent font-bold text-slate-100 text-xs focus:outline-none cursor-pointer pr-1">
+                                        <option value="CS201" selected class="bg-slate-900 text-slate-100">CS201 (Indigo)</option>
+                                        <option value="MATH204" class="bg-slate-900 text-slate-100">MATH204 (Violet)</option>
+                                        <option value="CS310" class="bg-slate-900 text-slate-100">CS310 (Cyan)</option>
+                                        <option value="PHY102" class="bg-slate-900 text-slate-100">PHY102 (Amber)</option>
+                                        <option value="ENG215" class="bg-slate-900 text-slate-100">ENG215 (Rose)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Swap Subjects Button -->
+                                <button type="button"
+                                        id="overlaySwapSubjectsBtn"
+                                        title="Swap primary and overlaid subjects"
+                                        aria-label="Swap Subject A and Subject B"
+                                        class="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                                    </svg>
+                                </button>
+
+                                <!-- Subject B Selector -->
+                                <label for="overlaySubjectBSelect" class="sr-only">Overlaid subject for comparison</label>
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-800/90 border border-slate-700 text-xs">
+                                    <span id="overlaySubjectBDot" class="w-2.5 h-2.5 rounded-full bg-violet-500 shrink-0" aria-hidden="true"></span>
+                                    <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">B</span>
+                                    <select id="overlaySubjectBSelect"
+                                            aria-label="Overlaid subject B for comparison"
+                                            class="bg-transparent font-bold text-slate-100 text-xs focus:outline-none cursor-pointer pr-1">
+                                        <option value="CS201" class="bg-slate-900 text-slate-100">CS201 (Indigo)</option>
+                                        <option value="MATH204" selected class="bg-slate-900 text-slate-100">MATH204 (Violet)</option>
+                                        <option value="CS310" class="bg-slate-900 text-slate-100">CS310 (Cyan)</option>
+                                        <option value="PHY102" class="bg-slate-900 text-slate-100">PHY102 (Amber)</option>
+                                        <option value="ENG215" class="bg-slate-900 text-slate-100">ENG215 (Rose)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Overlay Curve Mode Toggle -->
+                                <div class="flex items-center bg-slate-800/90 p-0.5 rounded-xl border border-slate-700" role="group" aria-label="Overlay comparison timeframe">
+                                    <button type="button" id="overlayModeHistoryBtn" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-600 text-white shadow-sm transition cursor-pointer">
+                                        4-Week Trend
+                                    </button>
+                                    <button type="button" id="overlayModeDailyBtn" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer">
+                                        Daily Pace (Mon–Fri)
+                                    </button>
+                                </div>
+
+                                <button type="button"
+                                        id="closeSubjectOverlayBtn"
+                                        aria-label="Close two-subject overlay comparison"
+                                        class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Side-by-Side KPI Comparison Strip -->
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 my-3.5 text-xs">
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-2">
+                                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">This Week Logged</p>
+                                <p id="overlayKpiLogged" class="text-xs sm:text-sm font-extrabold text-white mt-0.5">5.5h vs 4.0h</p>
+                                <p id="overlayKpiLoggedDiff" class="text-[10px] font-semibold text-emerald-400 mt-0.5">CS201 +1.5h ahead</p>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-2">
+                                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Goal Progress</p>
+                                <p id="overlayKpiGoalPct" class="text-xs sm:text-sm font-extrabold text-white mt-0.5">92% vs 80%</p>
+                                <p id="overlayKpiGoalDiff" class="text-[10px] font-semibold text-indigo-300 mt-0.5">+12 pts gap (6h vs 5h)</p>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-2">
+                                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">4-Week Average</p>
+                                <p id="overlayKpiFourWkAvg" class="text-xs sm:text-sm font-extrabold text-white mt-0.5">4.3h vs 3.4h</p>
+                                <p id="overlayKpiFourWkDiff" class="text-[10px] font-semibold text-sky-300 mt-0.5">17.0h vs 13.5h total</p>
+                            </div>
+                            <div class="bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-2">
+                                <p class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Sun Projection &amp; Streak</p>
+                                <p id="overlayKpiProjection" class="text-xs sm:text-sm font-extrabold text-white mt-0.5">7.7h vs 5.7h</p>
+                                <p id="overlayKpiStreak" class="text-[10px] font-semibold text-amber-300 mt-0.5">Streaks: 0 wks vs 1 wk</p>
+                            </div>
+                        </div>
+
+                        <!-- Overlaid Dual-Series Area & Line Comparison SVG -->
+                        <div class="w-full overflow-x-auto relative">
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] mb-2">
+                                <span id="overlayPointDetail" class="text-slate-300 font-medium">Hover or click any point to inspect overlaid hours</span>
+                                <div class="flex flex-wrap items-center gap-3 text-slate-300">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span id="overlayLegendLineA" class="w-4 h-0.5 bg-indigo-400 inline-block"></span>
+                                        <span id="overlayLegendLabelA" class="font-bold text-indigo-300">CS201 (Solid)</span>
+                                    </span>
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <span id="overlayLegendLineB" class="w-4 h-0 border-t-2 border-dashed border-violet-400 inline-block"></span>
+                                        <span id="overlayLegendLabelB" class="font-bold text-violet-300">MATH204 (Dashed)</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <svg id="subjectOverlaySvg" viewBox="0 0 650 212" class="w-full h-52 min-w-[480px]" role="img" aria-label="Overlaid comparison chart for two selected subjects">
+                                <defs id="subjectOverlayDefs"></defs>
+                                <g id="overlayGridLayer"></g>
+                                <g id="overlaySeriesLayer"></g>
+                                <g id="overlayGoalsLayer"></g>
+                                <g id="overlayPointsLayer"></g>
+                            </svg>
+                        </div>
                     </div>
 
                     <!-- 4-Week Subject Progress History Area Chart Panel -->
@@ -2506,6 +2677,15 @@
             }
         };
 
+        // Shared current-week daily study hours logged Mon–Fri (Days 1–5) per subject
+        const SHARED_DAILY_SUBJECT_LOGS = {
+            CS201: [1.0, 0.9, 1.3, 1.1, 1.2],   // 5.5h -> Sun est: 7.74h
+            MATH204: [0.7, 0.8, 0.8, 0.9, 0.8], // 4.0h -> Sun est: 5.66h
+            CS310: [0.8, 0.7, 0.7, 0.7, 0.6],   // 3.5h -> Sun est: 4.90h
+            PHY102: [0.6, 0.5, 0.5, 0.5, 0.4],  // 2.5h -> Sun est: 3.50h
+            ENG215: [0.4, 0.3, 0.3, 0.3, 0.2]   // 1.5h -> Sun est: 2.10h
+        };
+
         (function initSubjectProgressHistory() {
             const container = document.getElementById('subjectChartContainer');
             const chartSvg = document.getElementById('subjectChartSvg');
@@ -2986,16 +3166,8 @@
 
             const SVG_NS = 'http://www.w3.org/2000/svg';
 
-            // Current week daily study hours logged Mon–Fri (Days 1–5) per subject
-            // Sum of each array matches each subject's current logged hours;
-            // OLS linear regression on cumulative progress extrapolates to Day 7 (Sunday).
-            const CURRENT_WEEK_DAILY_LOGS = {
-                CS201: [1.0, 0.9, 1.3, 1.1, 1.2],   // 5.5h -> Sun est: 7.74h
-                MATH204: [0.7, 0.8, 0.8, 0.9, 0.8], // 4.0h -> Sun est: 5.66h
-                CS310: [0.8, 0.7, 0.7, 0.7, 0.6],   // 3.5h -> Sun est: 4.90h
-                PHY102: [0.6, 0.5, 0.5, 0.5, 0.4],  // 2.5h -> Sun est: 3.50h
-                ENG215: [0.4, 0.3, 0.3, 0.3, 0.2]   // 1.5h -> Sun est: 2.10h
-            };
+            // OLS linear regression on cumulative Mon–Fri progress extrapolates to Day 7 (Sunday).
+            const CURRENT_WEEK_DAILY_LOGS = SHARED_DAILY_SUBJECT_LOGS;
 
             function computeLinearRegression(points) {
                 const n = points.length;
@@ -3202,6 +3374,682 @@
             });
 
             renderGoalProjection();
+        })();
+
+        (function initSubjectOverlayComparison() {
+            const container = document.getElementById('subjectChartContainer');
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const overlayBarLayer = document.getElementById('subjectOverlayLayer');
+            const toggleBtn = document.getElementById('toggleSubjectOverlayBtn');
+            const toggleLabel = document.getElementById('toggleSubjectOverlayLabel');
+            const closeBtn = document.getElementById('closeSubjectOverlayBtn');
+            const panel = document.getElementById('subjectOverlayPanel');
+            const selectA = document.getElementById('overlaySubjectASelect');
+            const selectB = document.getElementById('overlaySubjectBSelect');
+            const dotA = document.getElementById('overlaySubjectADot');
+            const dotB = document.getElementById('overlaySubjectBDot');
+            const swapBtn = document.getElementById('overlaySwapSubjectsBtn');
+            const modeHistoryBtn = document.getElementById('overlayModeHistoryBtn');
+            const modeDailyBtn = document.getElementById('overlayModeDailyBtn');
+
+            const legendItem = document.getElementById('subjectOverlayLegend');
+            const legendSwatches = document.getElementById('subjectOverlayLegendSwatches');
+            const legendText = document.getElementById('subjectOverlayLegendText');
+
+            const deltaPill = document.getElementById('subjectOverlayDeltaPill');
+            const filterNote = document.getElementById('subjectOverlayFilterNote');
+            const kpiLogged = document.getElementById('overlayKpiLogged');
+            const kpiLoggedDiff = document.getElementById('overlayKpiLoggedDiff');
+            const kpiGoalPct = document.getElementById('overlayKpiGoalPct');
+            const kpiGoalDiff = document.getElementById('overlayKpiGoalDiff');
+            const kpiFourWkAvg = document.getElementById('overlayKpiFourWkAvg');
+            const kpiFourWkDiff = document.getElementById('overlayKpiFourWkDiff');
+            const kpiProjection = document.getElementById('overlayKpiProjection');
+            const kpiStreak = document.getElementById('overlayKpiStreak');
+
+            const overlaySvg = document.getElementById('subjectOverlaySvg');
+            const overlayDefs = document.getElementById('subjectOverlayDefs');
+            const overlayGridLayer = document.getElementById('overlayGridLayer');
+            const overlaySeriesLayer = document.getElementById('overlaySeriesLayer');
+            const overlayGoalsLayer = document.getElementById('overlayGoalsLayer');
+            const overlayPointsLayer = document.getElementById('overlayPointsLayer');
+            const pointDetailEl = document.getElementById('overlayPointDetail');
+            const legendLineA = document.getElementById('overlayLegendLineA');
+            const legendLabelA = document.getElementById('overlayLegendLabelA');
+            const legendLineB = document.getElementById('overlayLegendLineB');
+            const legendLabelB = document.getElementById('overlayLegendLabelB');
+
+            if (!container || !chartSvg || !toggleBtn || !panel || !selectA || !selectB || !overlaySvg) return;
+
+            const SVG_NS = 'http://www.w3.org/2000/svg';
+            const SUBJECT_COLORS = {
+                CS201: { label: 'Indigo', stroke: '#818cf8', fill: '#6366f1', light: '#a5b4fc', dotClass: 'bg-indigo-500', textClass: 'text-indigo-300', grad: 'gradCS201' },
+                MATH204: { label: 'Violet', stroke: '#c084fc', fill: '#a855f7', light: '#d8b4fe', dotClass: 'bg-violet-500', textClass: 'text-violet-300', grad: 'gradMATH204' },
+                CS310: { label: 'Cyan', stroke: '#22d3ee', fill: '#06b6d4', light: '#67e8f9', dotClass: 'bg-cyan-500', textClass: 'text-cyan-300', grad: 'gradCS310' },
+                PHY102: { label: 'Amber', stroke: '#fbbf24', fill: '#f59e0b', light: '#fcd34d', dotClass: 'bg-amber-500', textClass: 'text-amber-300', grad: 'gradPHY102' },
+                ENG215: { label: 'Rose', stroke: '#fb7185', fill: '#f43f5e', light: '#fda4af', dotClass: 'bg-rose-500', textClass: 'text-rose-300', grad: 'gradENG215' }
+            };
+
+            let isOverlayActive = false;
+            let subjectA = selectA.value || 'CS201';
+            let subjectB = selectB.value || 'MATH204';
+            let overlayMode = 'history'; // 'history' | 'daily'
+
+            function formatHours(val) {
+                const rounded = Math.round(val * 10) / 10;
+                return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '')) + 'h';
+            }
+
+            function getSubjectSnapshot(code) {
+                const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
+                const history = (typeof SHARED_SUBJECT_HISTORY !== 'undefined' && SHARED_SUBJECT_HISTORY[code])
+                    ? SHARED_SUBJECT_HISTORY[code]
+                    : { title: code, weeks: [] };
+                const logged = mainBar ? (parseFloat(mainBar.getAttribute('data-logged') || '0') || 0) : 0;
+                const goalStr = mainBar ? (mainBar.getAttribute('data-goal') || '4h') : '4h';
+                const goal = Math.max(0.5, parseFloat(goalStr.replace('h', '')) || 4);
+                const pct = Math.round((logged / goal) * 100);
+                const projAttr = mainBar ? parseFloat(mainBar.getAttribute('data-proj-hours') || '') : NaN;
+                const projHours = Number.isNaN(projAttr) ? logged : projAttr;
+                const visible = mainBar ? mainBar.style.display !== 'none' : true;
+                const x = mainBar ? parseFloat(mainBar.getAttribute('x') || '0') : 0;
+                const y = mainBar ? parseFloat(mainBar.getAttribute('y') || '165') : 165;
+                const height = mainBar ? parseFloat(mainBar.getAttribute('height') || '0') : 0;
+
+                const weeks = history.weeks.map((w, idx) => {
+                    if (idx === history.weeks.length - 1) {
+                        return { label: w.label, hours: logged };
+                    }
+                    return { label: w.label, hours: w.hours };
+                });
+
+                let streak = 0;
+                for (let i = weeks.length - 1; i >= 0; i--) {
+                    if (weeks[i].hours + 1e-9 >= goal) {
+                        streak++;
+                    } else {
+                        break;
+                    }
+                }
+
+                const dailyRaw = (typeof SHARED_DAILY_SUBJECT_LOGS !== 'undefined' && SHARED_DAILY_SUBJECT_LOGS[code])
+                    ? SHARED_DAILY_SUBJECT_LOGS[code]
+                    : [0.5, 0.5, 0.5, 0.5, 0.5];
+                const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+                let cum = 0;
+                const dailyCumulative = dailyRaw.map((h, idx) => {
+                    cum += h;
+                    return {
+                        label: dayNames[idx] || ('Day ' + (idx + 1)),
+                        dayHours: h,
+                        hours: Math.round(cum * 100) / 100
+                    };
+                });
+
+                const fourWkTotal = weeks.reduce((acc, w) => acc + w.hours, 0);
+                const fourWkAvg = weeks.length ? fourWkTotal / weeks.length : 0;
+
+                return {
+                    code: code,
+                    title: history.title || code,
+                    color: SUBJECT_COLORS[code] || SUBJECT_COLORS.CS201,
+                    logged: logged,
+                    goal: goal,
+                    goalStr: formatHours(goal),
+                    pct: pct,
+                    projHours: projHours,
+                    streak: streak,
+                    visible: visible,
+                    x: x,
+                    y: y,
+                    height: height,
+                    weeks: weeks,
+                    dailyCumulative: dailyCumulative,
+                    fourWkTotal: fourWkTotal,
+                    fourWkAvg: fourWkAvg
+                };
+            }
+
+            function buildSmoothAreaPaths(coords, baselineY) {
+                if (!coords.length) return { linePath: '', areaPath: '' };
+                let linePath = 'M ' + coords[0].x + ' ' + coords[0].y;
+                for (let i = 0; i < coords.length - 1; i++) {
+                    const p0 = coords[i];
+                    const p1 = coords[i + 1];
+                    const midX = ((p0.x + p1.x) / 2).toFixed(1);
+                    linePath += ' C ' + midX + ' ' + p0.y + ', ' + midX + ' ' + p1.y + ', ' + p1.x + ' ' + p1.y;
+                }
+                const last = coords[coords.length - 1];
+                const first = coords[0];
+                const areaPath = linePath + ' L ' + last.x + ' ' + baselineY + ' L ' + first.x + ' ' + baselineY + ' Z';
+                return { linePath: linePath, areaPath: areaPath };
+            }
+
+            function renderMainBarOverlay(snapA, snapB) {
+                if (!overlayBarLayer) return;
+                overlayBarLayer.innerHTML = '';
+
+                chartSvg.querySelectorAll('[data-subject]').forEach((el) => {
+                    el.classList.remove('subject-overlay-dimmed', 'subject-overlay-primary', 'subject-overlay-secondary');
+                });
+
+                if (!isOverlayActive) return;
+
+                chartSvg.querySelectorAll('[data-subject]').forEach((el) => {
+                    const subj = el.getAttribute('data-subject');
+                    if (subj !== snapA.code && subj !== snapB.code) {
+                        el.classList.add('subject-overlay-dimmed');
+                    } else if (el.classList.contains('subject-main-bar')) {
+                        el.classList.add(subj === snapA.code ? 'subject-overlay-primary' : 'subject-overlay-secondary');
+                    }
+                });
+
+                if (!snapA.visible || !snapB.visible) return;
+
+                // Draw Subject B overlaid directly inside/on top of Subject A's column at the exact same baseline (y = 165)
+                const overlayX = snapA.x + 8;
+                const overlayW = 39;
+
+                const ghostRect = document.createElementNS(SVG_NS, 'rect');
+                ghostRect.setAttribute('x', overlayX.toFixed(1));
+                ghostRect.setAttribute('y', snapB.y.toFixed(1));
+                ghostRect.setAttribute('width', String(overlayW));
+                ghostRect.setAttribute('height', Math.max(4, snapB.height).toFixed(1));
+                ghostRect.setAttribute('rx', '5');
+                ghostRect.setAttribute('fill', 'url(#' + snapB.color.grad + ')');
+                ghostRect.setAttribute('fill-opacity', '0.68');
+                ghostRect.setAttribute('stroke', snapB.color.light);
+                ghostRect.setAttribute('stroke-width', '1.8');
+                ghostRect.setAttribute('stroke-dasharray', '4 2');
+                overlayBarLayer.appendChild(ghostRect);
+
+                // Subject B's goal marker line overlaid across Subject A's bar
+                const goalBY = Math.max(15, Math.min(165, Math.round(165 - snapB.goal * 18)));
+                const goalLineB = document.createElementNS(SVG_NS, 'line');
+                goalLineB.setAttribute('x1', (snapA.x + 2).toFixed(1));
+                goalLineB.setAttribute('x2', (snapA.x + 53).toFixed(1));
+                goalLineB.setAttribute('y1', String(goalBY));
+                goalLineB.setAttribute('y2', String(goalBY));
+                goalLineB.setAttribute('stroke', snapB.color.light);
+                goalLineB.setAttribute('stroke-width', '1.5');
+                goalLineB.setAttribute('stroke-dasharray', '2 2');
+                goalLineB.setAttribute('opacity', '0.9');
+                overlayBarLayer.appendChild(goalLineB);
+
+                // Compact overlaid comparison badge anchored cleanly inside the bar base
+                const diff = Math.round((snapA.logged - snapB.logged) * 10) / 10;
+                const diffLabel = snapB.code + ' ' + snapB.logged.toFixed(1) + 'h (' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'h)';
+                const centerX = snapA.x + 27.5;
+                const pillW = Math.max(76, diffLabel.length * 4.8 + 10);
+                const pillY = 147;
+
+                const pillBg = document.createElementNS(SVG_NS, 'rect');
+                pillBg.setAttribute('x', (centerX - pillW / 2).toFixed(1));
+                pillBg.setAttribute('y', String(pillY));
+                pillBg.setAttribute('width', pillW.toFixed(1));
+                pillBg.setAttribute('height', '14');
+                pillBg.setAttribute('rx', '7');
+                pillBg.setAttribute('fill', '#0f172a');
+                pillBg.setAttribute('fill-opacity', '0.94');
+                pillBg.setAttribute('stroke', snapB.color.light);
+                pillBg.setAttribute('stroke-width', '1.1');
+                overlayBarLayer.appendChild(pillBg);
+
+                const pillText = document.createElementNS(SVG_NS, 'text');
+                pillText.setAttribute('x', centerX.toFixed(1));
+                pillText.setAttribute('y', String(pillY + 9.8));
+                pillText.setAttribute('fill', snapB.color.light);
+                pillText.setAttribute('font-size', '7.8');
+                pillText.setAttribute('font-weight', 'bold');
+                pillText.setAttribute('text-anchor', 'middle');
+                pillText.textContent = diffLabel;
+                overlayBarLayer.appendChild(pillText);
+            }
+
+            function renderOverlayChart(snapA, snapB) {
+                if (!overlaySeriesLayer || !overlayGridLayer || !overlayPointsLayer || !overlayDefs || !overlayGoalsLayer) return;
+
+                // Ensure gradients for A and B exist in overlaySvg defs
+                overlayDefs.innerHTML =
+                    '<linearGradient id="overlayAreaGradA" x1="0%" y1="0%" x2="0%" y2="100%">' +
+                        '<stop offset="0%" stop-color="' + snapA.color.stroke + '" stop-opacity="0.42" />' +
+                        '<stop offset="85%" stop-color="' + snapA.color.fill + '" stop-opacity="0.10" />' +
+                        '<stop offset="100%" stop-color="#0f172a" stop-opacity="0.0" />' +
+                    '</linearGradient>' +
+                    '<linearGradient id="overlayAreaGradB" x1="0%" y1="0%" x2="0%" y2="100%">' +
+                        '<stop offset="0%" stop-color="' + snapB.color.stroke + '" stop-opacity="0.34" />' +
+                        '<stop offset="85%" stop-color="' + snapB.color.fill + '" stop-opacity="0.08" />' +
+                        '<stop offset="100%" stop-color="#0f172a" stop-opacity="0.0" />' +
+                    '</linearGradient>';
+
+                const seriesA = overlayMode === 'daily' ? snapA.dailyCumulative : snapA.weeks;
+                const seriesB = overlayMode === 'daily' ? snapB.dailyCumulative : snapB.weeks;
+
+                const leftX = 64;
+                const rightX = 596;
+                const topY = 24;
+                const bottomY = 172;
+                const chartHeight = bottomY - topY;
+
+                const maxVal = Math.max(
+                    snapA.goal * 1.1,
+                    snapB.goal * 1.1,
+                    ...seriesA.map((p) => p.hours * 1.15),
+                    ...seriesB.map((p) => p.hours * 1.15),
+                    4
+                );
+                const yMax = Math.ceil(maxVal);
+
+                overlayGridLayer.innerHTML = '';
+                [0, 0.333, 0.667, 1].forEach((frac, idx) => {
+                    const val = Math.round(yMax * frac * 10) / 10;
+                    const y = Math.round((bottomY - frac * chartHeight) * 10) / 10;
+
+                    const line = document.createElementNS(SVG_NS, 'line');
+                    line.setAttribute('x1', String(leftX));
+                    line.setAttribute('y1', String(y));
+                    line.setAttribute('x2', String(rightX));
+                    line.setAttribute('y2', String(y));
+                    line.setAttribute('stroke', '#334155');
+                    if (idx > 0) line.setAttribute('stroke-dasharray', '3 3');
+                    overlayGridLayer.appendChild(line);
+
+                    const txt = document.createElementNS(SVG_NS, 'text');
+                    txt.setAttribute('x', String(leftX - 10));
+                    txt.setAttribute('y', String(y + 4));
+                    txt.setAttribute('fill', '#94a3b8');
+                    txt.setAttribute('font-size', '10');
+                    txt.setAttribute('text-anchor', 'end');
+                    txt.textContent = formatHours(val);
+                    overlayGridLayer.appendChild(txt);
+                });
+
+                const count = Math.max(1, seriesA.length);
+                const stepX = count > 1 ? (rightX - leftX) / (count - 1) : 0;
+
+                const coordsA = seriesA.map((pt, idx) => {
+                    const x = Math.round(leftX + idx * stepX);
+                    const y = Math.round((bottomY - Math.max(0, Math.min(1, pt.hours / yMax)) * chartHeight) * 10) / 10;
+                    return { x: x, y: y, hours: pt.hours, label: pt.label, dayHours: pt.dayHours };
+                });
+
+                const coordsB = seriesB.map((pt, idx) => {
+                    const x = Math.round(leftX + idx * stepX);
+                    const y = Math.round((bottomY - Math.max(0, Math.min(1, pt.hours / yMax)) * chartHeight) * 10) / 10;
+                    return { x: x, y: y, hours: pt.hours, label: pt.label, dayHours: pt.dayHours };
+                });
+
+                // Render overlaid goal reference lines
+                overlayGoalsLayer.innerHTML = '';
+                [
+                    { snap: snapA, anchor: 'start', xLabel: leftX + 4, dashed: '4 4' },
+                    { snap: snapB, anchor: 'end', xLabel: rightX - 4, dashed: '2 3' }
+                ].forEach((cfg) => {
+                    const gY = Math.round((bottomY - Math.max(0, Math.min(1, cfg.snap.goal / yMax)) * chartHeight) * 10) / 10;
+                    const gLine = document.createElementNS(SVG_NS, 'line');
+                    gLine.setAttribute('x1', String(leftX));
+                    gLine.setAttribute('x2', String(rightX));
+                    gLine.setAttribute('y1', String(gY));
+                    gLine.setAttribute('y2', String(gY));
+                    gLine.setAttribute('stroke', cfg.snap.color.light);
+                    gLine.setAttribute('stroke-width', '1.2');
+                    gLine.setAttribute('stroke-dasharray', cfg.dashed);
+                    gLine.setAttribute('opacity', '0.7');
+                    overlayGoalsLayer.appendChild(gLine);
+
+                    const gLbl = document.createElementNS(SVG_NS, 'text');
+                    gLbl.setAttribute('x', String(cfg.xLabel));
+                    gLbl.setAttribute('y', String(Math.max(12, gY - 4)));
+                    gLbl.setAttribute('fill', cfg.snap.color.light);
+                    gLbl.setAttribute('font-size', '9');
+                    gLbl.setAttribute('font-weight', 'bold');
+                    gLbl.setAttribute('text-anchor', cfg.anchor);
+                    gLbl.textContent = cfg.snap.code + ' Goal: ' + cfg.snap.goalStr;
+                    overlayGoalsLayer.appendChild(gLbl);
+                });
+
+                // Render both area + line paths on top of each other
+                overlaySeriesLayer.innerHTML = '';
+                const pathsA = buildSmoothAreaPaths(coordsA, bottomY);
+                const pathsB = buildSmoothAreaPaths(coordsB, bottomY);
+
+                const areaA = document.createElementNS(SVG_NS, 'path');
+                areaA.setAttribute('d', pathsA.areaPath);
+                areaA.setAttribute('fill', 'url(#overlayAreaGradA)');
+                overlaySeriesLayer.appendChild(areaA);
+
+                const areaB = document.createElementNS(SVG_NS, 'path');
+                areaB.setAttribute('d', pathsB.areaPath);
+                areaB.setAttribute('fill', 'url(#overlayAreaGradB)');
+                overlaySeriesLayer.appendChild(areaB);
+
+                // Vertical gap connectors at each X tick
+                coordsA.forEach((pA, idx) => {
+                    const pB = coordsB[idx];
+                    if (!pB) return;
+                    const gapLine = document.createElementNS(SVG_NS, 'line');
+                    gapLine.setAttribute('x1', String(pA.x));
+                    gapLine.setAttribute('x2', String(pA.x));
+                    gapLine.setAttribute('y1', String(pA.y));
+                    gapLine.setAttribute('y2', String(pB.y));
+                    gapLine.setAttribute('stroke', '#94a3b8');
+                    gapLine.setAttribute('stroke-width', '1.2');
+                    gapLine.setAttribute('stroke-dasharray', '2 2');
+                    gapLine.setAttribute('opacity', '0.55');
+                    overlaySeriesLayer.appendChild(gapLine);
+                });
+
+                const lineA = document.createElementNS(SVG_NS, 'path');
+                lineA.setAttribute('d', pathsA.linePath);
+                lineA.setAttribute('fill', 'none');
+                lineA.setAttribute('stroke', snapA.color.stroke);
+                lineA.setAttribute('stroke-width', '3');
+                lineA.setAttribute('stroke-linecap', 'round');
+                lineA.setAttribute('stroke-linejoin', 'round');
+                overlaySeriesLayer.appendChild(lineA);
+
+                const lineB = document.createElementNS(SVG_NS, 'path');
+                lineB.setAttribute('d', pathsB.linePath);
+                lineB.setAttribute('fill', 'none');
+                lineB.setAttribute('stroke', snapB.color.stroke);
+                lineB.setAttribute('stroke-width', '2.6');
+                lineB.setAttribute('stroke-dasharray', '6 3');
+                lineB.setAttribute('stroke-linecap', 'round');
+                lineB.setAttribute('stroke-linejoin', 'round');
+                overlaySeriesLayer.appendChild(lineB);
+
+                // Render interactive point pairs & X-axis labels
+                overlayPointsLayer.innerHTML = '';
+                coordsA.forEach((pA, idx) => {
+                    const pB = coordsB[idx] || { x: pA.x, y: bottomY, hours: 0, label: pA.label };
+
+                    const xLbl = document.createElementNS(SVG_NS, 'text');
+                    xLbl.setAttribute('x', String(pA.x));
+                    xLbl.setAttribute('y', String(bottomY + 20));
+                    xLbl.setAttribute('fill', idx === coordsA.length - 1 ? '#f8fafc' : '#94a3b8');
+                    xLbl.setAttribute('font-size', '10.5');
+                    xLbl.setAttribute('font-weight', idx === coordsA.length - 1 ? 'bold' : 'normal');
+                    xLbl.setAttribute('text-anchor', 'middle');
+                    xLbl.textContent = pA.label;
+                    overlayPointsLayer.appendChild(xLbl);
+
+                    // Value tags offset cleanly so they don't collide
+                    const aAbove = pA.y <= pB.y;
+                    const tagA = document.createElementNS(SVG_NS, 'text');
+                    tagA.setAttribute('x', String(pA.x));
+                    tagA.setAttribute('y', String(aAbove ? Math.max(12, pA.y - 10) : Math.min(bottomY - 4, pA.y + 15)));
+                    tagA.setAttribute('fill', snapA.color.light);
+                    tagA.setAttribute('font-size', '9.5');
+                    tagA.setAttribute('font-weight', 'bold');
+                    tagA.setAttribute('text-anchor', 'middle');
+                    tagA.setAttribute('stroke', '#0f172a');
+                    tagA.setAttribute('stroke-width', '2.4');
+                    tagA.setAttribute('paint-order', 'stroke');
+                    tagA.textContent = pA.hours.toFixed(1) + 'h';
+                    overlayPointsLayer.appendChild(tagA);
+
+                    const tagB = document.createElementNS(SVG_NS, 'text');
+                    tagB.setAttribute('x', String(pB.x));
+                    tagB.setAttribute('y', String(aAbove ? Math.min(bottomY - 4, pB.y + 15) : Math.max(12, pB.y - 10)));
+                    tagB.setAttribute('fill', snapB.color.light);
+                    tagB.setAttribute('font-size', '9.5');
+                    tagB.setAttribute('font-weight', 'bold');
+                    tagB.setAttribute('text-anchor', 'middle');
+                    tagB.setAttribute('stroke', '#0f172a');
+                    tagB.setAttribute('stroke-width', '2.4');
+                    tagB.setAttribute('paint-order', 'stroke');
+                    tagB.textContent = pB.hours.toFixed(1) + 'h';
+                    overlayPointsLayer.appendChild(tagB);
+
+                    const dotBEl = document.createElementNS(SVG_NS, 'circle');
+                    dotBEl.setAttribute('cx', String(pB.x));
+                    dotBEl.setAttribute('cy', String(pB.y));
+                    dotBEl.setAttribute('r', '4.5');
+                    dotBEl.setAttribute('fill', '#0f172a');
+                    dotBEl.setAttribute('stroke', snapB.color.stroke);
+                    dotBEl.setAttribute('stroke-width', '2.2');
+                    overlayPointsLayer.appendChild(dotBEl);
+
+                    const dotAEl = document.createElementNS(SVG_NS, 'circle');
+                    dotAEl.setAttribute('cx', String(pA.x));
+                    dotAEl.setAttribute('cy', String(pA.y));
+                    dotAEl.setAttribute('r', '5');
+                    dotAEl.setAttribute('fill', '#0f172a');
+                    dotAEl.setAttribute('stroke', snapA.color.stroke);
+                    dotAEl.setAttribute('stroke-width', '2.5');
+                    overlayPointsLayer.appendChild(dotAEl);
+
+                    // Invisible hit column for effortless hover/focus inspection
+                    const hitRect = document.createElementNS(SVG_NS, 'rect');
+                    hitRect.setAttribute('x', String(pA.x - 28));
+                    hitRect.setAttribute('y', String(topY - 8));
+                    hitRect.setAttribute('width', '56');
+                    hitRect.setAttribute('height', String(chartHeight + 16));
+                    hitRect.setAttribute('fill', 'transparent');
+                    hitRect.setAttribute('tabindex', '0');
+                    hitRect.setAttribute('role', 'button');
+                    const gapVal = Math.round((pA.hours - pB.hours) * 10) / 10;
+                    const gapStr = (gapVal >= 0 ? '+' : '') + gapVal.toFixed(1) + 'h';
+                    hitRect.setAttribute('aria-label', pA.label + ': ' + snapA.code + ' ' + pA.hours.toFixed(1) + 'h vs ' + snapB.code + ' ' + pB.hours.toFixed(1) + 'h (' + gapStr + ')');
+                    hitRect.style.cursor = 'pointer';
+
+                    const inspectPoint = () => {
+                        if (pointDetailEl) {
+                            const extra = overlayMode === 'daily' && typeof pA.dayHours === 'number'
+                                ? (' (Day: ' + pA.dayHours.toFixed(1) + 'h vs ' + pB.dayHours.toFixed(1) + 'h)')
+                                : '';
+                            pointDetailEl.textContent = pA.label + ': ' + snapA.code + ' ' + pA.hours.toFixed(1) + 'h vs ' + snapB.code + ' ' + pB.hours.toFixed(1) + 'h • Gap: ' + gapStr + extra;
+                        }
+                        dotAEl.setAttribute('r', '7');
+                        dotBEl.setAttribute('r', '6.5');
+                    };
+                    const resetPoint = () => {
+                        dotAEl.setAttribute('r', '5');
+                        dotBEl.setAttribute('r', '4.5');
+                    };
+
+                    hitRect.addEventListener('mouseenter', inspectPoint);
+                    hitRect.addEventListener('focus', inspectPoint);
+                    hitRect.addEventListener('click', inspectPoint);
+                    hitRect.addEventListener('mouseleave', resetPoint);
+                    hitRect.addEventListener('blur', resetPoint);
+                    overlayPointsLayer.appendChild(hitRect);
+                });
+
+                if (pointDetailEl && coordsA.length) {
+                    const lastA = coordsA[coordsA.length - 1];
+                    const lastB = coordsB[coordsB.length - 1];
+                    const lastGap = Math.round((lastA.hours - lastB.hours) * 10) / 10;
+                    const lastGapStr = (lastGap >= 0 ? '+' : '') + lastGap.toFixed(1) + 'h';
+                    pointDetailEl.textContent = lastA.label + ': ' + snapA.code + ' ' + lastA.hours.toFixed(1) + 'h vs ' + snapB.code + ' ' + lastB.hours.toFixed(1) + 'h • Gap: ' + lastGapStr;
+                }
+            }
+
+            function renderOverlayAll() {
+                const snapA = getSubjectSnapshot(subjectA);
+                const snapB = getSubjectSnapshot(subjectB);
+
+                if (dotA) dotA.className = 'w-2.5 h-2.5 rounded-full ' + snapA.color.dotClass + ' shrink-0';
+                if (dotB) dotB.className = 'w-2.5 h-2.5 rounded-full ' + snapB.color.dotClass + ' shrink-0';
+
+                if (legendSwatches) {
+                    legendSwatches.innerHTML =
+                        '<span class="w-2.5 h-2.5 rounded-sm ' + snapA.color.dotClass + ' ring-1 ring-white/60 inline-block"></span>' +
+                        '<span class="w-2.5 h-2.5 rounded-sm ' + snapB.color.dotClass + ' border border-dashed border-white/80 inline-block"></span>';
+                }
+                if (legendText) {
+                    legendText.textContent = 'Overlay: ' + snapA.code + ' vs ' + snapB.code;
+                }
+                if (legendItem) {
+                    legendItem.classList.toggle('hidden', !isOverlayActive);
+                }
+
+                renderMainBarOverlay(snapA, snapB);
+
+                if (!isOverlayActive) return;
+
+                if (filterNote) {
+                    filterNote.classList.toggle('hidden', snapA.visible && snapB.visible);
+                }
+
+                const loggedDiff = Math.round((snapA.logged - snapB.logged) * 10) / 10;
+                const pctDiff = snapA.pct - snapB.pct;
+                const avgDiff = Math.round((snapA.fourWkAvg - snapB.fourWkAvg) * 10) / 10;
+
+                if (deltaPill) {
+                    if (Math.abs(loggedDiff) < 0.05) {
+                        deltaPill.textContent = snapA.code + ' & ' + snapB.code + ' tied at ' + snapA.logged.toFixed(1) + 'h';
+                    } else if (loggedDiff > 0) {
+                        deltaPill.textContent = snapA.code + ' +' + loggedDiff.toFixed(1) + 'h ahead of ' + snapB.code;
+                    } else {
+                        deltaPill.textContent = snapB.code + ' +' + Math.abs(loggedDiff).toFixed(1) + 'h ahead of ' + snapA.code;
+                    }
+                }
+
+                if (kpiLogged) kpiLogged.textContent = snapA.logged.toFixed(1) + 'h vs ' + snapB.logged.toFixed(1) + 'h';
+                if (kpiLoggedDiff) {
+                    kpiLoggedDiff.textContent = loggedDiff === 0
+                        ? 'Even this week'
+                        : (loggedDiff > 0 ? snapA.code + ' +' + loggedDiff.toFixed(1) + 'h ahead' : snapB.code + ' +' + Math.abs(loggedDiff).toFixed(1) + 'h ahead');
+                    kpiLoggedDiff.className = loggedDiff >= 0 ? 'text-[10px] font-semibold text-emerald-400 mt-0.5' : 'text-[10px] font-semibold text-amber-300 mt-0.5';
+                }
+
+                if (kpiGoalPct) kpiGoalPct.textContent = snapA.pct + '% vs ' + snapB.pct + '%';
+                if (kpiGoalDiff) {
+                    kpiGoalDiff.textContent = (pctDiff >= 0 ? '+' : '') + pctDiff + ' pts (' + snapA.goalStr + ' vs ' + snapB.goalStr + ')';
+                }
+
+                if (kpiFourWkAvg) kpiFourWkAvg.textContent = snapA.fourWkAvg.toFixed(1) + 'h vs ' + snapB.fourWkAvg.toFixed(1) + 'h';
+                if (kpiFourWkDiff) {
+                    kpiFourWkDiff.textContent = snapA.fourWkTotal.toFixed(1) + 'h vs ' + snapB.fourWkTotal.toFixed(1) + 'h total (' + (avgDiff >= 0 ? '+' : '') + avgDiff.toFixed(1) + 'h/wk)';
+                }
+
+                if (kpiProjection) kpiProjection.textContent = snapA.projHours.toFixed(1) + 'h vs ' + snapB.projHours.toFixed(1) + 'h';
+                if (kpiStreak) {
+                    const fmtStreak = (n) => n === 1 ? '1 wk' : (n + ' wks');
+                    kpiStreak.textContent = 'Streaks: ' + fmtStreak(snapA.streak) + ' vs ' + fmtStreak(snapB.streak);
+                }
+
+                if (legendLineA) {
+                    legendLineA.style.backgroundColor = snapA.color.stroke;
+                }
+                if (legendLabelA) {
+                    legendLabelA.textContent = snapA.code + ' (Solid)';
+                    legendLabelA.className = 'font-bold ' + snapA.color.textClass;
+                }
+                if (legendLineB) {
+                    legendLineB.style.borderColor = snapB.color.stroke;
+                }
+                if (legendLabelB) {
+                    legendLabelB.textContent = snapB.code + ' (Dashed)';
+                    legendLabelB.className = 'font-bold ' + snapB.color.textClass;
+                }
+
+                renderOverlayChart(snapA, snapB);
+            }
+
+            function setOverlayOpen(open) {
+                isOverlayActive = open;
+                panel.classList.toggle('hidden', !open);
+                panel.setAttribute('aria-hidden', String(!open));
+                toggleBtn.setAttribute('aria-pressed', String(open));
+                toggleBtn.setAttribute('aria-expanded', String(open));
+                if (toggleLabel) {
+                    toggleLabel.textContent = open ? 'Hide Overlay Compare' : 'Overlay Compare (2)';
+                }
+                toggleBtn.className = open
+                    ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500 text-white font-semibold text-[11px] border border-violet-300/60 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400'
+                    : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-600/85 hover:bg-violet-500 text-white font-semibold text-[11px] border border-violet-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400';
+
+                renderOverlayAll();
+            }
+
+            function setOverlayMode(mode) {
+                overlayMode = mode;
+                if (modeHistoryBtn) {
+                    modeHistoryBtn.className = mode === 'history'
+                        ? 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-600 text-white shadow-sm transition cursor-pointer'
+                        : 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer';
+                }
+                if (modeDailyBtn) {
+                    modeDailyBtn.className = mode === 'daily'
+                        ? 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-600 text-white shadow-sm transition cursor-pointer'
+                        : 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer';
+                }
+                if (isOverlayActive) {
+                    renderOverlayAll();
+                }
+            }
+
+            toggleBtn.addEventListener('click', () => {
+                setOverlayOpen(!isOverlayActive);
+            });
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => setOverlayOpen(false));
+            }
+
+            selectA.addEventListener('change', () => {
+                const nextA = selectA.value;
+                if (nextA === subjectB) {
+                    subjectB = subjectA;
+                    selectB.value = subjectB;
+                }
+                subjectA = nextA;
+                renderOverlayAll();
+            });
+
+            selectB.addEventListener('change', () => {
+                const nextB = selectB.value;
+                if (nextB === subjectA) {
+                    subjectA = subjectB;
+                    selectA.value = subjectA;
+                }
+                subjectB = nextB;
+                renderOverlayAll();
+            });
+
+            if (swapBtn) {
+                swapBtn.addEventListener('click', () => {
+                    const prevA = subjectA;
+                    subjectA = subjectB;
+                    subjectB = prevA;
+                    selectA.value = subjectA;
+                    selectB.value = subjectB;
+                    renderOverlayAll();
+                });
+            }
+
+            if (modeHistoryBtn) modeHistoryBtn.addEventListener('click', () => setOverlayMode('history'));
+            if (modeDailyBtn) modeDailyBtn.addEventListener('click', () => setOverlayMode('daily'));
+
+            // Keep overlay synchronized with goal updates, sorting, drag reordering, and filters
+            document.addEventListener('subjectChartDataUpdated', () => requestAnimationFrame(renderOverlayAll));
+            chartSvg.addEventListener('subjectBarsReordered', () => requestAnimationFrame(renderOverlayAll));
+            const sortSelect = document.getElementById('subjectSortSelect');
+            if (sortSelect) {
+                sortSelect.addEventListener('change', () => requestAnimationFrame(renderOverlayAll));
+            }
+            container.querySelectorAll('.subject-filter-checkbox').forEach((cb) => {
+                cb.addEventListener('change', renderOverlayAll);
+            });
+            const selectAllBtn = document.getElementById('subjectSelectAllBtn');
+            const clearAllBtn = document.getElementById('subjectClearAllBtn');
+            if (selectAllBtn) selectAllBtn.addEventListener('click', () => requestAnimationFrame(renderOverlayAll));
+            if (clearAllBtn) clearAllBtn.addEventListener('click', () => requestAnimationFrame(renderOverlayAll));
+            chartSvg.addEventListener('pointerdown', () => {
+                if (isOverlayActive && overlayBarLayer) {
+                    overlayBarLayer.style.opacity = '0.35';
+                }
+            });
+            window.addEventListener('pointerup', () => {
+                if (overlayBarLayer) overlayBarLayer.style.opacity = '1';
+                if (isOverlayActive) requestAnimationFrame(renderOverlayAll);
+            });
+            window.addEventListener('pointercancel', () => {
+                if (overlayBarLayer) overlayBarLayer.style.opacity = '1';
+                if (isOverlayActive) requestAnimationFrame(renderOverlayAll);
+            });
         })();
     </script>
 
