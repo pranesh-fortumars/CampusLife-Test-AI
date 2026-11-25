@@ -382,6 +382,18 @@
                             <span id="copyShareLinkLabel">Copy Share Link</span>
                         </button>
                         <button type="button"
+                                id="shareQrCodeBtn"
+                                aria-haspopup="dialog"
+                                aria-expanded="false"
+                                aria-controls="shareQrModal"
+                                title="Generate a scannable QR code pointing to this filtered analytics permalink"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/35 text-sky-200 hover:text-white text-xs font-semibold border border-sky-400/40 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-400">
+                            <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h2m4 0h-2m-2-3v2m4 4v-2m-4 2h2"/>
+                            </svg>
+                            <span>QR Code</span>
+                        </button>
+                        <button type="button"
                                 id="shareAnalyticsBtn"
                                 aria-haspopup="dialog"
                                 aria-expanded="false"
@@ -2753,9 +2765,11 @@
                     const filterMenu = document.getElementById('subjectFilterMenu');
                     const goalsModal = document.getElementById('bulkGoalsModal');
                     const shareModal = document.getElementById('shareAnalyticsModal');
+                    const qrModal = document.getElementById('shareQrModal');
                     if ((filterMenu && !filterMenu.classList.contains('hidden')) ||
                         (goalsModal && !goalsModal.classList.contains('hidden')) ||
-                        (shareModal && !shareModal.classList.contains('hidden'))) {
+                        (shareModal && !shareModal.classList.contains('hidden')) ||
+                        (qrModal && !qrModal.classList.contains('hidden'))) {
                         return;
                     }
                     setFocusMode(false);
@@ -5418,7 +5432,172 @@
                 showCopyFeedback(permalink, copied);
             });
 
+            window.getAnalyticsPermalink = buildAnalyticsPermalink;
+            window.copyAnalyticsTextToClipboard = copyTextToClipboard;
+
             restoreAnalyticsViewFromPermalink();
+        })();
+
+        (function initAnalyticsQrCodeModal() {
+            const qrBtn = document.getElementById('shareQrCodeBtn');
+            const modal = document.getElementById('shareQrModal');
+            const closeBtn = document.getElementById('closeShareQrModalBtn');
+            const cancelBtn = document.getElementById('cancelShareQrBtn');
+            const qrImg = document.getElementById('shareQrCodeImg');
+            const loadingEl = document.getElementById('shareQrLoadingState');
+            const errorEl = document.getElementById('shareQrErrorState');
+            const permalinkTextEl = document.getElementById('shareQrPermalinkText');
+            const copyUrlBtn = document.getElementById('shareQrCopyUrlBtn');
+            const copyUrlLabel = document.getElementById('shareQrCopyUrlLabel');
+            const downloadBtn = document.getElementById('shareQrDownloadBtn');
+            const viewBadge = document.getElementById('shareQrViewBadge');
+            const subjectsBadge = document.getElementById('shareQrSubjectsBadge');
+            const sortBadge = document.getElementById('shareQrSortBadge');
+            const tokenBadge = document.getElementById('shareQrTokenBadge');
+
+            if (!qrBtn || !modal || !qrImg) return;
+
+            let activePermalink = '';
+            let activeQrUrl = '';
+            let copyResetTimer = null;
+
+            function formatSortLabel(sortVal) {
+                switch (sortVal) {
+                    case 'hours-desc': return 'Most Hours';
+                    case 'hours-asc': return 'Least Hours';
+                    case 'goal-pct-desc': return 'Goal %';
+                    case 'alpha-asc': return 'A–Z';
+                    case 'custom': return 'Custom Order';
+                    default: return sortVal || 'Default';
+                }
+            }
+
+            function updateSummaryBadges(permalink) {
+                try {
+                    const parsed = new URL(permalink);
+                    const params = parsed.searchParams;
+                    const view = params.get('view') === 'weekly' ? 'Weekly Trend' : 'By Subject';
+                    const subjectsParam = params.get('subjects') || '';
+                    const subjectCount = (subjectsParam && subjectsParam !== 'none')
+                        ? subjectsParam.split(',').filter(Boolean).length
+                        : 0;
+                    const sortLabel = formatSortLabel(params.get('sort') || 'hours-desc');
+                    const token = params.get('v') || '';
+
+                    if (viewBadge) viewBadge.textContent = 'View: ' + view;
+                    if (subjectsBadge) subjectsBadge.textContent = 'Subjects: ' + subjectCount + '/5';
+                    if (sortBadge) sortBadge.textContent = 'Sort: ' + sortLabel;
+                    if (tokenBadge) tokenBadge.textContent = token ? ('ID: #' + token) : 'Live View';
+                } catch (_) {}
+            }
+
+            function openQrModal() {
+                activePermalink = typeof window.getAnalyticsPermalink === 'function'
+                    ? window.getAnalyticsPermalink()
+                    : window.location.href;
+
+                try {
+                    if (window.history && typeof window.history.replaceState === 'function') {
+                        window.history.replaceState(null, '', activePermalink);
+                    }
+                } catch (_) {}
+
+                activeQrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&format=png&data='
+                    + encodeURIComponent(activePermalink);
+
+                if (permalinkTextEl) {
+                    permalinkTextEl.textContent = activePermalink;
+                }
+                updateSummaryBadges(activePermalink);
+
+                if (loadingEl) loadingEl.classList.remove('hidden');
+                if (errorEl) errorEl.classList.add('hidden');
+                qrImg.classList.add('opacity-0');
+                qrImg.src = activeQrUrl;
+                if (qrImg.complete && qrImg.naturalWidth > 0) {
+                    if (loadingEl) loadingEl.classList.add('hidden');
+                    qrImg.classList.remove('opacity-0');
+                }
+
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                qrBtn.setAttribute('aria-expanded', 'true');
+            }
+
+            function closeQrModal() {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                qrBtn.setAttribute('aria-expanded', 'false');
+            }
+
+            qrImg.addEventListener('load', () => {
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (errorEl) errorEl.classList.add('hidden');
+                qrImg.classList.remove('opacity-0');
+            });
+
+            qrImg.addEventListener('error', () => {
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (errorEl) errorEl.classList.remove('hidden');
+            });
+
+            qrBtn.addEventListener('click', openQrModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeQrModal);
+            if (cancelBtn) cancelBtn.addEventListener('click', closeQrModal);
+
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeQrModal();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeQrModal();
+                }
+            });
+
+            if (copyUrlBtn) {
+                copyUrlBtn.addEventListener('click', async () => {
+                    if (!activePermalink) return;
+                    let copied = false;
+                    if (typeof window.copyAnalyticsTextToClipboard === 'function') {
+                        copied = await window.copyAnalyticsTextToClipboard(activePermalink);
+                    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                        try {
+                            await navigator.clipboard.writeText(activePermalink);
+                            copied = true;
+                        } catch (_) {}
+                    }
+                    if (copyUrlLabel) {
+                        copyUrlLabel.textContent = copied ? 'Copied ✓' : 'Selected';
+                    }
+                    if (copyResetTimer) clearTimeout(copyResetTimer);
+                    copyResetTimer = setTimeout(() => {
+                        if (copyUrlLabel) copyUrlLabel.textContent = 'Copy Link';
+                    }, 2500);
+                });
+            }
+
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', async () => {
+                    if (!activeQrUrl) return;
+                    const filename = 'campuslife-analytics-qr-' + new Date().toISOString().slice(0, 10) + '.png';
+                    try {
+                        const resp = await fetch(activeQrUrl);
+                        if (!resp.ok) throw new Error('QR fetch failed');
+                        const blob = await resp.blob();
+                        const objectUrl = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = objectUrl;
+                        link.download = filename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+                    } catch (_) {
+                        window.open(activeQrUrl, '_blank', 'noopener,noreferrer');
+                    }
+                });
+            }
         })();
     </script>
 
@@ -5718,6 +5897,102 @@
             <div class="px-6 py-3.5 bg-slate-900/95 border-t border-slate-800 flex items-center justify-end">
                 <button type="button"
                         id="cancelShareAnalyticsBtn"
+                        class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Peer QR Code Permalink Modal -->
+    <div id="shareQrModal"
+         role="dialog"
+         aria-modal="true"
+         aria-hidden="true"
+         aria-labelledby="shareQrModalTitle"
+         class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-slate-900 border border-sky-500/40 rounded-3xl shadow-2xl shadow-black/75 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between gap-4 px-6 py-4 bg-slate-900/95 border-b border-slate-800">
+                <div>
+                    <h4 id="shareQrModalTitle" class="text-base font-extrabold text-white flex items-center gap-2">
+                        <svg class="w-4 h-4 text-sky-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 3h2m4 0h-2m-2-3v2m4 4v-2m-4 2h2"/>
+                        </svg>
+                        <span>Scan Analytics Permalink</span>
+                    </h4>
+                    <p class="text-xs text-slate-400 mt-0.5">Peers can scan this QR code to open your exact filtered and sorted study view.</p>
+                </div>
+                <button type="button"
+                        id="closeShareQrModalBtn"
+                        aria-label="Close QR code modal"
+                        class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- QR Code Display & Permalink Details -->
+            <div class="p-6 space-y-4">
+                <!-- View State Chips -->
+                <div class="flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-semibold">
+                    <span id="shareQrViewBadge" class="px-2.5 py-0.5 rounded-full bg-indigo-950/80 text-indigo-200 border border-indigo-500/35">View: By Subject</span>
+                    <span id="shareQrSubjectsBadge" class="px-2.5 py-0.5 rounded-full bg-emerald-950/80 text-emerald-200 border border-emerald-500/35">Subjects: 5/5</span>
+                    <span id="shareQrSortBadge" class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700">Sort: Most Hours</span>
+                    <span id="shareQrTokenBadge" class="px-2.5 py-0.5 rounded-full bg-sky-950/80 text-sky-300 border border-sky-500/35 font-mono">Live View</span>
+                </div>
+
+                <!-- Scannable White Frame -->
+                <div class="flex justify-center">
+                    <div class="relative w-56 h-56 rounded-2xl bg-white p-3.5 shadow-xl shadow-black/40 border-2 border-sky-400/50 flex items-center justify-center">
+                        <div id="shareQrLoadingState" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500 text-xs font-semibold">
+                            <span class="w-6 h-6 rounded-full border-2 border-sky-500 border-t-transparent animate-spin"></span>
+                            <span>Generating QR…</span>
+                        </div>
+                        <div id="shareQrErrorState" class="hidden absolute inset-0 p-4 flex flex-col items-center justify-center text-center text-slate-600 text-xs font-medium">
+                            <span>Unable to load QR image offline. Use Copy Link below to share the permalink.</span>
+                        </div>
+                        <img id="shareQrCodeImg"
+                             src=""
+                             alt="QR code pointing to your shared CampusLife analytics permalink"
+                             class="w-full h-full object-contain rounded-lg transition-opacity duration-200 opacity-0" />
+                    </div>
+                </div>
+
+                <!-- Permalink Box & Actions -->
+                <div class="rounded-2xl bg-slate-950/80 border border-slate-800 p-3 space-y-2.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Encoded Permalink</span>
+                        <span class="text-[10px] font-medium text-sky-400">Ready to scan</span>
+                    </div>
+                    <code id="shareQrPermalinkText"
+                          class="block text-[11px] font-mono text-sky-300 bg-slate-900 px-2.5 py-2 rounded-xl border border-slate-800 truncate select-all"></code>
+                    <div class="flex items-center gap-2 pt-0.5">
+                        <button type="button"
+                                id="shareQrCopyUrlBtn"
+                                class="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-400">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                            <span id="shareQrCopyUrlLabel">Copy Link</span>
+                        </button>
+                        <button type="button"
+                                id="shareQrDownloadBtn"
+                                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-500">
+                            <svg class="w-3.5 h-3.5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                            <span>Save QR</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3.5 bg-slate-900/95 border-t border-slate-800 flex items-center justify-end">
+                <button type="button"
+                        id="cancelShareQrBtn"
                         class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
                     Close
                 </button>
