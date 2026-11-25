@@ -362,13 +362,27 @@
                         <p class="text-xs text-slate-400 mt-1" id="chartSubheading">Track subject mastery and monitor weekly consistency trends accumulated from Room</p>
                     </div>
 
-                    <!-- View Mode Toggle Buttons -->
-                    <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700/60 self-start sm:self-auto">
-                        <button id="btnSubject" onclick="switchChartView('subject')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
-                            By Subject
-                        </button>
-                        <button id="btnWeekly" onclick="switchChartView('weekly')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
-                            Weekly Trend 📈
+                    <!-- Header Actions & View Mode Toggle Buttons -->
+                    <div class="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+                        <div class="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700/60">
+                            <button id="btnSubject" onclick="switchChartView('subject')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white shadow-sm transition">
+                                By Subject
+                            </button>
+                            <button id="btnWeekly" onclick="switchChartView('weekly')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">
+                                Weekly Trend 📈
+                            </button>
+                        </div>
+                        <button type="button"
+                                id="shareAnalyticsBtn"
+                                aria-haspopup="dialog"
+                                aria-expanded="false"
+                                aria-controls="shareAnalyticsModal"
+                                title="Export weekly study analytics summary as a PNG image for local social apps"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-bold border border-emerald-400/35 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                            </svg>
+                            <span>Share</span>
                         </button>
                     </div>
                 </div>
@@ -2719,7 +2733,10 @@
                 if (event.key === 'Escape' && document.body.classList.contains('chart-focus-mode')) {
                     const filterMenu = document.getElementById('subjectFilterMenu');
                     const goalsModal = document.getElementById('bulkGoalsModal');
-                    if ((filterMenu && !filterMenu.classList.contains('hidden')) || (goalsModal && !goalsModal.classList.contains('hidden'))) {
+                    const shareModal = document.getElementById('shareAnalyticsModal');
+                    if ((filterMenu && !filterMenu.classList.contains('hidden')) ||
+                        (goalsModal && !goalsModal.classList.contains('hidden')) ||
+                        (shareModal && !shareModal.classList.contains('hidden'))) {
                         return;
                     }
                     setFocusMode(false);
@@ -4631,6 +4648,506 @@
 
             renderAcademicPriority();
         })();
+
+        (function initShareAnalyticsExport() {
+            const shareBtn = document.getElementById('shareAnalyticsBtn');
+            const modal = document.getElementById('shareAnalyticsModal');
+            const closeBtn = document.getElementById('closeShareAnalyticsModalBtn');
+            const cancelBtn = document.getElementById('cancelShareAnalyticsBtn');
+            const previewImg = document.getElementById('shareAnalyticsPreviewImg');
+            const nativeShareBtn = document.getElementById('shareNativeAppsBtn');
+            const downloadBtn = document.getElementById('shareDownloadPngBtn');
+            const copyImageBtn = document.getElementById('shareCopyImageBtn');
+            const statusBanner = document.getElementById('shareAnalyticsStatus');
+            const whatsappBtn = document.getElementById('shareSocialWhatsAppBtn');
+            const telegramBtn = document.getElementById('shareSocialTelegramBtn');
+            const xBtn = document.getElementById('shareSocialXBtn');
+            const chartSvg = document.getElementById('subjectChartSvg');
+
+            if (!shareBtn || !modal || !previewImg || !chartSvg) return;
+
+            const SUBJECT_PALETTES = {
+                CS201: { top: '#818cf8', bottom: '#4338ca', light: '#a5b4fc' },
+                MATH204: { top: '#c084fc', bottom: '#6d28d9', light: '#d8b4fe' },
+                CS310: { top: '#22d3ee', bottom: '#0369a1', light: '#67e8f9' },
+                PHY102: { top: '#fbbf24', bottom: '#b45309', light: '#fcd34d' },
+                ENG215: { top: '#fb7185', bottom: '#be123c', light: '#fda4af' }
+            };
+
+            let currentBlob = null;
+            let currentDataUrl = '';
+            let currentSummaryText = '';
+
+            function drawRoundedRect(ctx, x, y, w, h, r) {
+                const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+                ctx.beginPath();
+                ctx.moveTo(x + radius, y);
+                ctx.lineTo(x + w - radius, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+                ctx.lineTo(x + w, y + h - radius);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+                ctx.lineTo(x + radius, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+                ctx.lineTo(x, y + radius);
+                ctx.quadraticCurveTo(x, y, x + radius, y);
+                ctx.closePath();
+            }
+
+            function collectAnalyticsSnapshot() {
+                const bars = Array.from(chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]'))
+                    .sort((a, b) => parseFloat(a.getAttribute('x') || '0') - parseFloat(b.getAttribute('x') || '0'));
+
+                let totalLogged = 0;
+                let totalGoal = 0;
+                let onPaceCount = 0;
+
+                const subjects = bars.map((bar) => {
+                    const code = bar.getAttribute('data-subject') || '';
+                    const course = bar.getAttribute('data-course') || code;
+                    const logged = parseFloat(bar.getAttribute('data-logged') || '0') || 0;
+                    const goalStr = bar.getAttribute('data-goal') || '4h';
+                    const goal = Math.max(0.5, parseFloat(goalStr.replace('h', '')) || 4);
+                    const pct = Math.round((logged / goal) * 100);
+                    const trend = bar.getAttribute('data-trend') || '';
+                    const trendDir = bar.getAttribute('data-trend-dir') || 'up';
+                    const status = bar.getAttribute('data-status') || 'normal';
+                    const projAttr = parseFloat(bar.getAttribute('data-proj-hours') || '');
+                    const projHours = Number.isNaN(projAttr) ? logged : projAttr;
+                    const hitsGoal = projHours + 1e-9 >= goal;
+
+                    totalLogged += logged;
+                    totalGoal += goal;
+                    if (hitsGoal) onPaceCount++;
+
+                    return {
+                        code: code,
+                        course: course,
+                        logged: logged,
+                        goal: goal,
+                        goalStr: goalStr,
+                        pct: pct,
+                        trend: trend,
+                        trendDir: trendDir,
+                        status: status,
+                        projHours: projHours,
+                        hitsGoal: hitsGoal,
+                        palette: SUBJECT_PALETTES[code] || SUBJECT_PALETTES.CS201
+                    };
+                });
+
+                const dailyHours = (typeof dailyRecordedHours !== 'undefined' && Array.isArray(dailyRecordedHours))
+                    ? dailyRecordedHours
+                    : [2.2, 1.8, 3.1, 2.5, 2.0, 3.4, 1.9];
+                const dailyGoal = (typeof currentDailyGoal === 'number') ? currentDailyGoal : 2.0;
+                const daysMet = dailyHours.filter((h) => h >= dailyGoal).length;
+
+                const streakBadgeEl = document.getElementById('multiWeekStreakBadge');
+                const streakSummary = streakBadgeEl ? streakBadgeEl.textContent.trim() : 'Streak Active';
+
+                const overallPct = totalGoal > 0 ? Math.round((totalLogged / totalGoal) * 100) : 0;
+
+                return {
+                    subjects: subjects,
+                    totalLogged: Math.round(totalLogged * 10) / 10,
+                    totalGoal: Math.round(totalGoal * 10) / 10,
+                    overallPct: overallPct,
+                    onPaceCount: onPaceCount,
+                    dailyHours: dailyHours,
+                    dailyGoal: dailyGoal,
+                    daysMet: daysMet,
+                    streakSummary: streakSummary
+                };
+            }
+
+            function renderSummaryCanvas(snap) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 1200;
+                canvas.height = 760;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return canvas;
+
+                // Background gradient
+                const bgGrad = ctx.createLinearGradient(0, 0, 1200, 760);
+                bgGrad.addColorStop(0, '#0f172a');
+                bgGrad.addColorStop(0.55, '#111c33');
+                bgGrad.addColorStop(1, '#090f1d');
+                ctx.fillStyle = bgGrad;
+                ctx.fillRect(0, 0, 1200, 760);
+
+                // Subtle decorative glows
+                const glowLeft = ctx.createRadialGradient(180, 120, 20, 180, 120, 340);
+                glowLeft.addColorStop(0, 'rgba(99, 102, 241, 0.22)');
+                glowLeft.addColorStop(1, 'rgba(99, 102, 241, 0)');
+                ctx.fillStyle = glowLeft;
+                ctx.fillRect(0, 0, 600, 460);
+
+                const glowRight = ctx.createRadialGradient(1020, 620, 20, 1020, 620, 340);
+                glowRight.addColorStop(0, 'rgba(16, 185, 129, 0.16)');
+                glowRight.addColorStop(1, 'rgba(16, 185, 129, 0)');
+                ctx.fillStyle = glowRight;
+                ctx.fillRect(620, 300, 580, 460);
+
+                // Outer frame
+                drawRoundedRect(ctx, 24, 24, 1152, 712, 28);
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Header
+                ctx.fillStyle = '#34d399';
+                ctx.beginPath();
+                ctx.arc(68, 72, 7, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '800 30px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText('CampusLife · Weekly Study Analytics', 88, 82);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '600 15px "Plus Jakarta Sans", system-ui, sans-serif';
+                const dateLabel = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                ctx.fillText('Generated ' + dateLabel + ' • Subject Mastery & Goal Projection Summary', 88, 110);
+
+                // Overall Attainment Pill (Top Right)
+                drawRoundedRect(ctx, 880, 54, 260, 46, 23);
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.fillStyle = '#6ee7b7';
+                ctx.font = '800 16px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(snap.totalLogged.toFixed(1) + 'h / ' + snap.totalGoal.toFixed(1) + 'h (' + snap.overallPct + '%)', 1010, 83);
+                ctx.textAlign = 'left';
+
+                // 4 KPI Cards Row
+                const kpis = [
+                    { label: 'TOTAL LOGGED', value: snap.totalLogged.toFixed(1) + ' hrs', sub: 'Across ' + snap.subjects.length + ' courses', accent: '#818cf8' },
+                    { label: 'WEEKLY TARGET', value: snap.totalGoal.toFixed(1) + ' hrs', sub: snap.overallPct + '% attained so far', accent: '#c084fc' },
+                    { label: 'CONSISTENCY', value: snap.daysMet + ' / 7 Days', sub: 'Daily goal: ' + snap.dailyGoal.toFixed(1) + 'h', accent: '#34d399' },
+                    { label: 'SUNDAY PACE', value: snap.onPaceCount + ' / ' + snap.subjects.length + ' On Pace', sub: snap.streakSummary, accent: '#38bdf8' }
+                ];
+
+                kpis.forEach((k, idx) => {
+                    const kx = 56 + idx * 276;
+                    const ky = 136;
+                    drawRoundedRect(ctx, kx, ky, 258, 92, 16);
+                    ctx.fillStyle = 'rgba(30, 41, 59, 0.72)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(71, 85, 105, 0.6)';
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '700 11px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(k.label, kx + 18, ky + 26);
+
+                    ctx.fillStyle = k.accent;
+                    ctx.font = '800 24px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(k.value, kx + 18, ky + 56);
+
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.font = '600 12px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(k.sub, kx + 18, ky + 78);
+                });
+
+                // Left Panel: Subject Breakdown Bars
+                drawRoundedRect(ctx, 56, 252, 740, 420, 20);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(71, 85, 105, 0.55)';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '800 17px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText('Subject Progress vs Custom Weekly Goals', 82, 286);
+
+                const chartLeft = 104;
+                const chartBottom = 575;
+                const chartTop = 325;
+                const chartHeight = chartBottom - chartTop;
+                const maxHrs = Math.max(8, ...snap.subjects.map((s) => Math.max(s.logged, s.goal, s.projHours) * 1.12));
+
+                // Gridlines
+                [0, 0.33, 0.66, 1].forEach((f) => {
+                    const gy = chartBottom - f * chartHeight;
+                    ctx.strokeStyle = f === 0 ? '#475569' : 'rgba(71, 85, 105, 0.45)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash(f === 0 ? [] : [4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(chartLeft, gy);
+                    ctx.lineTo(768, gy);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '600 11px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText((maxHrs * f).toFixed(1) + 'h', chartLeft - 10, gy + 4);
+                });
+                ctx.textAlign = 'left';
+
+                const colGap = 132;
+                const barWidth = 64;
+
+                snap.subjects.forEach((s, idx) => {
+                    const bx = chartLeft + 26 + idx * colGap;
+                    const barH = Math.max(6, (s.logged / maxHrs) * chartHeight);
+                    const by = chartBottom - barH;
+                    const cx = bx + barWidth / 2;
+
+                    // Bar gradient
+                    const grad = ctx.createLinearGradient(0, by, 0, chartBottom);
+                    grad.addColorStop(0, s.palette.top);
+                    grad.addColorStop(1, s.palette.bottom);
+                    drawRoundedRect(ctx, bx, by, barWidth, barH, 8);
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+
+                    if (s.status === 'alert') {
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    } else if (s.status === 'met') {
+                        ctx.strokeStyle = '#34d399';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+
+                    // Custom weekly goal dashed marker
+                    const goalY = chartBottom - (s.goal / maxHrs) * chartHeight;
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(bx - 6, goalY);
+                    ctx.lineTo(bx + barWidth + 6, goalY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Sun projection dot
+                    const projY = Math.max(chartTop + 6, chartBottom - (s.projHours / maxHrs) * chartHeight);
+                    ctx.fillStyle = s.hitsGoal ? '#34d399' : '#f87171';
+                    ctx.beginPath();
+                    ctx.arc(cx, projY, 5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Labels
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#e2e8f0';
+                    ctx.font = '700 12px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(s.logged.toFixed(1) + 'h/' + s.goalStr, cx, Math.min(by, goalY) - 10);
+
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.font = '800 13px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(s.code, cx, chartBottom + 24);
+
+                    ctx.fillStyle = s.palette.light;
+                    ctx.font = '700 11px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(s.pct + '% Goal', cx, chartBottom + 43);
+
+                    ctx.fillStyle = s.hitsGoal ? '#6ee7b7' : '#fda4af';
+                    ctx.font = '700 11px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText('Sun: ' + s.projHours.toFixed(1) + 'h ' + (s.hitsGoal ? '✓' : '✗'), cx, chartBottom + 61);
+                });
+                ctx.textAlign = 'left';
+
+                // Right Panel: Mon-Sun Consistency Mini-Bars
+                drawRoundedRect(ctx, 816, 252, 326, 420, 20);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(71, 85, 105, 0.55)';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '800 17px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText('Mon–Sun Activity', 842, 286);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '600 12px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText('Daily target: ' + snap.dailyGoal.toFixed(1) + 'h (' + snap.daysMet + '/7 met)', 842, 308);
+
+                const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const maxDaily = Math.max(4.0, ...snap.dailyHours);
+                snap.dailyHours.forEach((dh, idx) => {
+                    const ry = 338 + idx * 44;
+                    const metDay = dh >= snap.dailyGoal;
+
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.font = '700 13px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.fillText(dayLabels[idx], 842, ry + 18);
+
+                    const trackX = 892;
+                    const trackW = 178;
+                    drawRoundedRect(ctx, trackX, ry + 4, trackW, 18, 9);
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fill();
+
+                    const fillW = Math.max(12, Math.min(trackW, (dh / maxDaily) * trackW));
+                    drawRoundedRect(ctx, trackX, ry + 4, fillW, 18, 9);
+                    ctx.fillStyle = metDay ? '#34d399' : '#38bdf8';
+                    ctx.fill();
+
+                    ctx.fillStyle = metDay ? '#6ee7b7' : '#e2e8f0';
+                    ctx.font = '800 13px "Plus Jakarta Sans", system-ui, sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(dh.toFixed(1) + 'h', 1118, ry + 18);
+                    ctx.textAlign = 'left';
+                });
+
+                // Footer attribution
+                ctx.fillStyle = '#64748b';
+                ctx.font = '600 12px "Plus Jakarta Sans", system-ui, sans-serif';
+                ctx.fillText('CampusLife Study Tracker • Exported from Analytics Dashboard', 56, 706);
+
+                return canvas;
+            }
+
+            function setStatusMessage(msg, tone) {
+                if (!statusBanner) return;
+                statusBanner.textContent = msg;
+                statusBanner.classList.remove('hidden');
+                if (tone === 'success') {
+                    statusBanner.className = 'rounded-xl px-3.5 py-2 text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/35';
+                } else if (tone === 'warn') {
+                    statusBanner.className = 'rounded-xl px-3.5 py-2 text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/35';
+                } else {
+                    statusBanner.className = 'rounded-xl px-3.5 py-2 text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-500/35';
+                }
+            }
+
+            function triggerPngDownload() {
+                if (!currentDataUrl) return;
+                const a = document.createElement('a');
+                a.href = currentDataUrl;
+                a.download = 'campuslife-weekly-study-analytics.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+
+            function openShareModal() {
+                const snap = collectAnalyticsSnapshot();
+                const canvas = renderSummaryCanvas(snap);
+                currentDataUrl = canvas.toDataURL('image/png');
+                previewImg.src = currentDataUrl;
+
+                const topSubject = snap.subjects[0];
+                currentSummaryText =
+                    '📚 My Weekly Study Analytics (' + snap.totalLogged.toFixed(1) + 'h / ' + snap.totalGoal.toFixed(1) + 'h · ' + snap.overallPct + '% Goal)\n' +
+                    '🔥 Consistency: ' + snap.daysMet + '/7 days | Sun Pace: ' + snap.onPaceCount + '/' + snap.subjects.length + ' on track' +
+                    (topSubject ? (' | Top Subject: ' + topSubject.code + ' (' + topSubject.logged.toFixed(1) + 'h)') : '');
+
+                canvas.toBlob((blob) => {
+                    currentBlob = blob;
+                }, 'image/png');
+
+                if (whatsappBtn) {
+                    whatsappBtn.href = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(currentSummaryText);
+                }
+                if (telegramBtn) {
+                    telegramBtn.href = 'https://t.me/share/url?url=' + encodeURIComponent(window.location.href) + '&text=' + encodeURIComponent(currentSummaryText);
+                }
+                if (xBtn) {
+                    xBtn.href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(currentSummaryText);
+                }
+
+                if (statusBanner) {
+                    statusBanner.classList.add('hidden');
+                }
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+                shareBtn.setAttribute('aria-expanded', 'true');
+            }
+
+            function closeShareModal() {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+                shareBtn.setAttribute('aria-expanded', 'false');
+            }
+
+            shareBtn.addEventListener('click', openShareModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeShareModal);
+            if (cancelBtn) cancelBtn.addEventListener('click', closeShareModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeShareModal();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeShareModal();
+                }
+            });
+
+            if (nativeShareBtn) {
+                nativeShareBtn.addEventListener('click', async () => {
+                    try {
+                        if (currentBlob && typeof File !== 'undefined' && navigator.share) {
+                            const imageFile = new File([currentBlob], 'campuslife-weekly-study-analytics.png', { type: 'image/png' });
+                            if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                                await navigator.share({
+                                    title: 'Weekly Study Analytics Summary',
+                                    text: currentSummaryText,
+                                    files: [imageFile]
+                                });
+                                setStatusMessage('Shared your weekly analytics image via your device share sheet!', 'success');
+                                return;
+                            }
+                            triggerPngDownload();
+                            await navigator.share({
+                                title: 'Weekly Study Analytics Summary',
+                                text: currentSummaryText
+                            });
+                            setStatusMessage('Image downloaded & share sheet opened — attach the saved PNG in your social app.', 'info');
+                            return;
+                        }
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                    }
+                    triggerPngDownload();
+                    setStatusMessage('PNG saved locally! Open your local social app (or use Quick Share below) to post the image.', 'info');
+                });
+            }
+
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => {
+                    triggerPngDownload();
+                    setStatusMessage('Downloaded campuslife-weekly-study-analytics.png to your device.', 'success');
+                });
+            }
+
+            if (copyImageBtn) {
+                copyImageBtn.addEventListener('click', async () => {
+                    try {
+                        if (currentBlob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': currentBlob })]);
+                            setStatusMessage('Analytics image copied to clipboard! Paste directly into Discord, WhatsApp, or X.', 'success');
+                            return;
+                        }
+                    } catch (_) {}
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(currentSummaryText);
+                            triggerPngDownload();
+                            setStatusMessage('Summary text copied & PNG downloaded for attaching in your social app.', 'info');
+                            return;
+                        }
+                    } catch (_) {}
+                    triggerPngDownload();
+                    setStatusMessage('Downloaded PNG summary — ready to attach to your post.', 'info');
+                });
+            }
+
+            [whatsappBtn, telegramBtn, xBtn].forEach((socialLink) => {
+                if (!socialLink) return;
+                socialLink.addEventListener('click', () => {
+                    triggerPngDownload();
+                    setStatusMessage('PNG image downloaded — attach it inside the opened social app window!', 'info');
+                });
+            });
+        })();
     </script>
 
     <!-- Bulk Weekly Study Goals Slider Modal -->
@@ -4829,6 +5346,111 @@
                 </button>
             </div>
         </form>
+    </div>
+
+    <!-- Share Weekly Study Analytics Image Export Modal -->
+    <div id="shareAnalyticsModal"
+         role="dialog"
+         aria-modal="true"
+         aria-hidden="true"
+         aria-labelledby="shareAnalyticsModalTitle"
+         class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-2xl bg-slate-900 border border-emerald-500/40 rounded-3xl shadow-2xl shadow-black/75 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between gap-4 px-6 py-4 bg-slate-900/95 border-b border-slate-800">
+                <div>
+                    <h4 id="shareAnalyticsModalTitle" class="text-base font-extrabold text-white flex items-center gap-2">
+                        <span>📤 Share Weekly Study Analytics</span>
+                    </h4>
+                    <p class="text-xs text-slate-400 mt-0.5">Export a crisp snapshot of your current weekly hours, custom goals, and Sunday pace to your local social apps.</p>
+                </div>
+                <button type="button"
+                        id="closeShareAnalyticsModalBtn"
+                        aria-label="Close share analytics modal"
+                        class="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Live Generated Image Preview -->
+            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div class="rounded-2xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-inner">
+                    <img id="shareAnalyticsPreviewImg"
+                         src=""
+                         alt="Preview of exported weekly study analytics summary image"
+                         class="w-full h-auto block" />
+                </div>
+
+                <div id="shareAnalyticsStatus" class="hidden"></div>
+
+                <!-- Primary & Utility Export Actions -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <button type="button"
+                            id="shareNativeAppsBtn"
+                            class="flex-1 min-w-[200px] inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold shadow-lg shadow-emerald-600/25 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                        </svg>
+                        <span>Share to Local Social Apps</span>
+                    </button>
+                    <button type="button"
+                            id="shareDownloadPngBtn"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer">
+                        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        <span>Download PNG</span>
+                    </button>
+                    <button type="button"
+                            id="shareCopyImageBtn"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer">
+                        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <span>Copy Image</span>
+                    </button>
+                </div>
+
+                <!-- Direct Social App Launchers (downloads PNG + opens prefilled compose) -->
+                <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-[11px] font-semibold text-slate-400">Quick launch &amp; download PNG:</span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a id="shareSocialWhatsAppBtn"
+                           href="https://api.whatsapp.com/send"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-700/50 text-[11px] font-bold transition">
+                            <span>WhatsApp</span>
+                        </a>
+                        <a id="shareSocialTelegramBtn"
+                           href="https://t.me/share/url"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950/60 hover:bg-sky-900/70 text-sky-300 border border-sky-700/50 text-[11px] font-bold transition">
+                            <span>Telegram</span>
+                        </a>
+                        <a id="shareSocialXBtn"
+                           href="https://twitter.com/intent/tweet"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600/60 text-[11px] font-bold transition">
+                            <span>X / Twitter</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3.5 bg-slate-900/95 border-t border-slate-800 flex items-center justify-end">
+                <button type="button"
+                        id="cancelShareAnalyticsBtn"
+                        class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 border border-slate-700 transition cursor-pointer">
+                    Close
+                </button>
+            </div>
+        </div>
     </div>
 </body>
 </html>
