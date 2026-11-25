@@ -373,6 +373,15 @@
                             </button>
                         </div>
                         <button type="button"
+                                id="copyShareLinkBtn"
+                                title="Copy a unique permalink to the current filtered and sorted analytics view"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-indigo-200 hover:text-white text-xs font-semibold border border-indigo-500/35 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <svg class="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                            </svg>
+                            <span id="copyShareLinkLabel">Copy Share Link</span>
+                        </button>
+                        <button type="button"
                                 id="shareAnalyticsBtn"
                                 aria-haspopup="dialog"
                                 aria-expanded="false"
@@ -385,6 +394,16 @@
                             <span>Share</span>
                         </button>
                     </div>
+                </div>
+                <div id="copyShareLinkToast"
+                     role="status"
+                     aria-live="polite"
+                     class="hidden mb-4 rounded-xl bg-indigo-950/60 border border-indigo-500/40 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span class="font-semibold text-indigo-200 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                        <span>Unique view permalink copied:</span>
+                    </span>
+                    <code id="copyShareLinkUrlPreview" class="text-[11px] font-mono text-sky-300 bg-slate-900/90 px-2 py-0.5 rounded-lg border border-slate-700/80 max-w-full truncate"></code>
                 </div>
 
                 <!-- Consistency Highlights Bar (Visible for Weekly Trend) -->
@@ -5147,6 +5166,259 @@
                     setStatusMessage('PNG image downloaded — attach it inside the opened social app window!', 'info');
                 });
             });
+        })();
+
+        (function initCopyShareLink() {
+            const copyBtn = document.getElementById('copyShareLinkBtn');
+            const copyLabel = document.getElementById('copyShareLinkLabel');
+            const toastEl = document.getElementById('copyShareLinkToast');
+            const toastUrlEl = document.getElementById('copyShareLinkUrlPreview');
+            const chartCard = document.getElementById('analyticsChartCard');
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const sortSelect = document.getElementById('subjectSortSelect');
+            const compareCheckbox = document.getElementById('compareLastWeekCheckbox');
+            const weeklyContainer = document.getElementById('weeklyChartContainer');
+
+            if (!copyBtn || !chartCard || !chartSvg) return;
+
+            const DEFAULT_GOAL_MAP = {
+                CS201: 6.0,
+                MATH204: 5.0,
+                CS310: 4.5,
+                PHY102: 4.0,
+                ENG215: 3.5
+            };
+            const MANAGED_PARAMS = ['view', 'subjects', 'sort', 'order', 'compare', 'overlay', 'goals', 'dailyGoal', 'v'];
+            let feedbackTimer = null;
+
+            function hashViewState(str) {
+                let h = 2166136261;
+                for (let i = 0; i < str.length; i++) {
+                    h ^= str.charCodeAt(i);
+                    h = Math.imul(h, 16777619);
+                }
+                return (h >>> 0).toString(36);
+            }
+
+            function getCurrentVisualOrder() {
+                return Array.from(chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]'))
+                    .sort((a, b) => parseFloat(a.getAttribute('x') || '0') - parseFloat(b.getAttribute('x') || '0'))
+                    .map((bar) => bar.getAttribute('data-subject') || '')
+                    .filter(Boolean);
+            }
+
+            function buildAnalyticsPermalink() {
+                const viewMode = (weeklyContainer && !weeklyContainer.classList.contains('hidden')) ? 'weekly' : 'subject';
+                const checkboxes = Array.from(chartCard.querySelectorAll('.subject-filter-checkbox'));
+                const checkedSubjects = checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+                const sortMode = sortSelect ? (sortSelect.value || 'hours-desc') : 'hours-desc';
+                const orderList = getCurrentVisualOrder();
+                const compareLastWeek = Boolean(compareCheckbox && compareCheckbox.checked);
+
+                const overlayPanel = document.getElementById('subjectOverlayPanel');
+                const overlayActive = Boolean(overlayPanel && !overlayPanel.classList.contains('hidden'));
+                const selectA = document.getElementById('overlaySubjectASelect');
+                const selectB = document.getElementById('overlaySubjectBSelect');
+                const modeDailyBtn = document.getElementById('overlayModeDailyBtn');
+                const overlayMode = (modeDailyBtn && modeDailyBtn.classList.contains('bg-violet-600')) ? 'daily' : 'history';
+
+                const goalPairs = [];
+                chartSvg.querySelectorAll('rect.subject-main-bar[data-subject]').forEach((bar) => {
+                    const code = bar.getAttribute('data-subject');
+                    const goalVal = parseFloat((bar.getAttribute('data-goal') || '').replace('h', ''));
+                    if (code && !Number.isNaN(goalVal) && Math.abs(goalVal - (DEFAULT_GOAL_MAP[code] || 0)) > 0.05) {
+                        goalPairs.push(code + ':' + goalVal);
+                    }
+                });
+
+                const url = new URL(window.location.href);
+                MANAGED_PARAMS.forEach((p) => url.searchParams.delete(p));
+
+                url.searchParams.set('view', viewMode);
+                url.searchParams.set('subjects', checkedSubjects.length > 0 ? checkedSubjects.join(',') : 'none');
+                url.searchParams.set('sort', sortMode);
+                if (orderList.length) {
+                    url.searchParams.set('order', orderList.join(','));
+                }
+                if (compareLastWeek) {
+                    url.searchParams.set('compare', '1');
+                }
+                if (overlayActive && selectA && selectB) {
+                    url.searchParams.set('overlay', selectA.value + ',' + selectB.value + ',' + overlayMode);
+                }
+                if (goalPairs.length) {
+                    url.searchParams.set('goals', goalPairs.join(','));
+                }
+                if (typeof currentDailyGoal === 'number' && Math.abs(currentDailyGoal - 2.0) > 0.05) {
+                    url.searchParams.set('dailyGoal', currentDailyGoal.toFixed(1));
+                }
+
+                const canonicalState = [
+                    viewMode,
+                    checkedSubjects.join(','),
+                    sortMode,
+                    orderList.join(','),
+                    compareLastWeek ? '1' : '0',
+                    overlayActive && selectA && selectB ? (selectA.value + ',' + selectB.value + ',' + overlayMode) : '',
+                    goalPairs.join(','),
+                    typeof currentDailyGoal === 'number' ? currentDailyGoal.toFixed(1) : '2.0'
+                ].join('|');
+
+                url.searchParams.set('v', hashViewState(canonicalState));
+                url.hash = 'analyticsChartCard';
+                return url.toString();
+            }
+
+            async function copyTextToClipboard(text) {
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return true;
+                    } catch (_) {}
+                }
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    return ok;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            function showCopyFeedback(permalink, copiedOk) {
+                copyBtn.setAttribute('data-permalink', permalink);
+                if (copyLabel) {
+                    copyLabel.textContent = copiedOk ? 'Copied Link ✓' : 'Link Ready ✓';
+                }
+                copyBtn.className = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/25 text-emerald-300 text-xs font-bold border border-emerald-400/50 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400';
+
+                if (toastEl && toastUrlEl) {
+                    toastUrlEl.textContent = permalink;
+                    toastEl.classList.remove('hidden');
+                }
+
+                if (feedbackTimer) clearTimeout(feedbackTimer);
+                feedbackTimer = setTimeout(() => {
+                    if (copyLabel) copyLabel.textContent = 'Copy Share Link';
+                    copyBtn.className = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-indigo-200 hover:text-white text-xs font-semibold border border-indigo-500/35 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400';
+                    if (toastEl) toastEl.classList.add('hidden');
+                }, 4000);
+            }
+
+            function restoreAnalyticsViewFromPermalink() {
+                const params = new URLSearchParams(window.location.search);
+                const hasAnalyticsParams = MANAGED_PARAMS.some((p) => params.has(p));
+                if (!hasAnalyticsParams) return;
+
+                // 1. Restore custom weekly goals if specified
+                const goalsParam = params.get('goals');
+                if (goalsParam) {
+                    goalsParam.split(',').forEach((pair) => {
+                        const [code, valStr] = pair.split(':');
+                        const val = parseFloat(valStr);
+                        const slider = document.querySelector('.subject-goal-slider[data-goal-subject="' + code + '"]');
+                        if (slider && !Number.isNaN(val) && val >= 0.5 && val <= 20) {
+                            slider.value = String(val);
+                            slider.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    });
+                }
+
+                // 2. Restore filtered subjects
+                const subjectsParam = params.get('subjects');
+                if (subjectsParam !== null) {
+                    const allowed = subjectsParam === 'none'
+                        ? new Set()
+                        : new Set(subjectsParam.split(',').map((s) => s.trim()).filter(Boolean));
+                    const checkboxes = Array.from(chartCard.querySelectorAll('.subject-filter-checkbox'));
+                    checkboxes.forEach((cb) => {
+                        cb.checked = allowed.has(cb.value);
+                    });
+                    if (checkboxes.length) {
+                        checkboxes[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
+                // 3. Restore compare-with-last-week toggle
+                if (compareCheckbox && params.has('compare')) {
+                    compareCheckbox.checked = params.get('compare') === '1';
+                    compareCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+
+                // 4. Restore sort mode or custom drag-and-drop bar order
+                const sortParam = params.get('sort');
+                const orderParam = params.get('order');
+                if (sortParam === 'custom' && orderParam) {
+                    const customOrder = orderParam.split(',').map((s) => s.trim()).filter(Boolean);
+                    if (customOrder.length) {
+                        chartSvg.dispatchEvent(new CustomEvent('applyCustomSubjectOrder', {
+                            detail: { order: customOrder }
+                        }));
+                    }
+                } else if (sortSelect && sortParam) {
+                    const hasOption = Array.from(sortSelect.options).some((opt) => opt.value === sortParam);
+                    if (hasOption) {
+                        sortSelect.value = sortParam;
+                        sortSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }
+
+                // 5. Restore daily goal and active chart view
+                const dailyGoalParam = parseFloat(params.get('dailyGoal') || '');
+                if (!Number.isNaN(dailyGoalParam) && typeof currentDailyGoal === 'number' && typeof adjustDailyGoal === 'function') {
+                    const delta = Math.round((dailyGoalParam - currentDailyGoal) * 10) / 10;
+                    if (Math.abs(delta) >= 0.1) {
+                        adjustDailyGoal(delta);
+                    }
+                }
+                if (params.get('view') === 'weekly' && typeof switchChartView === 'function') {
+                    switchChartView('weekly');
+                }
+
+                // 6. Restore Two-Subject Overlay state if saved in permalink
+                const overlayParam = params.get('overlay');
+                if (overlayParam) {
+                    const [subA, subB, mode] = overlayParam.split(',');
+                    const selectA = document.getElementById('overlaySubjectASelect');
+                    const selectB = document.getElementById('overlaySubjectBSelect');
+                    const toggleOverlayBtn = document.getElementById('toggleSubjectOverlayBtn');
+                    const modeBtn = mode === 'daily'
+                        ? document.getElementById('overlayModeDailyBtn')
+                        : document.getElementById('overlayModeHistoryBtn');
+                    if (selectA && subA) {
+                        selectA.value = subA;
+                        selectA.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (selectB && subB) {
+                        selectB.value = subB;
+                        selectB.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    if (modeBtn) modeBtn.click();
+                    if (toggleOverlayBtn && toggleOverlayBtn.getAttribute('aria-pressed') !== 'true') {
+                        toggleOverlayBtn.click();
+                    }
+                }
+            }
+
+            copyBtn.addEventListener('click', async () => {
+                const permalink = buildAnalyticsPermalink();
+                try {
+                    if (window.history && typeof window.history.replaceState === 'function') {
+                        window.history.replaceState(null, '', permalink);
+                    }
+                } catch (_) {}
+                const copied = await copyTextToClipboard(permalink);
+                showCopyFeedback(permalink, copied);
+            });
+
+            restoreAnalyticsViewFromPermalink();
         })();
     </script>
 
