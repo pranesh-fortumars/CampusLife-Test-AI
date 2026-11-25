@@ -122,6 +122,7 @@
         body.chart-focus-mode #heroSection,
         body.chart-focus-mode #featuresGridHeading,
         body.chart-focus-mode #featuresCardsGrid,
+        body.chart-focus-mode #academicPrioritySection,
         body.chart-focus-mode #mainFooter {
             display: none !important;
         }
@@ -1265,6 +1266,88 @@
                             </linearGradient>
                         </defs>
                     </svg>
+                </div>
+            </div>
+
+            <!-- Automated Academic Priority Ranker & Optimal Daily Study Schedule -->
+            <div id="academicPrioritySection" class="mt-8 bg-slate-800/60 border border-slate-700/80 rounded-3xl p-6 md:p-8 transition-all duration-200">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-700/70">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <span class="w-3 h-3 rounded-full bg-amber-400 animate-pulse"></span>
+                            <h4 class="font-bold text-lg text-white">Academic Priority Ranker &amp; Daily Study Planner</h4>
+                            <span id="priorityTopSubjectPill" class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-red-500/20 text-red-300 border border-red-500/40">
+                                Top Focus: Calculating...
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">Automatically ranks subjects by upcoming exam dates and remaining weekly goal deficits to generate an optimal 5-day Pomodoro study schedule.</p>
+                    </div>
+
+                    <!-- Interactive Ranker Controls -->
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <!-- Strategy Weighting Mode -->
+                        <div class="inline-flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/80" role="group" aria-label="Priority ranking strategy">
+                            <button type="button" data-priority-strategy="balanced" class="priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 text-white shadow-sm transition cursor-pointer">
+                                Balanced
+                            </button>
+                            <button type="button" data-priority-strategy="exam" class="priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer">
+                                Exam Crunch
+                            </button>
+                            <button type="button" data-priority-strategy="goal" class="priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer">
+                                Goal Catch-Up
+                            </button>
+                        </div>
+
+                        <!-- Daily Study Capacity Stepper -->
+                        <div class="inline-flex items-center gap-1.5 bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-700/80 text-xs">
+                            <span class="text-slate-400 font-semibold text-[11px]">Daily Budget:</span>
+                            <button type="button" id="priorityBudgetMinusBtn" aria-label="Decrease daily study budget by 0.5 hours" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center transition cursor-pointer">-</button>
+                            <span id="priorityDailyBudgetLabel" class="font-extrabold text-amber-300 min-w-[3.4rem] text-center">3.5h/d</span>
+                            <button type="button" id="priorityBudgetPlusBtn" aria-label="Increase daily study budget by 0.5 hours" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center transition cursor-pointer">+</button>
+                        </div>
+
+                        <!-- Sync Chart Bars to Priority Order -->
+                        <button type="button"
+                                id="applyPrioritySortBtn"
+                                title="Reorder subject bars in the chart above to match Academic Priority rank"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/85 hover:bg-indigo-500 text-white font-semibold text-[11px] border border-indigo-400/30 shadow-sm transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/>
+                            </svg>
+                            <span>Sync Chart Order</span>
+                        </button>
+
+                        <!-- Reset Exam Dates -->
+                        <button type="button"
+                                id="resetPriorityDatesBtn"
+                                class="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 font-semibold text-[11px] border border-slate-700 transition cursor-pointer">
+                            Reset Dates
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Two-Column Priority Queue & Optimal Daily Schedule -->
+                <div class="mt-6 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                    <!-- Left: Ranked Priority Queue + Editable Exam Dates -->
+                    <div class="xl:col-span-5 space-y-3">
+                        <div class="flex items-center justify-between text-xs px-1">
+                            <span class="font-bold uppercase tracking-wider text-slate-400 text-[11px]">Priority Ranking (Live Score 0–100)</span>
+                            <span class="text-[11px] text-slate-400">Edit exam dates to recalculate</span>
+                        </div>
+                        <div id="priorityRankList" class="space-y-2.5"></div>
+                    </div>
+
+                    <!-- Right: Generated Optimal 5-Day Study Schedule -->
+                    <div class="xl:col-span-7 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+                            <span class="font-bold uppercase tracking-wider text-slate-400 text-[11px]">Suggested Optimal Daily Schedule (Next 5 Days)</span>
+                            <div id="priorityScheduleSummary" class="flex flex-wrap items-center gap-2 text-[11px]">
+                                <span id="priorityTotalPlannedBadge" class="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 font-bold">17.5h Planned</span>
+                                <span id="priorityGoalCoverageBadge" class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">Goals On Track</span>
+                            </div>
+                        </div>
+                        <div id="priorityDailySchedule" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -2578,6 +2661,21 @@
                     applySubjectOrder(currentOrder, { animate: true });
                     setCustomOrderMode(subject);
                 });
+            });
+
+            chartSvg.addEventListener('applyCustomSubjectOrder', (event) => {
+                const requestedOrder = event && event.detail && Array.isArray(event.detail.order)
+                    ? event.detail.order
+                    : null;
+                if (!requestedOrder) return;
+                const validOrder = requestedOrder.filter((c) => currentOrder.includes(c));
+                currentOrder.forEach((c) => {
+                    if (!validOrder.includes(c)) validOrder.push(c);
+                });
+                if (!validOrder.length) return;
+                currentOrder = validOrder;
+                applySubjectOrder(currentOrder, { animate: true });
+                setCustomOrderMode(validOrder[0]);
             });
         })();
 
@@ -4050,6 +4148,488 @@
                 if (overlayBarLayer) overlayBarLayer.style.opacity = '1';
                 if (isOverlayActive) requestAnimationFrame(renderOverlayAll);
             });
+        })();
+
+        (function initAcademicPriorityRanker() {
+            const chartSvg = document.getElementById('subjectChartSvg');
+            const rankListEl = document.getElementById('priorityRankList');
+            const scheduleEl = document.getElementById('priorityDailySchedule');
+            const topPillEl = document.getElementById('priorityTopSubjectPill');
+            const budgetLabelEl = document.getElementById('priorityDailyBudgetLabel');
+            const budgetMinusBtn = document.getElementById('priorityBudgetMinusBtn');
+            const budgetPlusBtn = document.getElementById('priorityBudgetPlusBtn');
+            const applySortBtn = document.getElementById('applyPrioritySortBtn');
+            const resetDatesBtn = document.getElementById('resetPriorityDatesBtn');
+            const totalPlannedEl = document.getElementById('priorityTotalPlannedBadge');
+            const coverageBadgeEl = document.getElementById('priorityGoalCoverageBadge');
+            const strategyBtns = Array.from(document.querySelectorAll('.priority-strategy-btn'));
+
+            if (!chartSvg || !rankListEl || !scheduleEl) return;
+
+            const SUBJECT_INFO = {
+                CS201: { title: 'Data Structures', hex: '#6366f1', light: '#a5b4fc', badgeBg: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/35', dot: 'bg-indigo-500', defaultOffsetDays: 17 },
+                MATH204: { title: 'Linear Algebra', hex: '#8b5cf6', light: '#d8b4fe', badgeBg: 'bg-violet-500/20 text-violet-300 border-violet-500/35', dot: 'bg-violet-500', defaultOffsetDays: 12 },
+                CS310: { title: 'Operating Systems', hex: '#06b6d4', light: '#67e8f9', badgeBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/35', dot: 'bg-cyan-500', defaultOffsetDays: 9 },
+                PHY102: { title: 'Engineering Physics', hex: '#f59e0b', light: '#fcd34d', badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/35', dot: 'bg-amber-500', defaultOffsetDays: 4 },
+                ENG215: { title: 'Technical Writing', hex: '#f43f5e', light: '#fda4af', badgeBg: 'bg-rose-500/20 text-rose-300 border-rose-500/35', dot: 'bg-rose-500', defaultOffsetDays: 6 }
+            };
+            const SUBJECT_CODES = Object.keys(SUBJECT_INFO);
+
+            const STRATEGY_WEIGHTS = {
+                balanced: { examWeight: 1.0, goalWeight: 1.0 },
+                exam: { examWeight: 1.45, goalWeight: 0.65 },
+                goal: { examWeight: 0.65, goalWeight: 1.45 }
+            };
+
+            function getLocalToday() {
+                const now = new Date();
+                return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            }
+
+            function addDaysLocal(baseDate, days) {
+                return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + days);
+            }
+
+            function formatLocalDateISO(date) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return y + '-' + m + '-' + d;
+            }
+
+            function parseLocalDateISO(str) {
+                if (!str || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
+                const parts = str.split('-').map((n) => parseInt(n, 10));
+                return new Date(parts[0], parts[1] - 1, parts[2]);
+            }
+
+            function buildDefaultExamDates() {
+                const today = getLocalToday();
+                const map = {};
+                SUBJECT_CODES.forEach((code) => {
+                    map[code] = formatLocalDateISO(addDaysLocal(today, SUBJECT_INFO[code].defaultOffsetDays));
+                });
+                return map;
+            }
+
+            let examDates = buildDefaultExamDates();
+            let dailyBudget = 3.5;
+            let activeStrategy = 'balanced';
+            let lastRankedList = [];
+
+            function formatHoursShort(val) {
+                const rounded = Math.round(val * 10) / 10;
+                return (Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace(/\.0$/, '')) + 'h';
+            }
+
+            function formatDayLabel(date, dayOffset) {
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const dateTag = weekDays[date.getDay()] + ', ' + monthNames[date.getMonth()] + ' ' + date.getDate();
+                if (dayOffset === 0) return { title: 'Today', subtitle: dateTag };
+                if (dayOffset === 1) return { title: 'Tomorrow', subtitle: dateTag };
+                return { title: weekDays[date.getDay()], subtitle: monthNames[date.getMonth()] + ' ' + date.getDate() };
+            }
+
+            function readSubjectMetrics() {
+                const today = getLocalToday();
+                const weights = STRATEGY_WEIGHTS[activeStrategy] || STRATEGY_WEIGHTS.balanced;
+
+                return SUBJECT_CODES.map((code) => {
+                    const info = SUBJECT_INFO[code];
+                    const mainBar = chartSvg.querySelector('rect.subject-main-bar[data-subject="' + code + '"]');
+                    const logged = mainBar ? (parseFloat(mainBar.getAttribute('data-logged') || '0') || 0) : 0;
+                    const goalStr = mainBar ? (mainBar.getAttribute('data-goal') || '4h') : '4h';
+                    const goal = Math.max(0.5, parseFloat(goalStr.replace('h', '')) || 4);
+                    const pct = Math.round((logged / goal) * 100);
+                    const deficit = Math.max(0, Math.round((goal - logged) * 10) / 10);
+
+                    const examDate = parseLocalDateISO(examDates[code]) || addDaysLocal(today, info.defaultOffsetDays);
+                    const rawDays = Math.round((examDate.getTime() - today.getTime()) / 86400000);
+                    const daysUntilExam = Math.max(0, rawDays);
+                    const isPassed = rawDays < 0;
+
+                    // Exam urgency component (0–55 pts before strategy multiplier)
+                    const baseExamScore = isPassed ? 4 : (rawDays === 0 ? 55 : 55 * Math.exp(-daysUntilExam / 9));
+
+                    // Goal deficit component (0–45 pts before strategy multiplier)
+                    const pctShortfall = Math.max(0, 1 - logged / goal);
+                    const alertBonus = pct < 50 ? 6 : 0;
+                    const baseGoalScore = (pctShortfall * 28) + Math.min(11, deficit * 3.0) + alertBonus;
+
+                    const rawScore = (baseExamScore * weights.examWeight) + (baseGoalScore * weights.goalWeight);
+                    const priorityScore = Math.max(5, Math.min(100, Math.round(rawScore)));
+
+                    let tier = { label: 'Maintain', badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35', barClass: 'bg-emerald-500' };
+                    if (priorityScore >= 65) {
+                        tier = { label: 'Critical', badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40', barClass: 'bg-red-500' };
+                    } else if (priorityScore >= 45) {
+                        tier = { label: 'High', badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40', barClass: 'bg-amber-500' };
+                    } else if (priorityScore >= 25) {
+                        tier = { label: 'Medium', badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/35', barClass: 'bg-sky-500' };
+                    }
+
+                    const countdownText = isPassed
+                        ? 'Exam passed'
+                        : (daysUntilExam === 0 ? 'Exam today!' : (daysUntilExam === 1 ? 'Exam tomorrow' : ('Exam in ' + daysUntilExam + 'd')));
+
+                    return {
+                        code: code,
+                        title: info.title,
+                        info: info,
+                        logged: logged,
+                        goal: goal,
+                        goalStr: formatHoursShort(goal),
+                        pct: pct,
+                        deficit: deficit,
+                        examDateISO: formatLocalDateISO(examDate),
+                        rawDays: rawDays,
+                        daysUntilExam: daysUntilExam,
+                        isPassed: isPassed,
+                        countdownText: countdownText,
+                        priorityScore: priorityScore,
+                        tier: tier
+                    };
+                }).sort((a, b) => (b.priorityScore - a.priorityScore) || (b.deficit - a.deficit) || a.code.localeCompare(b.code));
+            }
+
+            function buildOptimalSchedule(rankedSubjects) {
+                const today = getLocalToday();
+                const weights = STRATEGY_WEIGHTS[activeStrategy] || STRATEGY_WEIGHTS.balanced;
+                const slotHours = 0.5;
+                const daysCount = 5;
+
+                // Remaining hours pressure per subject across the 5-day planning window
+                const tracker = {};
+                rankedSubjects.forEach((s) => {
+                    const examReviewBuffer = (!s.isPassed && s.daysUntilExam <= 10)
+                        ? Math.round((Math.max(0.5, (11 - s.daysUntilExam) * 0.25)) * 2) / 2
+                        : 0;
+                    tracker[s.code] = {
+                        remainingDeficit: s.deficit,
+                        examBuffer: examReviewBuffer,
+                        plannedTotal: 0
+                    };
+                });
+
+                const days = [];
+                const timeStartMinutes = 9 * 60; // 09:00 AM suggested start
+
+                for (let d = 0; d < daysCount; d++) {
+                    const dayDate = addDaysLocal(today, d);
+                    const totalSlots = Math.max(1, Math.round(dailyBudget / slotHours));
+                    const allocations = {};
+                    const examsToday = rankedSubjects
+                        .filter((s) => !s.isPassed && s.rawDays === d)
+                        .map((s) => s.code);
+
+                    const hasEligibleOnDay = rankedSubjects.some((s) => s.isPassed || d <= s.rawDays);
+
+                    for (let slot = 0; slot < totalSlots; slot++) {
+                        let bestSubj = null;
+                        let bestNeed = -1;
+
+                        rankedSubjects.forEach((s) => {
+                            if (hasEligibleOnDay && !s.isPassed && d > s.rawDays) return; // Skip already-completed exams when later subjects remain
+                            const st = tracker[s.code];
+                            const assignedToday = allocations[s.code] || 0;
+                            // Prevent one subject from monopolizing the entire day unless others have zero need
+                            const sameDayFatigue = assignedToday >= Math.max(1.5, dailyBudget * 0.55) ? 0.35 : 1.0;
+
+                            const daysLeftToExam = s.isPassed ? 21 : Math.max(1, s.rawDays - d + 1);
+                            const urgentExamFactor = s.isPassed ? 0.15 : (1 + Math.max(0, 12 - daysLeftToExam) * 0.18 * weights.examWeight);
+                            const needRemaining = st.remainingDeficit + st.examBuffer;
+                            const baseWeight = needRemaining > 0
+                                ? (needRemaining * urgentExamFactor * (1 + (1 - Math.min(1, s.pct / 100)) * 0.5 * weights.goalWeight))
+                                : (0.12 * (s.priorityScore / 100));
+
+                            // Limit distinct subjects per day to 3 for deep focus
+                            const distinctToday = Object.keys(allocations).length;
+                            if (distinctToday >= 3 && !allocations[s.code]) return;
+
+                            const effectiveScore = baseWeight * sameDayFatigue;
+                            if (effectiveScore > bestNeed) {
+                                bestNeed = effectiveScore;
+                                bestSubj = s;
+                            }
+                        });
+
+                        if (!bestSubj) {
+                            bestSubj = rankedSubjects[0];
+                        }
+
+                        allocations[bestSubj.code] = (allocations[bestSubj.code] || 0) + slotHours;
+                        const st = tracker[bestSubj.code];
+                        st.plannedTotal += slotHours;
+                        if (st.remainingDeficit > 0) {
+                            st.remainingDeficit = Math.max(0, Math.round((st.remainingDeficit - slotHours) * 10) / 10);
+                        } else if (st.examBuffer > 0) {
+                            st.examBuffer = Math.max(0, Math.round((st.examBuffer - slotHours) * 10) / 10);
+                        }
+                    }
+
+                    // Order blocks by subject priority rank and assign suggested focus windows
+                    const blocks = [];
+                    let cursorMin = timeStartMinutes;
+                    rankedSubjects.forEach((s) => {
+                        const hrs = allocations[s.code];
+                        if (!hrs) return;
+                        const durationMins = Math.round(hrs * 60);
+                        const startH = String(Math.floor(cursorMin / 60)).padStart(2, '0');
+                        const startM = String(cursorMin % 60).padStart(2, '0');
+                        const endMin = cursorMin + durationMins;
+                        const endH = String(Math.floor(endMin / 60)).padStart(2, '0');
+                        const endM = String(endMin % 60).padStart(2, '0');
+                        cursorMin = endMin + 15; // 15m recovery break between subject blocks
+
+                        const pomodoros = Math.max(1, Math.round(durationMins / 30));
+                        let focusTag = 'Steady Practice';
+                        if (!s.isPassed && (s.rawDays - d) <= 3) {
+                            focusTag = 'Pre-Exam Crunch';
+                        } else if (s.deficit > 0 && s.pct < 50) {
+                            focusTag = 'Alert Catch-Up';
+                        } else if (s.deficit > 0) {
+                            focusTag = 'Goal Catch-Up';
+                        } else if (!s.isPassed && s.daysUntilExam <= 10) {
+                            focusTag = 'Exam Review';
+                        }
+
+                        blocks.push({
+                            subject: s,
+                            hours: hrs,
+                            pomodoros: pomodoros,
+                            timeWindow: startH + ':' + startM + '–' + endH + ':' + endM,
+                            focusTag: focusTag
+                        });
+                    });
+
+                    const totalDayHours = blocks.reduce((acc, b) => acc + b.hours, 0);
+                    days.push({
+                        dayOffset: d,
+                        date: dayDate,
+                        label: formatDayLabel(dayDate, d),
+                        totalHours: totalDayHours,
+                        examsToday: examsToday,
+                        blocks: blocks
+                    });
+                }
+
+                return { days: days, tracker: tracker };
+            }
+
+            function renderAcademicPriority() {
+                const ranked = readSubjectMetrics();
+                lastRankedList = ranked;
+                const { days, tracker } = buildOptimalSchedule(ranked);
+                const todayAllocMap = {};
+                if (days[0]) {
+                    days[0].blocks.forEach((b) => {
+                        todayAllocMap[b.subject.code] = b.hours;
+                    });
+                }
+
+                if (budgetLabelEl) {
+                    budgetLabelEl.textContent = formatHoursShort(dailyBudget) + '/d';
+                }
+
+                if (topPillEl && ranked.length) {
+                    const top = ranked[0];
+                    topPillEl.textContent = 'Top Focus: ' + top.code + ' · ' + top.priorityScore + '/100 (' + top.tier.label + ')';
+                    topPillEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ' + top.tier.badgeClass;
+                }
+
+                // Render Left Column: Priority Ranking List with Editable Exam Dates
+                rankListEl.innerHTML = '';
+                ranked.forEach((s, idx) => {
+                    const todayHours = todayAllocMap[s.code] || 0;
+                    const card = document.createElement('div');
+                    card.className = 'rounded-2xl bg-slate-900/85 border border-slate-700/80 p-3.5 space-y-2.5 transition hover:border-slate-600';
+                    card.setAttribute('data-priority-subject', s.code);
+
+                    const countdownColor = s.isPassed
+                        ? 'text-slate-500'
+                        : (s.daysUntilExam <= 4 ? 'text-red-400 font-bold' : (s.daysUntilExam <= 8 ? 'text-amber-300 font-semibold' : 'text-slate-300'));
+
+                    card.innerHTML =
+                        '<div class="flex items-start justify-between gap-2">' +
+                            '<div class="flex items-center gap-2.5 min-w-0">' +
+                                '<span class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 text-xs font-extrabold text-white flex items-center justify-center shrink-0">#' + (idx + 1) + '</span>' +
+                                '<span class="w-2.5 h-2.5 rounded-full ' + s.info.dot + ' shrink-0"></span>' +
+                                '<div class="min-w-0">' +
+                                    '<div class="flex items-center gap-1.5 flex-wrap">' +
+                                        '<span class="text-sm font-extrabold text-white">' + s.code + '</span>' +
+                                        '<span class="text-xs text-slate-400 truncate">' + s.title + '</span>' +
+                                    '</div>' +
+                                    '<p class="text-[11px] text-slate-400 mt-0.5">' +
+                                        'Goal: <span class="text-slate-200 font-semibold">' + formatHoursShort(s.logged) + ' / ' + s.goalStr + '</span> (' + s.pct + '%)' +
+                                        (s.deficit > 0 ? ' · <span class="text-amber-300 font-semibold">' + formatHoursShort(s.deficit) + ' left</span>' : ' · <span class="text-emerald-400 font-semibold">Goal met</span>') +
+                                    '</p>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="flex flex-col items-end gap-1 shrink-0">' +
+                                '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold border ' + s.tier.badgeClass + '">' + s.tier.label + ' · ' + s.priorityScore + '</span>' +
+                                '<span class="text-[10px] font-bold ' + (todayHours > 0 ? 'text-indigo-300' : 'text-slate-500') + '">' +
+                                    (todayHours > 0 ? ('Today: +' + formatHoursShort(todayHours)) : 'Scheduled later') +
+                                '</span>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">' +
+                            '<div class="h-full rounded-full transition-all duration-300 ' + s.tier.barClass + '" style="width: ' + s.priorityScore + '%"></div>' +
+                        '</div>' +
+                        '<div class="flex flex-wrap items-center justify-between gap-2 pt-0.5 text-[11px]">' +
+                            '<label class="inline-flex items-center gap-1.5 text-slate-400">' +
+                                '<span>Exam Date:</span>' +
+                                '<input type="date" data-exam-date-input="' + s.code + '" value="' + s.examDateISO + '" aria-label="Upcoming exam date for ' + s.code + '" class="bg-slate-800/90 border border-slate-700 rounded-lg px-2 py-0.5 text-[11px] font-semibold text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer" />' +
+                            '</label>' +
+                            '<span class="' + countdownColor + '">' + s.countdownText + '</span>' +
+                        '</div>';
+
+                    rankListEl.appendChild(card);
+                });
+
+                rankListEl.querySelectorAll('input[data-exam-date-input]').forEach((input) => {
+                    input.addEventListener('change', (event) => {
+                        const subj = event.target.getAttribute('data-exam-date-input');
+                        if (subj && event.target.value) {
+                            examDates[subj] = event.target.value;
+                            renderAcademicPriority();
+                        }
+                    });
+                });
+
+                // Render Right Column: Optimal 5-Day Study Schedule
+                let totalPlanned = 0;
+                let goalsCovered = 0;
+                ranked.forEach((s) => {
+                    const st = tracker[s.code];
+                    if (st && st.remainingDeficit <= 0.01) goalsCovered++;
+                });
+
+                scheduleEl.innerHTML = '';
+                days.forEach((day, dayIdx) => {
+                    totalPlanned += day.totalHours;
+                    const dayCard = document.createElement('div');
+                    dayCard.className = (dayIdx === 0
+                        ? 'rounded-2xl bg-indigo-950/30 border border-indigo-500/45 p-3.5 space-y-2.5 md:col-span-2'
+                        : 'rounded-2xl bg-slate-900/85 border border-slate-700/80 p-3.5 space-y-2.5');
+
+                    const examBannerHtml = day.examsToday.length > 0
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-500/20 text-red-300 border border-red-500/40">📝 Exam: ' + day.examsToday.join(', ') + '</span>'
+                        : '';
+
+                    let blocksHtml = '';
+                    day.blocks.forEach((b) => {
+                        blocksHtml +=
+                            '<div class="flex items-center justify-between gap-2 rounded-xl bg-slate-800/75 border border-slate-700/70 px-3 py-2" style="border-left: 3px solid ' + b.subject.info.hex + ';">' +
+                                '<div class="min-w-0">' +
+                                    '<div class="flex items-center gap-1.5 flex-wrap">' +
+                                        '<span class="text-xs font-extrabold text-white">' + b.subject.code + '</span>' +
+                                        '<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-900/90 text-slate-300 border border-slate-700">' + b.focusTag + '</span>' +
+                                    '</div>' +
+                                    '<p class="text-[10px] text-slate-400 mt-0.5">' + b.timeWindow + ' · ' + b.subject.title + '</p>' +
+                                '</div>' +
+                                '<div class="text-right shrink-0">' +
+                                    '<div class="text-xs font-extrabold" style="color: ' + b.subject.info.light + ';">' + formatHoursShort(b.hours) + '</div>' +
+                                    '<div class="text-[10px] text-slate-400">' + b.pomodoros + '×25m</div>' +
+                                '</div>' +
+                            '</div>';
+                    });
+
+                    dayCard.innerHTML =
+                        '<div class="flex flex-wrap items-center justify-between gap-2">' +
+                            '<div class="flex items-center gap-2">' +
+                                '<span class="text-xs font-extrabold text-white">' + day.label.title + '</span>' +
+                                '<span class="text-[11px] text-slate-400">' + day.label.subtitle + '</span>' +
+                                examBannerHtml +
+                            '</div>' +
+                            '<span class="text-[11px] font-bold text-indigo-300">' + formatHoursShort(day.totalHours) + ' scheduled</span>' +
+                        '</div>' +
+                        '<div class="' + (dayIdx === 0 ? 'grid grid-cols-1 sm:grid-cols-3 gap-2' : 'space-y-2') + '">' +
+                            blocksHtml +
+                        '</div>';
+
+                    scheduleEl.appendChild(dayCard);
+                });
+
+                if (totalPlannedEl) {
+                    totalPlannedEl.textContent = formatHoursShort(totalPlanned) + ' Planned (5 Days)';
+                }
+                if (coverageBadgeEl) {
+                    const allMet = goalsCovered === ranked.length;
+                    coverageBadgeEl.textContent = goalsCovered + '/' + ranked.length + ' Weekly Goals Covered';
+                    coverageBadgeEl.className = allMet
+                        ? 'px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold'
+                        : 'px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold';
+                }
+            }
+
+            strategyBtns.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const nextStrategy = btn.getAttribute('data-priority-strategy') || 'balanced';
+                    activeStrategy = nextStrategy;
+                    strategyBtns.forEach((b) => {
+                        const isActive = b.getAttribute('data-priority-strategy') === nextStrategy;
+                        b.className = isActive
+                            ? 'priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 text-white shadow-sm transition cursor-pointer'
+                            : 'priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer';
+                    });
+                    renderAcademicPriority();
+                });
+            });
+
+            if (budgetMinusBtn) {
+                budgetMinusBtn.addEventListener('click', () => {
+                    dailyBudget = Math.max(1.5, Math.round((dailyBudget - 0.5) * 10) / 10);
+                    renderAcademicPriority();
+                });
+            }
+
+            if (budgetPlusBtn) {
+                budgetPlusBtn.addEventListener('click', () => {
+                    dailyBudget = Math.min(8.0, Math.round((dailyBudget + 0.5) * 10) / 10);
+                    renderAcademicPriority();
+                });
+            }
+
+            if (applySortBtn) {
+                let sortConfirmTimer = null;
+                applySortBtn.addEventListener('click', () => {
+                    if (!lastRankedList.length) return;
+                    const priorityOrder = lastRankedList.map((s) => s.code);
+                    chartSvg.dispatchEvent(new CustomEvent('applyCustomSubjectOrder', {
+                        detail: { order: priorityOrder }
+                    }));
+                    const labelSpan = applySortBtn.querySelector('span');
+                    if (labelSpan) {
+                        labelSpan.textContent = 'Synced ✓';
+                        if (sortConfirmTimer) clearTimeout(sortConfirmTimer);
+                        sortConfirmTimer = setTimeout(() => {
+                            labelSpan.textContent = 'Sync Chart Order';
+                        }, 1500);
+                    }
+                });
+            }
+
+            if (resetDatesBtn) {
+                resetDatesBtn.addEventListener('click', () => {
+                    examDates = buildDefaultExamDates();
+                    dailyBudget = 3.5;
+                    activeStrategy = 'balanced';
+                    strategyBtns.forEach((b) => {
+                        const isActive = b.getAttribute('data-priority-strategy') === 'balanced';
+                        b.className = isActive
+                            ? 'priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-600 text-white shadow-sm transition cursor-pointer'
+                            : 'priority-strategy-btn px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white transition cursor-pointer';
+                    });
+                    renderAcademicPriority();
+                });
+            }
+
+            document.addEventListener('subjectChartDataUpdated', () => {
+                requestAnimationFrame(renderAcademicPriority);
+            });
+
+            renderAcademicPriority();
         })();
     </script>
 
