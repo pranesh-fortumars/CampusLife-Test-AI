@@ -4706,7 +4706,11 @@
             const previewImg = document.getElementById('shareAnalyticsPreviewImg');
             const nativeShareBtn = document.getElementById('shareNativeAppsBtn');
             const downloadBtn = document.getElementById('shareDownloadPngBtn');
+            const downloadBtnLabel = document.getElementById('shareDownloadBtnLabel');
             const copyImageBtn = document.getElementById('shareCopyImageBtn');
+            const formatSelect = document.getElementById('shareExportFormatSelect');
+            const formatMetaBadge = document.getElementById('shareExportFormatMeta');
+            const quickLaunchLabel = document.getElementById('shareQuickLaunchLabel');
             const statusBanner = document.getElementById('shareAnalyticsStatus');
             const whatsappBtn = document.getElementById('shareSocialWhatsAppBtn');
             const telegramBtn = document.getElementById('shareSocialTelegramBtn');
@@ -4723,9 +4727,35 @@
                 ENG215: { top: '#fb7185', bottom: '#be123c', light: '#fda4af' }
             };
 
+            let currentCanvas = null;
             let currentBlob = null;
+            let currentPngBlob = null;
             let currentDataUrl = '';
             let currentSummaryText = '';
+
+            function getSelectedFormatConfig() {
+                const raw = formatSelect ? formatSelect.value : 'png';
+                if (raw === 'jpeg') {
+                    return {
+                        key: 'jpeg',
+                        label: 'JPEG',
+                        mime: 'image/jpeg',
+                        ext: 'jpg',
+                        quality: 0.92,
+                        filename: 'campuslife-weekly-study-analytics.jpg',
+                        metaText: '1200×760 · JPEG (92%)'
+                    };
+                }
+                return {
+                    key: 'png',
+                    label: 'PNG',
+                    mime: 'image/png',
+                    ext: 'png',
+                    quality: undefined,
+                    filename: 'campuslife-weekly-study-analytics.png',
+                    metaText: '1200×760 · PNG (Lossless)'
+                };
+            }
 
             function drawRoundedRect(ctx, x, y, w, h, r) {
                 const radius = Math.max(0, Math.min(r, w / 2, h / 2));
@@ -5130,21 +5160,55 @@
                 }
             }
 
-            function triggerPngDownload() {
+            function triggerImageDownload() {
                 if (!currentDataUrl) return;
+                const fmt = getSelectedFormatConfig();
                 const a = document.createElement('a');
                 a.href = currentDataUrl;
-                a.download = 'campuslife-weekly-study-analytics.png';
+                a.download = fmt.filename;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
             }
 
+            function encodeCanvasForSelectedFormat(canvas) {
+                if (!canvas) return;
+                const fmt = getSelectedFormatConfig();
+
+                currentDataUrl = fmt.quality !== undefined
+                    ? canvas.toDataURL(fmt.mime, fmt.quality)
+                    : canvas.toDataURL(fmt.mime);
+                previewImg.src = currentDataUrl;
+
+                if (downloadBtnLabel) {
+                    downloadBtnLabel.textContent = 'Download ' + fmt.label;
+                }
+                if (quickLaunchLabel) {
+                    quickLaunchLabel.textContent = 'Quick launch & download ' + fmt.label + ':';
+                }
+                if (formatMetaBadge) {
+                    formatMetaBadge.textContent = fmt.metaText;
+                }
+
+                currentBlob = null;
+                canvas.toBlob((blob) => {
+                    currentBlob = blob;
+                    if (fmt.key === 'png') {
+                        currentPngBlob = blob;
+                    }
+                }, fmt.mime, fmt.quality);
+
+                if (fmt.key !== 'png') {
+                    canvas.toBlob((pngBlob) => {
+                        currentPngBlob = pngBlob;
+                    }, 'image/png');
+                }
+            }
+
             function renderAndPopulateSharePreview() {
                 const snap = collectAnalyticsSnapshot();
-                const canvas = renderSummaryCanvas(snap);
-                currentDataUrl = canvas.toDataURL('image/png');
-                previewImg.src = currentDataUrl;
+                currentCanvas = renderSummaryCanvas(snap);
+                encodeCanvasForSelectedFormat(currentCanvas);
 
                 const watermarkMetaEl = document.getElementById('shareWatermarkMetaLabel');
                 if (watermarkMetaEl) {
@@ -5157,10 +5221,6 @@
                     '⏱️ Logged: ' + snap.totalLogged.toFixed(1) + 'h / ' + snap.totalGoal.toFixed(1) + 'h (' + snap.overallPct + '% Goal)\n' +
                     '🔥 Consistency: ' + snap.daysMet + '/7 days | Sun Pace: ' + snap.onPaceCount + '/' + snap.subjects.length + ' on track' +
                     (topSubject ? (' | Top Subject: ' + topSubject.code + ' (' + topSubject.logged.toFixed(1) + 'h)') : '');
-
-                canvas.toBlob((blob) => {
-                    currentBlob = blob;
-                }, 'image/png');
 
                 if (whatsappBtn) {
                     whatsappBtn.href = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(currentSummaryText);
@@ -5210,70 +5270,92 @@
                 }
             });
 
+            if (formatSelect) {
+                formatSelect.addEventListener('change', () => {
+                    if (currentCanvas) {
+                        encodeCanvasForSelectedFormat(currentCanvas);
+                    } else {
+                        renderAndPopulateSharePreview();
+                    }
+                    const fmt = getSelectedFormatConfig();
+                    setStatusMessage('Export format switched to ' + fmt.label + ' (' + fmt.filename + ').', 'info');
+                });
+            }
+
             if (nativeShareBtn) {
                 nativeShareBtn.addEventListener('click', async () => {
+                    const fmt = getSelectedFormatConfig();
                     try {
                         if (currentBlob && typeof File !== 'undefined' && navigator.share) {
-                            const imageFile = new File([currentBlob], 'campuslife-weekly-study-analytics.png', { type: 'image/png' });
+                            const imageFile = new File([currentBlob], fmt.filename, { type: fmt.mime });
                             if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
                                 await navigator.share({
                                     title: 'Weekly Study Analytics Summary',
                                     text: currentSummaryText,
                                     files: [imageFile]
                                 });
-                                setStatusMessage('Shared your weekly analytics image via your device share sheet!', 'success');
+                                setStatusMessage('Shared your weekly analytics ' + fmt.label + ' via your device share sheet!', 'success');
                                 return;
                             }
-                            triggerPngDownload();
+                            triggerImageDownload();
                             await navigator.share({
                                 title: 'Weekly Study Analytics Summary',
                                 text: currentSummaryText
                             });
-                            setStatusMessage('Image downloaded & share sheet opened — attach the saved PNG in your social app.', 'info');
+                            setStatusMessage(fmt.label + ' image downloaded & share sheet opened — attach the saved file in your social app.', 'info');
                             return;
                         }
                     } catch (err) {
                         if (err && err.name === 'AbortError') return;
                     }
-                    triggerPngDownload();
-                    setStatusMessage('PNG saved locally! Open your local social app (or use Quick Share below) to post the image.', 'info');
+                    triggerImageDownload();
+                    setStatusMessage(fmt.label + ' saved locally (' + fmt.filename + ')! Open your local social app (or use Quick Share below) to post.', 'info');
                 });
             }
 
             if (downloadBtn) {
                 downloadBtn.addEventListener('click', () => {
-                    triggerPngDownload();
-                    setStatusMessage('Downloaded campuslife-weekly-study-analytics.png to your device.', 'success');
+                    const fmt = getSelectedFormatConfig();
+                    triggerImageDownload();
+                    setStatusMessage('Downloaded ' + fmt.filename + ' to your device.', 'success');
                 });
             }
 
             if (copyImageBtn) {
                 copyImageBtn.addEventListener('click', async () => {
+                    const fmt = getSelectedFormatConfig();
+                    const clipboardBlob = currentPngBlob || currentBlob;
                     try {
-                        if (currentBlob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': currentBlob })]);
-                            setStatusMessage('Analytics image copied to clipboard! Paste directly into Discord, WhatsApp, or X.', 'success');
+                        if (clipboardBlob && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                            await navigator.clipboard.write([new ClipboardItem({ 'image/png': clipboardBlob })]);
+                            setStatusMessage(
+                                fmt.key === 'jpeg'
+                                    ? 'Analytics image copied to clipboard! (Download JPEG anytime via Download JPEG).'
+                                    : 'Analytics image copied to clipboard! Paste directly into Discord, WhatsApp, or X.',
+                                'success'
+                            );
                             return;
                         }
                     } catch (_) {}
                     try {
                         if (navigator.clipboard && navigator.clipboard.writeText) {
                             await navigator.clipboard.writeText(currentSummaryText);
-                            triggerPngDownload();
-                            setStatusMessage('Summary text copied & PNG downloaded for attaching in your social app.', 'info');
+                            triggerImageDownload();
+                            setStatusMessage('Summary text copied & ' + fmt.label + ' downloaded for attaching in your social app.', 'info');
                             return;
                         }
                     } catch (_) {}
-                    triggerPngDownload();
-                    setStatusMessage('Downloaded PNG summary — ready to attach to your post.', 'info');
+                    triggerImageDownload();
+                    setStatusMessage('Downloaded ' + fmt.label + ' summary — ready to attach to your post.', 'info');
                 });
             }
 
             [whatsappBtn, telegramBtn, xBtn].forEach((socialLink) => {
                 if (!socialLink) return;
                 socialLink.addEventListener('click', () => {
-                    triggerPngDownload();
-                    setStatusMessage('PNG image downloaded — attach it inside the opened social app window!', 'info');
+                    const fmt = getSelectedFormatConfig();
+                    triggerImageDownload();
+                    setStatusMessage(fmt.label + ' image downloaded — attach it inside the opened social app window!', 'info');
                 });
             });
         })();
@@ -6056,6 +6138,22 @@
 
                 <div id="shareAnalyticsStatus" class="hidden"></div>
 
+                <!-- Format Selection Bar -->
+                <div class="rounded-xl bg-slate-950/75 border border-slate-800 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <label for="shareExportFormatSelect" class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                            Export Format
+                        </label>
+                        <select id="shareExportFormatSelect"
+                                aria-label="Choose export image format"
+                                class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-bold text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer">
+                            <option value="png">PNG (.png)</option>
+                            <option value="jpeg">JPEG (.jpg)</option>
+                        </select>
+                    </div>
+                    <span id="shareExportFormatMeta" class="text-[11px] font-medium text-slate-400">1200×760 · PNG (Lossless)</span>
+                </div>
+
                 <!-- Primary & Utility Export Actions -->
                 <div class="flex flex-wrap items-center gap-2.5">
                     <button type="button"
@@ -6072,7 +6170,7 @@
                         <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
-                        <span>Download PNG</span>
+                        <span id="shareDownloadBtnLabel">Download PNG</span>
                     </button>
                     <button type="button"
                             id="shareCopyImageBtn"
@@ -6084,9 +6182,9 @@
                     </button>
                 </div>
 
-                <!-- Direct Social App Launchers (downloads PNG + opens prefilled compose) -->
+                <!-- Direct Social App Launchers (downloads selected format + opens prefilled compose) -->
                 <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
-                    <span class="text-[11px] font-semibold text-slate-400">Quick launch &amp; download PNG:</span>
+                    <span id="shareQuickLaunchLabel" class="text-[11px] font-semibold text-slate-400">Quick launch &amp; download PNG:</span>
                     <div class="flex flex-wrap items-center gap-2">
                         <a id="shareSocialWhatsAppBtn"
                            href="https://api.whatsapp.com/send"
