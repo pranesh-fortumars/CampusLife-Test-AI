@@ -4707,6 +4707,7 @@
             const nativeShareBtn = document.getElementById('shareNativeAppsBtn');
             const downloadBtn = document.getElementById('shareDownloadPngBtn');
             const downloadBtnLabel = document.getElementById('shareDownloadBtnLabel');
+            const downloadPdfBtn = document.getElementById('shareDownloadPdfBtn');
             const copyImageBtn = document.getElementById('shareCopyImageBtn');
             const formatSelect = document.getElementById('shareExportFormatSelect');
             const formatMetaBadge = document.getElementById('shareExportFormatMeta');
@@ -4859,12 +4860,16 @@
                 };
             }
 
-            function renderSummaryCanvas(snap) {
+            function renderSummaryCanvas(snap, scale) {
+                const s = (typeof scale === 'number' && scale > 0) ? scale : 1;
                 const canvas = document.createElement('canvas');
-                canvas.width = 1200;
-                canvas.height = 760;
+                canvas.width = Math.round(1200 * s);
+                canvas.height = Math.round(760 * s);
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return canvas;
+                if (s !== 1) {
+                    ctx.scale(s, s);
+                }
 
                 // Background gradient
                 const bgGrad = ctx.createLinearGradient(0, 0, 1200, 760);
@@ -5313,11 +5318,155 @@
                 });
             }
 
+            function toPdfSafeText(str) {
+                return String(str || '')
+                    .replace(/[\u2013\u2014]/g, '-')
+                    .replace(/[^\x20-\x7E]/g, '')
+                    .replace(/\\/g, '\\\\')
+                    .replace(/\(/g, '\\(')
+                    .replace(/\)/g, '\\)')
+                    .trim();
+            }
+
+            function createPdfBlobFromHighResCanvas(hiResCanvas, snap) {
+                const jpegDataUrl = hiResCanvas.toDataURL('image/jpeg', 0.95);
+                const base64 = jpegDataUrl.split(',')[1] || '';
+                const binStr = atob(base64);
+                const jpegBytes = new Uint8Array(binStr.length);
+                for (let i = 0; i < binStr.length; i++) {
+                    jpegBytes[i] = binStr.charCodeAt(i);
+                }
+
+                const pageW = 841.89; // A4 Landscape width (pt)
+                const pageH = 595.28; // A4 Landscape height (pt)
+                const drawW = 793.89;
+                const drawH = +(drawW * (760 / 1200)).toFixed(2);
+                const imgX = +((pageW - drawW) / 2).toFixed(2);
+                const imgY = 44.00;
+
+                const headerLeft = toPdfSafeText('CampusLife Weekly Study Analytics Report');
+                const headerRight = toPdfSafeText(snap.studentName + '  |  Week: ' + snap.weekDateRange);
+                const footerLeft = toPdfSafeText('Exported ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' - CampusLife Study Tracker');
+                const footerRight = 'Page 1 of 1';
+
+                const contentStreamStr = [
+                    '0.0353 0.0588 0.1137 rg',
+                    '0 0 ' + pageW + ' ' + pageH + ' re f',
+                    'q',
+                    drawW + ' 0 0 ' + drawH + ' ' + imgX + ' ' + imgY + ' cm',
+                    '/Im0 Do',
+                    'Q',
+                    'BT /F2 11 Tf 0.886 0.910 0.941 rg 24 566 Td (' + headerLeft + ') Tj ET',
+                    'BT /F1 9.5 Tf 0.580 0.639 0.722 rg 490 566 Td (' + headerRight + ') Tj ET',
+                    'BT /F1 8.5 Tf 0.392 0.455 0.545 rg 24 22 Td (' + footerLeft + ') Tj ET',
+                    'BT /F1 8.5 Tf 0.392 0.455 0.545 rg 770 22 Td (' + footerRight + ') Tj ET'
+                ].join('\n');
+
+                const encoder = new TextEncoder();
+                const contentBytes = encoder.encode(contentStreamStr);
+
+                const chunks = [];
+                let totalLen = 0;
+                function pushBytes(u8) {
+                    chunks.push(u8);
+                    totalLen += u8.length;
+                }
+                function pushStr(s) {
+                    pushBytes(encoder.encode(s));
+                }
+
+                pushBytes(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
+
+                const offsets = [0];
+
+                function beginObj(id) {
+                    offsets[id] = totalLen;
+                    pushStr(id + ' 0 obj\n');
+                }
+                function endObj() {
+                    pushStr('\nendobj\n');
+                }
+
+                beginObj(1);
+                pushStr('<< /Type /Catalog /Pages 2 0 R >>');
+                endObj();
+
+                beginObj(2);
+                pushStr('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+                endObj();
+
+                beginObj(3);
+                pushStr('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageW + ' ' + pageH + '] /Resources << /Font << /F1 6 0 R /F2 7 0 R >> /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+                endObj();
+
+                beginObj(4);
+                pushStr('<< /Type /XObject /Subtype /Image /Width ' + hiResCanvas.width + ' /Height ' + hiResCanvas.height + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegBytes.length + ' >>\nstream\n');
+                pushBytes(jpegBytes);
+                pushStr('\nendstream');
+                endObj();
+
+                beginObj(5);
+                pushStr('<< /Length ' + contentBytes.length + ' >>\nstream\n');
+                pushBytes(contentBytes);
+                pushStr('\nendstream');
+                endObj();
+
+                beginObj(6);
+                pushStr('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+                endObj();
+
+                beginObj(7);
+                pushStr('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+                endObj();
+
+                beginObj(8);
+                pushStr('<< /Title (' + toPdfSafeText('CampusLife Weekly Study Analytics - ' + snap.weekDateRange) + ') /Author (' + toPdfSafeText(snap.studentName) + ') /Subject (Weekly Study Analytics Report) /Creator (CampusLife Analytics) >>');
+                endObj();
+
+                const xrefOffset = totalLen;
+                pushStr('xref\n0 9\n');
+                pushStr('0000000000 65535 f \n');
+                for (let id = 1; id <= 8; id++) {
+                    pushStr(String(offsets[id]).padStart(10, '0') + ' 00000 n \n');
+                }
+                pushStr('trailer\n<< /Size 9 /Root 1 0 R /Info 8 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF');
+
+                const merged = new Uint8Array(totalLen);
+                let cursor = 0;
+                for (let i = 0; i < chunks.length; i++) {
+                    merged.set(chunks[i], cursor);
+                    cursor += chunks[i].length;
+                }
+                return new Blob([merged], { type: 'application/pdf' });
+            }
+
             if (downloadBtn) {
                 downloadBtn.addEventListener('click', () => {
                     const fmt = getSelectedFormatConfig();
                     triggerImageDownload();
                     setStatusMessage('Downloaded ' + fmt.filename + ' to your device.', 'success');
+                });
+            }
+
+            if (downloadPdfBtn) {
+                downloadPdfBtn.addEventListener('click', () => {
+                    try {
+                        const snap = collectAnalyticsSnapshot();
+                        const hiResCanvas = renderSummaryCanvas(snap, 2);
+                        const pdfBlob = createPdfBlobFromHighResCanvas(hiResCanvas, snap);
+                        const pdfUrl = URL.createObjectURL(pdfBlob);
+                        const pdfFilename = 'campuslife-weekly-study-analytics-report.pdf';
+                        const link = document.createElement('a');
+                        link.href = pdfUrl;
+                        link.download = pdfFilename;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(pdfUrl), 2000);
+                        setStatusMessage('Downloaded high-quality PDF report (' + pdfFilename + ').', 'success');
+                    } catch (_) {
+                        setStatusMessage('Unable to generate PDF report in this browser. Try Download PNG/JPEG instead.', 'warn');
+                    }
                 });
             }
 
@@ -6171,6 +6320,16 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
                         <span id="shareDownloadBtnLabel">Download PNG</span>
+                    </button>
+                    <button type="button"
+                            id="shareDownloadPdfBtn"
+                            title="Export a high-resolution A4 landscape PDF document report"
+                            class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/35 text-rose-200 hover:text-white text-xs font-bold border border-rose-400/40 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-400">
+                        <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-6 4h4"/>
+                        </svg>
+                        <span>Download as PDF</span>
                     </button>
                     <button type="button"
                             id="shareCopyImageBtn"
